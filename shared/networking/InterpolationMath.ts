@@ -3,7 +3,7 @@ import {
   PHYSICS_DT_SECONDS,
   REMOTE_TIME_SCALE_ACCELERATION,
   REMOTE_TIME_SCALE_DECELERATION,
-} from "../vehicle/TestVehicleConfig";
+} from "../player/PlayerConfig";
 
 // ==================================================
 // REMOTE INTERPOLATION & TIME CALCULATIONS

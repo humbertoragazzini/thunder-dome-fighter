@@ -6,7 +6,7 @@ import {
   ANGULAR_VELOCITY_RECONCILIATION_EPSILON,
   RESIDUAL_POSITION_EPSILON,
   RESIDUAL_ROTATION_EPSILON,
-} from "../vehicle/TestVehicleConfig";
+} from "../player/PlayerConfig";
 import {
   type PredictedHistoryFrame,
   calculatePositionDistance,
