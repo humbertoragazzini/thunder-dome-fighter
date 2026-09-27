@@ -384,11 +384,11 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 **Dependencies:** Phase 1.  
 
 #### Steps
-- [ ] 2.1 Setup persistence database schema (PostgreSQL) with `users`, `players`, and `sessions` tables.
-- [ ] 2.2 Implement password hashing using `argon2` or `bcrypt` (never store plaintext passwords).
-- [ ] 2.3 Implement registration endpoint validating email uniqueness, player name uniqueness, and password strength.
-- [ ] 2.4 Implement login endpoint generating cryptographically signed session tokens (JWT or secure opaque bearer tokens).
-- [ ] 2.5 Implement token verification middleware for Colyseus connection handshake (`onAuth` hook in `GameRoom`).
+- [ ] 2.1 Initialize Prisma ORM with PostgreSQL schema (`schema.prisma`) defining `User`, `Player`, and `Session` models with migrations.
+- [ ] 2.2 Implement secure password hashing using `argon2` (never store plaintext passwords).
+- [ ] 2.3 Set up Fastify HTTP server instance with route registration, CORS, error handling, and JSON Schema validation.
+- [ ] 2.4 Implement Fastify authentication routes (`/api/auth/register`, `/api/auth/login`) issuing cryptographically signed JWT tokens via `@fastify/jwt`.
+- [ ] 2.5 Implement token verification middleware for Colyseus connection handshake (`onAuth` hook in `GameRoom`) to validate JWT sessions before allowing room joins.
 - [ ] 2.6 Implement client-side auth state in Zustand store with token persistence in `localStorage`.
 
 #### Completion Criteria
@@ -660,8 +660,8 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 #### Steps
 - [ ] 13.1 Implement runtime `MatchStatsTracker` inside `GameRoom` (accumulates kills, deaths, assists, damage dealt/taken, weapon-specific hits/kills).
 - [ ] 13.2 Implement live `Scoreboard` data synchronization via Colyseus state or on-demand message.
-- [ ] 13.3 Design database schema for match persistence: `matches`, `match_participants`, `match_teams`, `player_item_stats`.
-- [ ] 13.4 Implement idempotent match finalization transaction in database:
+- [ ] 13.3 Design Prisma schema for match persistence: `Match`, `MatchParticipant`, `MatchTeam`, `PlayerItemStats`.
+- [ ] 13.4 Implement idempotent match finalization transaction via `prisma.$transaction`:
   - Record completed `Match`.
   - Record participant results.
   - Update `PlayerStats` (increment matches, wins, losses, kills, deaths, damage).
@@ -670,7 +670,7 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 - [ ] 13.5 Handle unexpected server crashes: unfinalized matches marked as `CANCELLED` without corrupting player lifetime stats.
 
 #### Completion Criteria
-- Match results persist accurately to PostgreSQL within a single atomic database transaction.
+- Match results persist accurately to PostgreSQL within a single atomic Prisma transaction.
 - Duplicate completion calls cannot inflate stats.
 
 #### Verification
@@ -685,7 +685,7 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 **Dependencies:** Phase 13.  
 
 #### Steps
-- [ ] 14.1 Implement backend API endpoint `/api/player/profile` returning player identity, lifetime stats, and recent matches.
+- [ ] 14.1 Implement Fastify API endpoint `/api/player/profile` querying Prisma with selective field projections and relation joins.
 - [ ] 14.2 Calculate derived ratios safely on read:
   - `K/D = deaths > 0 ? (kills / deaths) : kills`
   - `WinRate = matches > 0 ? (wins / matches) * 100 : 0`
