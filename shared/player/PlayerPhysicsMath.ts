@@ -4,13 +4,13 @@ import {
   MAX_STEERING_TORQUE,
   MAX_BRAKE_FORCE,
   BRAKE_DAMPING_FACTOR,
-} from "./TestVehicleConfig";
+} from "./PlayerConfig";
 
 // Reusable scratch vectors to prevent GC allocations during tight loops
 const tempForward = new Vector3();
 
 // ==================================================
-// SHARED VEHICLE FORCES & TORQUES
+// SHARED PLAYER FORCES & TORQUES
 //
 // Pure calculations used identically by both client prediction
 // and server authoritative Havok simulation.
@@ -18,9 +18,9 @@ const tempForward = new Vector3();
 // ==================================================
 
 /**
- * Calculates forward propulsion force along the vehicle's heading.
+ * Calculates forward propulsion force along the player's heading.
  *
- * @param currentRotation Vehicle's current rotation quaternion
+ * @param currentRotation Player's current rotation quaternion
  * @param throttle Normalized throttle input [0, 1]
  * @param result Optional target Vector3 to store the result
  */
@@ -67,7 +67,7 @@ export function calculateSteeringTorque(
 /**
  * Calculates braking force opposing horizontal movement.
  *
- * @param linearVelocity Vehicle's current linear velocity
+ * @param linearVelocity Player's current linear velocity
  * @param brake Normalized brake input [0, 1]
  * @param result Optional target Vector3 to store the result
  */

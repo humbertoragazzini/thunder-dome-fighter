@@ -1,5 +1,5 @@
 // ==================================================
-// VEHICLE, PHYSICS & NETWORKING SHARED CONFIGURATION
+// PLAYER, PHYSICS & NETWORKING SHARED CONFIGURATION
 //
 // Pure TypeScript constants and interfaces shared between
 // client prediction and server simulation.
@@ -15,7 +15,7 @@ export const PHYSICS_DT_MS = 1000 / PHYSICS_HZ;
 export const PHYSICS_DT_SECONDS = 1 / PHYSICS_HZ;
 
 // ==================================================
-// VEHICLE GEOMETRY & TUNING
+// PLAYER GEOMETRY & TUNING
 // ==================================================
 
 export const PLAYER_BOX_SIZE = {
@@ -35,7 +35,7 @@ export const LINEAR_DAMPING = 0.5;
 export const ANGULAR_DAMPING = 2.5;
 
 // ==================================================
-// VEHICLE FORCES
+// PLAYER FORCES
 // ==================================================
 
 export const MAX_THROTTLE_FORCE = 25;
