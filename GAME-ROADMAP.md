@@ -222,9 +222,22 @@ classDiagram
         +Int seedB
         +UUID winnerParticipantId
     }
+    class Party {
+        +UUID id
+        +UUID leaderPlayerId
+        +String inviteCode
+        +DateTime createdAt
+    }
+    class PartyMember {
+        +UUID partyId
+        +UUID playerId
+        +DateTime joinedAt
+    }
 
     User "1" -- "1" Player : owns
     Player "1" -- "1" PlayerStats : tracks
+    Player "1" -- "0..1" PartyMember : joins
+    Party "1" -- "1..*" PartyMember : contains
     GameMode "1" -- "0..*" Match : governs
     LevelDefinition "1" -- "0..*" Match : stages
     Match "1" -- "1..*" MatchParticipant : includes
@@ -720,33 +733,47 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 - [ ] 15.4 Client receives reservation and automatically connects to the designated room.
 - [ ] 15.5 Implement `QuickStart` button on Main Menu: immediately queues player into their most recently played or default mode (`1v1`).
 - [ ] 15.6 Display queue elapsed time, estimated time, and allow clean queue cancellation.
+- [ ] 15.7 Implement **Party & Friend Invitation System**:
+  - Players can create a `Party` (generating a shareable invite code or direct friend invite).
+  - Friends join the party lobby overlay (showing party member avatars and ready statuses).
+  - Party Leader initiates matchmaking for the entire group simultaneously as an indivisible ticket.
 
 #### Completion Criteria
 - Clicking Quick Play automatically pairs waiting players into a freshly created room without manual room code entry.
+- Friends can assemble in a party and queue together under their party leader.
 
 #### Verification
 - Automated test: Launch 2 simulated queue clients; assert matchmaker pairs them and both receive valid room seat reservations within 1 second.
+- Party test: 2 clients form a party, leader queues, verify both clients receive synchronized queue states.
 
 ---
 
-### Phase 16 — 3v3 Team Mode Support
+### Phase 16 — 3v3 Team Mode Support & Atomic Party Matchmaking
 
 **Status:** Not Started `[ ]`  
-**Goal:** Expand matchmaking and room architecture to support 6-player team matches (Team Alpha vs Team Beta).  
+**Goal:** Expand matchmaking and room architecture to support 6-player team matches (Team Alpha vs Team Beta) with **strict party cohesion** and solo backfilling.  
 **Dependencies:** Phase 15.  
 
 #### Steps
 - [ ] 16.1 Configure `GameMode_3v3` (2 teams, 3 players each, team score limit 10 kills).
-- [ ] 16.2 Implement team assignment in `GameRoom`: balance players into Team Alpha (Blue) and Team Beta (Red).
-- [ ] 16.3 Allocate team-specific spawn points in `LevelDefinition` so teammates spawn together.
-- [ ] 16.4 Update visual shaders/materials: tint character outline, nameplate, or armor accents with team colors.
-- [ ] 16.5 Update in-game HUD to display Team Scoreboard (Alpha Score vs Beta Score) and friendly vs enemy health bars.
-- [ ] 16.6 Prevent friendly fire in server combat collision checks.
+- [ ] 16.2 Implement **Bin-Packing Team Backfilling Matchmaker**:
+  - **Party Cohesion Invariant**: Members of the same party are *strictly locked* to the same team and **must never be separated**.
+  - Matchmaker fills each 3-player team bin using valid partition combinations:
+    - `[3]` (Full 3-player party)
+    - `[2 + 1]` (2 friends party + 1 backfilled solo player)
+    - `[1 + 1 + 1]` (3 solo random players)
+  - Evaluates both teams simultaneously (e.g., Party of 2 + Solo vs Party of 3, or Party of 2 + Solo vs Party of 2 + Solo).
+- [ ] 16.3 Pass pre-assigned `teamId` (`alpha` or `beta`) in Colyseus seat reservation tokens so players connect directly to their designated team.
+- [ ] 16.4 Allocate team-specific spawn points in `LevelDefinition` so teammates spawn together.
+- [ ] 16.5 Update visual shaders/materials: tint character outline, nameplate, or armor accents with team colors.
+- [ ] 16.6 Update in-game HUD to display Team Scoreboard (Alpha Score vs Beta Score) and friendly vs enemy health bars.
+- [ ] 16.7 Prevent friendly fire in server combat collision checks.
 
 #### Completion Criteria
-- 6 players connect, split into two 3-person teams, spawn at opposing sides, fight without friendly fire, and win as a team.
+- 6 players connect, respect party groupings (friends stay on the same team), backfill missing team slots with solos, spawn at opposing sides, fight without friendly fire, and win as a team.
 
 #### Verification
+- Automated matchmaker test: Queue a party of 2 friends and 4 solo players for 3v3; assert friends are placed on the exact same team with 1 solo teammate, opposing team has 3 solos.
 - Headless test with 6 mock clients verifying team assignment, score accumulation, and team victory condition.
 
 ---
@@ -759,10 +786,13 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 #### Steps
 - [ ] 17.1 Configure `GameMode_4v4` (2 teams, 4 players each, team score limit 15 kills).
-- [ ] 17.2 Expand arena spawn points to support 4 simultaneous spawns per team without overlap.
-- [ ] 17.3 Implement team assist tracking: dealing >=30% damage to an enemy killed by a teammate awards an assist.
-- [ ] 17.4 Include assists in match scoreboard and persistent player statistics.
-- [ ] 17.5 Verify network bandwidth and server tick stability with 8 connected clients.
+- [ ] 17.2 Expand **Bin-Packing Team Backfilling** for 4-player team bins:
+  - Supports partitions: `[4]`, `[3 + 1]`, `[2 + 2]`, `[2 + 1 + 1]`, and `[1 + 1 + 1 + 1]`.
+  - Preserves party atomic cohesion; never splits parties across teams.
+- [ ] 17.3 Expand arena spawn points to support 4 simultaneous spawns per team without overlap.
+- [ ] 17.4 Implement team assist tracking: dealing >=30% damage to an enemy killed by a teammate awards an assist.
+- [ ] 17.5 Include assists in match scoreboard and persistent player statistics.
+- [ ] 17.6 Verify network bandwidth and server tick stability with 8 connected clients.
 
 #### Completion Criteria
 - 8-player matches run at stable 30 Hz server tick with complete team scoring and assist metrics.
@@ -1106,6 +1136,7 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 | **ADR-010** | **30 Hz Server Simulation & Patch Rate** | Balances high-precision physics simulation with bandwidth efficiency and server CPU scalability across many concurrent rooms. | **Accepted** |
 | **ADR-011** | **Exponential Visual Error Decay (100ms Time Constant)** | Reconciled physics discrepancies are smoothly absorbed into the visual mesh, eliminating abrupt visual snaps during network variance. | **Accepted** |
 | **ADR-012** | **Idempotent Match Finalization via Database Transactions** | Ensures match results and stat increments are applied exactly once, preventing double-counting if network retries occur. | **Accepted** |
+| **ADR-013** | **Atomic Party Cohesion & Bin-Packing Team Backfilling** | Friends in a party are treated as an indivisible unit in matchmaking and strictly assigned to the same team, with missing slots filled by solos. | **Accepted** |
 
 ---
 
@@ -1116,7 +1147,6 @@ These features are recognized as valuable long-term opportunities but must **not
 - **Skill-Based Matchmaking (SBMM / MMR)**: ELO/Glicko-2 rating system pairing players of identical skill.
 - **Seasons & Battle Pass**: Time-boxed competitive seasons with seasonal cosmetic progression ladders.
 - **Clans & Guild Infrastructure**: Clan tags, shared clan leaderboards, and organized clan vs. clan wars.
-- **Social Party System**: Group queueing allowing friends to join lobbies together.
 - **In-Engine Spectator Camera**: Free-cam and cinematic broadcast director mode for tournament streaming.
 - **Full Match Replay System**: Input recording and deterministic playback for post-match analysis.
 - **In-Game Currency & Monetization Shop**: Virtual wallet for cosmetic skins.
