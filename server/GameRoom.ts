@@ -1,7 +1,7 @@
 import { Client, Room } from "colyseus";
 import { GameState, PlayerState } from "./GameState";
 import { SimulatorWorld } from "./SimulationWorld";
-import type { PlayerInputCommand } from "../shared/vehicle/TestVehicleConfig";
+import type { PlayerInputCommand } from "../shared/player/PlayerConfig";
 
 // ==================================================
 // INPUT VALIDATION & CLAMPING

@@ -31,13 +31,13 @@ import {
     SERVER_INPUT_BUFFER_TARGET,
     type PlayerInput,
     type PlayerInputCommand,
-} from "../shared/vehicle/TestVehicleConfig";
+} from "../shared/player/PlayerConfig";
 
 import {
     calculateThrottleForce,
     calculateSteeringTorque,
     calculateBrakeForce,
-} from "../shared/vehicle/VehiclePhysicsMath";
+} from "../shared/player/PlayerPhysicsMath";
 
 // ==================================================
 // ENTITIES CONFIGURATION
@@ -228,7 +228,7 @@ export class SimulatorWorld {
             mass: PLAYER_MASS,
         });
 
-        // Vehicle tuning damping to behave more like a controllable vehicle
+        // Player tuning damping to behave more like a controllable player
         boxBody.setLinearDamping(LINEAR_DAMPING);
         boxBody.setAngularDamping(ANGULAR_DAMPING);
 
@@ -288,7 +288,7 @@ export class SimulatorWorld {
     }
 
     // ==================================================
-    // PLAYER INPUT & VEHICLE CONTROLS
+    // PLAYER INPUT & CONTROLS
     // ==================================================
 
     enqueueEntityInput(
