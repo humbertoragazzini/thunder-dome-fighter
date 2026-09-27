@@ -25,13 +25,13 @@ import {
   LOCAL_HARD_SNAP_DISTANCE,
   type PlayerInput,
   type PlayerInputCommand,
-} from "../../shared/vehicle/TestVehicleConfig";
+} from "../../shared/player/PlayerConfig";
 
 import {
   calculateThrottleForce,
   calculateSteeringTorque,
   calculateBrakeForce,
-} from "../../shared/vehicle/VehiclePhysicsMath";
+} from "../../shared/player/PlayerPhysicsMath";
 
 import {
   type PredictedHistoryFrame,
@@ -211,7 +211,7 @@ export class LocalPlayerPrediction {
     const currentRotation =
       this.predictionNode.rotationQuaternion ?? Quaternion.Identity();
 
-    // 1. Throttle: delegate force calculation to VehiclePhysicsMath
+    // 1. Throttle: delegate force calculation to PlayerPhysicsMath
     if (command.throttle > 0) {
       const throttleForce = calculateThrottleForce(
         currentRotation,
@@ -223,13 +223,13 @@ export class LocalPlayerPrediction {
       );
     }
 
-    // 2. Steering: delegate torque calculation to VehiclePhysicsMath
+    // 2. Steering: delegate torque calculation to PlayerPhysicsMath
     if (command.steering !== 0) {
       const steeringTorque = calculateSteeringTorque(command.steering);
       this.predictionBody.applyTorque(steeringTorque);
     }
 
-    // 3. Brake: delegate brake force calculation to VehiclePhysicsMath
+    // 3. Brake: delegate brake force calculation to PlayerPhysicsMath
     if (command.brake > 0) {
       const linearVelocity = this.predictionBody.getLinearVelocity();
       const brakeForce = calculateBrakeForce(linearVelocity, command.brake);

@@ -24,7 +24,7 @@ import {
   GRAVITY,
   type PlayerInput,
   type PlayerInputCommand,
-} from "../../shared/vehicle/TestVehicleConfig";
+} from "../../shared/player/PlayerConfig";
 
 interface BabylonCanvasProps {
   onSceneReady?: (scene: Scene) => void;

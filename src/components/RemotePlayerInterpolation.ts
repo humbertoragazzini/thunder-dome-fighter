@@ -12,7 +12,7 @@ import {
   REMOTE_INTERPOLATION_TARGET_DELAY_TICKS,
   REMOTE_INTERPOLATION_DELAY_TOLERANCE_TICKS,
   REMOTE_MAX_SNAPSHOTS,
-} from "../../shared/vehicle/TestVehicleConfig";
+} from "../../shared/player/PlayerConfig";
 
 import {
   advanceMonotonicRenderTick,
