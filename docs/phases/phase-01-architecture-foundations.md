@@ -157,3 +157,46 @@ Re-exports `Identity.ts`, `GameMode.ts`, `Level.ts`, `Match.ts`, and `Party.ts`.
 #### Why It Exists (Architectural Rationale):
 - **Clean Architecture & Module Hygiene**: Consumers import cleanly via `import { User, Match, GameMode } from "../../shared/domain"` without coupling to internal file locations.
 
+---
+
+### 7. `shared/contracts/network/ClientMessages.ts`
+
+- **Path**: [`shared/contracts/network/ClientMessages.ts`](file:///home/betovicio/Projects/thunder-dome-fighter/shared/contracts/network/ClientMessages.ts)
+- **Primary Exports**: `ClientMessageType`, `ClientMessagePayloadMap`, `RoomReadyPayload`, `PartyJoinPayload`, `MatchQueuePayload`, `InteractPayload`.
+
+#### What It Does:
+Declares the strict catalog of WebSocket message names and expected payload structures sent from clients to the Colyseus server.
+
+#### How It Works:
+- `ClientMessageType`: Object dictionary with `as const` providing string literal types (`"player-input"`, `"room-ready"`, `"party-join"`, etc.).
+- `ClientMessagePayloadMap`: TypeScript mapped interface associating each message string to its exact payload interface.
+
+#### Why It Exists (Architectural Rationale):
+- **Elimination of Magic Strings**: Prevents silent bugs caused by channel typos (e.g. `"player_input"` vs `"player-input"`).
+- **Compile-Time Wire Protocol Enforcement**: Clients cannot dispatch malformed payloads; TypeScript validates message parameters at compile time.
+
+---
+
+### 8. `shared/contracts/network/ServerMessages.ts`
+
+- **Path**: [`shared/contracts/network/ServerMessages.ts`](file:///home/betovicio/Projects/thunder-dome-fighter/shared/contracts/network/ServerMessages.ts)
+- **Primary Exports**: `ServerMessageType`, `ServerMessagePayloadMap`, `MatchStatusPayload`, `MatchCountdownPayload`, `MatchmakingStatusPayload`, `PartyUpdatedPayload`, `ServerErrorPayload`.
+
+#### What It Does:
+Declares the strict catalog of WebSocket messages dispatched from Colyseus to clients (state changes, countdowns, match results, party updates, errors).
+
+#### How It Works:
+- Maps server channels to payloads, ensuring `MATCH_SUMMARY` carries a valid `MatchSummaryView` and `SERVER_ERROR` carries structured `{ code, message, fatal }` error objects.
+
+#### Why It Exists (Architectural Rationale):
+- **Authoritative Flow**: The client never guesses match countdowns or victory triggers; it passively reacts to typed server broadcasts.
+- **Structured Error Handling**: Centralizes error contracts so UI error modals display actionable messages rather than raw stack traces.
+
+---
+
+### 9. `shared/contracts/network/index.ts`
+
+- **Path**: [`shared/contracts/network/index.ts`](file:///home/betovicio/Projects/thunder-dome-fighter/shared/contracts/network/index.ts)
+- **Primary Exports**: Barrel export of `ClientMessages.ts` and `ServerMessages.ts`.
+
+

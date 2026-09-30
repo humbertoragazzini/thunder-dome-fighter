@@ -11,10 +11,10 @@
 | Field | Value |
 | :--- | :--- |
 | **Current Phase** | **Phase 1 — Architecture Foundations, Generic Domain Models & Shared Contracts** |
-| **Current Step** | **Step 1.2 — Create `shared/contracts/network/` defining typed network message schemas** |
-| **Last Completed Step** | **Step 1.1 — Establish shared generic domain interfaces (`shared/domain/`)** |
-| **Next Step** | **Step 1.2 — Define typed client-to-server and server-to-client network contracts** |
-| **Overall Status** | **Generic domain contracts established; ready for typed network protocol contracts.** |
+| **Current Step** | **Step 1.3 — Create `shared/contracts/events/` defining match and game event payloads** |
+| **Last Completed Step** | **Step 1.2 — Define typed network message contracts (`shared/contracts/network/`)** |
+| **Next Step** | **Step 1.3 — Define typed match and gameplay event contracts (`shared/contracts/events/`)** |
+| **Overall Status** | **Typed network protocol contracts established; ready for gameplay event contracts.** |
 | **Last Updated** | **2026-09-30** |
 
 ---
@@ -372,7 +372,7 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 #### Steps
 - [x] 1.1 Create `shared/domain/` defining generic domain interfaces (`User`, `Player`, `Session`, `Match`, `MatchParticipant`, `MatchTeam`, `GameMode`, `LevelDefinition`, `Party`, `PartyMember`).
-- [ ] 1.2 Create `shared/contracts/network/` defining typed client-to-server and server-to-client message schemas.
+- [x] 1.2 Create `shared/contracts/network/` defining typed client-to-server and server-to-client message schemas.
 - [ ] 1.3 Create `shared/contracts/events/` defining match and game event payloads (`PlayerJoined`, `DamageApplied`, `PlayerKilled`, `MatchEnded`).
 - [ ] 1.4 Refactor shared player physics interfaces from vehicle terms (`throttle`, `steering`, `brake`) to character movement actions (`moveX`, `moveZ`, `lookYaw`, `jump`, `sprint`).
 - [ ] 1.5 Establish shared math utilities for 2D/3D character rotation, direction vectors, and normalized input clamping.
