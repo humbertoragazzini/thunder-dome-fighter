@@ -122,3 +122,38 @@ Coordinates the active lifecycle of a playable game, live in-memory match stats,
 
 - **Deterministic State Gates**: Physics movement and attacks are strictly prohibited during `WAITING_FOR_PLAYERS` and `COUNTDOWN`. Simulation only activates when entering `PLAYING`.
 - **Runtime Stats vs. Permanent Stats**: A player's in-match score is volatile and kept in server RAM. Only when the match ends does the server run an atomic `prisma.$transaction` to increment permanent lifetime stats.
+
+---
+
+### 5. `shared/domain/Party.ts`
+
+- **Path**: [`shared/domain/Party.ts`](file:///home/betovicio/Projects/thunder-dome-fighter/shared/domain/Party.ts)
+- **Primary Exports**: `Party`, `PartyMember`, `MatchmakingTicket`.
+
+#### What It Does:
+Enables friends to assemble in a pre-match social group and enter matchmaking queues together as an indivisible atomic team unit.
+
+#### How It Works:
+- `Party`: Holds a unique `id`, `leaderPlayerId`, an alphanumeric `inviteCode` (e.g. `"THNDR9"`), and member records.
+- `PartyMember`: Tracks participant readiness (`isReady`) and join timestamp.
+- `MatchmakingTicket`: The queue payload dispatched to the matchmaker containing `gameModeId`, `partyId`, and the array of all member `playerIds`.
+
+#### Why It Exists (Architectural Rationale):
+- **Atomic Party Cohesion Invariant**: In multiplayer team games, queuing with friends must never result in friends being split across opposing teams. By wrapping group members in an indivisible `MatchmakingTicket`, the server's bin-packing algorithm always places them on the same team.
+
+---
+
+### 6. `shared/domain/index.ts`
+
+- **Path**: [`shared/domain/index.ts`](file:///home/betovicio/Projects/thunder-dome-fighter/shared/domain/index.ts)
+- **Primary Exports**: Barrel re-export of all domain entities.
+
+#### What It Does:
+Provides a clean, centralized entry point for all domain models.
+
+#### How It Works:
+Re-exports `Identity.ts`, `GameMode.ts`, `Level.ts`, `Match.ts`, and `Party.ts`.
+
+#### Why It Exists (Architectural Rationale):
+- **Clean Architecture & Module Hygiene**: Consumers import cleanly via `import { User, Match, GameMode } from "../../shared/domain"` without coupling to internal file locations.
+

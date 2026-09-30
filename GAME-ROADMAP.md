@@ -11,11 +11,11 @@
 | Field | Value |
 | :--- | :--- |
 | **Current Phase** | **Phase 1 — Architecture Foundations, Generic Domain Models & Shared Contracts** |
-| **Current Step** | **Step 1.1 — Establish shared generic domain interfaces and network protocol definitions** |
-| **Last Completed Step** | **Phase 0 — Baseline Repository Assessment and Architecture Audit** |
-| **Next Step** | **Step 1.1 — Define generic domain type contracts in `shared/domain/`** |
-| **Overall Status** | **Authoritative headless Babylon+Havok physics and client prediction baseline verified; ready for generic domain models and character controller transition.** |
-| **Last Updated** | **2026-09-27** |
+| **Current Step** | **Step 1.2 — Create `shared/contracts/network/` defining typed network message schemas** |
+| **Last Completed Step** | **Step 1.1 — Establish shared generic domain interfaces (`shared/domain/`)** |
+| **Next Step** | **Step 1.2 — Define typed client-to-server and server-to-client network contracts** |
+| **Overall Status** | **Generic domain contracts established; ready for typed network protocol contracts.** |
+| **Last Updated** | **2026-09-30** |
 
 ---
 
@@ -371,7 +371,7 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 **Dependencies:** Phase 0.  
 
 #### Steps
-- [ ] 1.1 Create `shared/domain/` defining generic domain interfaces (`User`, `Player`, `Session`, `Match`, `MatchParticipant`, `MatchTeam`, `GameMode`, `LevelDefinition`).
+- [x] 1.1 Create `shared/domain/` defining generic domain interfaces (`User`, `Player`, `Session`, `Match`, `MatchParticipant`, `MatchTeam`, `GameMode`, `LevelDefinition`, `Party`, `PartyMember`).
 - [ ] 1.2 Create `shared/contracts/network/` defining typed client-to-server and server-to-client message schemas.
 - [ ] 1.3 Create `shared/contracts/events/` defining match and game event payloads (`PlayerJoined`, `DamageApplied`, `PlayerKilled`, `MatchEnded`).
 - [ ] 1.4 Refactor shared player physics interfaces from vehicle terms (`throttle`, `steering`, `brake`) to character movement actions (`moveX`, `moveZ`, `lookYaw`, `jump`, `sprint`).
