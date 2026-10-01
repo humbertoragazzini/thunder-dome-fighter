@@ -247,6 +247,38 @@ Transitions the physics and input contracts from vehicular mechanics (`throttle`
 #### Why It Exists (Architectural Rationale):
 - **Strangler Fig Pattern**: In large refactors, introducing target contracts with backward-compatible aliases allows incremental upgrades across subsystems (Phase 1 domain/math $\rightarrow$ Phase 4 Havok physics) without ever breaking the build.
 
+---
+
+### 13. `shared/player/CharacterPhysicsMath.ts`
+
+- **Path**: [`shared/player/CharacterPhysicsMath.ts`](file:///home/betovicio/Projects/thunder-dome-fighter/shared/player/CharacterPhysicsMath.ts)
+- **Primary Exports**: `clampInputVector`, `calculateCharacterTargetVelocity`, `normalizeAngle`, `calculateShortestAngleDelta`, `calculateYawFromDirection`.
+
+#### What It Does:
+Provides pure, deterministic 2D/3D math routines for humanoid character movement, rotation, and input clamping.
+
+#### How It Works:
+- `clampInputVector`: Normalizes diagonal vectors $(moveX, moveZ)$ when length exceeds $1.0$ (preventing the $1.414\times$ strafe-run speed exploit) while preserving smaller magnitudes for analog walking.
+- `calculateCharacterTargetVelocity`: Rotates local movement intentions by `lookYaw` to produce world-space velocities $(v_x, v_z)$ and incorporates sprint and temporary kill-streak multipliers.
+- `normalizeAngle`: Bounds any radian angle into $[-\pi, +\pi]$.
+- `calculateShortestAngleDelta`: Calculates the shortest signed rotational path between two yaw headings (preventing jarring $360^\circ$ spins).
+
+#### Why It Exists (Architectural Rationale):
+- **Deterministic Parity**: The client prediction loop and server authoritative simulation must execute identical mathematical formulas down to the floating-point calculation.
+- **Cheating & Exploit Prevention**: Server clamping prevents malicious clients from dispatching forged `moveX = 10` inputs to super-speed across the arena.
+
+---
+
+## Phase 1 Completion Checklist
+
+- [x] **Generic Domain Layer**: `User`, `Player`, `Session`, `Match`, `GameMode`, `LevelDefinition`, `Party` declared in `shared/domain/`.
+- [x] **Typed Network Message Contracts**: Client and server WebSocket message payload maps established in `shared/contracts/network/`.
+- [x] **Match Event Protocol**: Discrete domain events (`DamageApplied`, `PlayerKilled`, `ModifierChanged`) declared in `shared/contracts/events/`.
+- [x] **Character Action Input Contracts**: Humanoid 8-way action commands and capsule specifications established in `shared/player/PlayerConfig.ts`.
+- [x] **Movement & Rotation Math**: Input clamping, local-to-world velocity projection, and angle normalization implemented in `shared/player/CharacterPhysicsMath.ts`.
+- [x] **Zero Build Regressions**: Full codebase builds with exit code 0 (`npx tsc -p tsconfig.app.json`).
+
+
 
 
 
