@@ -7,7 +7,7 @@
 // ==================================================
 
 // ==================================================
-// PHYSICS
+// PHYSICS SIMULATION CONSTANTS
 // ==================================================
 
 export const PHYSICS_HZ = 30;
@@ -15,7 +15,33 @@ export const PHYSICS_DT_MS = 1000 / PHYSICS_HZ;
 export const PHYSICS_DT_SECONDS = 1 / PHYSICS_HZ;
 
 // ==================================================
-// PLAYER GEOMETRY & TUNING
+// HUMANOID CHARACTER GEOMETRY & TUNING (PHASE 4 TARGET)
+// ==================================================
+
+export const CHARACTER_CAPSULE = {
+  radius: 0.4, // 0.4m radius (0.8m diameter shoulder-to-shoulder)
+  totalHeight: 1.8, // 1.8m standard human height
+} as const;
+
+export const CHARACTER_FORCES = {
+  /** Base ground movement speed in meters per second */
+  BASE_SPEED: 6.0,
+
+  /** Sprint multiplier applied to base speed */
+  SPRINT_MULTIPLIER: 1.35,
+
+  /** Upward velocity impulse imparted on jump */
+  JUMP_IMPULSE: 6.5,
+
+  /** Raycast distance below capsule base to detect ground contact */
+  GROUND_CHECK_DISTANCE: 0.15,
+
+  /** Maximum walkable ground slope in radians (~45 degrees) */
+  MAX_SLOPE_RADIANS: Math.PI / 4,
+} as const;
+
+// ==================================================
+// LEGACY PLAYER BOX GEOMETRY (USED BY ACTIVE SIMULATION UNTIL PHASE 4)
 // ==================================================
 
 export const PLAYER_BOX_SIZE = {
@@ -33,10 +59,6 @@ export const PLAYER_SPAWN_POSITION = {
 export const PLAYER_MASS = 1;
 export const LINEAR_DAMPING = 0.5;
 export const ANGULAR_DAMPING = 2.5;
-
-// ==================================================
-// PLAYER FORCES
-// ==================================================
 
 export const MAX_THROTTLE_FORCE = 25;
 export const MAX_STEERING_TORQUE = 5;
@@ -66,7 +88,7 @@ export const GRAVITY = {
 } as const;
 
 // ==================================================
-// SERVER INPUT QUEUE
+// SERVER INPUT QUEUE & JITTER BUFFER
 // ==================================================
 
 // Maximum input commands stored per entity before rejecting new arrivals
@@ -76,76 +98,91 @@ export const MAX_SERVER_INPUT_QUEUE = 16;
 export const SERVER_INPUT_BUFFER_TARGET = 2;
 
 // ==================================================
-// LOCAL PREDICTION
+// LOCAL PREDICTION & RECONCILIATION
 // ==================================================
 
-// Maximum fixed prediction steps evaluated per render update (avoids death spiral)
 export const MAX_PREDICTION_STEPS_PER_UPDATE = 5;
-
-// Maximum history frames kept for reconciliation comparison
 export const PREDICTION_HISTORY_MAX_FRAMES = 128;
 
-// ==================================================
-// RECONCILIATION TOLERANCES (EPSILONS)
-//
-// Starting tuning values. If discrepancy between client prediction
-// and server authoritative state at matching tick is below these values,
-// reconciliation is skipped entirely.
-// ==================================================
-
+// Tolerances beyond which reconciliation re-simulates physics
 export const POSITION_RECONCILIATION_EPSILON = 0.02; // 2 cm
 export const ROTATION_RECONCILIATION_EPSILON = 0.03; // ~1.7 degrees
-export const VELOCITY_RECONCILIATION_EPSILON = 0.10; // 0.1 m/s
-export const ANGULAR_VELOCITY_RECONCILIATION_EPSILON = 0.20; // 0.2 rad/s
+export const VELOCITY_RECONCILIATION_EPSILON = 0.1; // 0.1 m/s
+export const ANGULAR_VELOCITY_RECONCILIATION_EPSILON = 0.2; // 0.2 rad/s
 
-// ==================================================
-// VISUAL CORRECTION & ERROR DECAY
-//
-// Normal predicted movement is 1:1 with physics (no trailing lag filter).
-// Only actual reconciliation discrepancies are offset and decayed.
-// ==================================================
-
-// Timescale for exponential decay (mesh converges smoothly to corrected predicted physics)
+// Visual error smoothing
 export const VISUAL_CORRECTION_TIME_CONSTANT_MS = 100;
-
-// Discrepancy beyond which visual smoothing snaps immediately to avoid rubber-banding
 export const LOCAL_HARD_SNAP_DISTANCE = 3.0;
-
-// Residual thresholds below which offsets are explicitly zeroed to avoid lingering floating-point dust
 export const RESIDUAL_POSITION_EPSILON = 0.001; // 1 mm
-export const RESIDUAL_ROTATION_EPSILON = 0.001; // 0.001 radians
+export const RESIDUAL_ROTATION_EPSILON = 0.001;
 
 // ==================================================
 // REMOTE INTERPOLATION
 // ==================================================
 
-// Target buffer delay in server ticks (3 ticks * 33.3ms = 100ms)
 export const REMOTE_INTERPOLATION_TARGET_DELAY_TICKS = 3.0;
-
-// Dead-band tolerance around target delay where timeScale remains exactly 1.0
 export const REMOTE_INTERPOLATION_DELAY_TOLERANCE_TICKS = 0.5;
-
-// Gentle speedup when buffer is falling behind (delay > target + tolerance)
 export const REMOTE_TIME_SCALE_ACCELERATION = 1.03;
-
-// Gentle slowdown when buffer is creeping too close to newest tick (delay < target - tolerance)
 export const REMOTE_TIME_SCALE_DECELERATION = 0.97;
-
-// Maximum snapshots stored in remote interpolation history
 export const REMOTE_MAX_SNAPSHOTS = 32;
 
 // ==================================================
-// INPUT INTERFACES
+// HUMANOID CHARACTER INPUT CONTRACTS (MODERN TARGET)
 // ==================================================
 
-// Physical pedal and steering state
+export type AttackActionType =
+  | "NONE"
+  | "LIGHT_PUNCH"
+  | "HEAVY_PUNCH"
+  | "KICK"
+  | "BLOCK";
+
+/**
+ * High-level intention of a player controlling a humanoid character.
+ */
+export interface CharacterActionInput {
+  /** Lateral movement: -1.0 (left) to +1.0 (right) */
+  moveX: number;
+
+  /** Longitudinal movement: -1.0 (backward) to +1.0 (forward) */
+  moveZ: number;
+
+  /** Horizontal aim/look direction in radians around Y-axis [0, 2*PI) */
+  lookYaw: number;
+
+  /** Whether the jump action is pressed this frame */
+  jump: boolean;
+
+  /** Whether sprint modifier is actively held */
+  sprint: boolean;
+
+  /** Discrete combat action triggered this frame */
+  attackAction: AttackActionType;
+}
+
+/**
+ * Networked character input packet carrying a monotonic sequence number.
+ */
+export interface CharacterInputCommand extends CharacterActionInput {
+  sequence: number;
+}
+
+// ==================================================
+// LEGACY VEHICLE INPUTS (PRESERVED UNTIL PHASE 4 TRANSITION)
+// ==================================================
+
+/**
+ * @deprecated Legacy vehicle input interface. Will be retired in Phase 4.
+ */
 export interface PlayerInput {
   throttle: number;
   steering: number;
   brake: number;
 }
 
-// Networked input command carrying monotonic sequence number
+/**
+ * @deprecated Legacy vehicle input command. Will be retired in Phase 4.
+ */
 export interface PlayerInputCommand {
   sequence: number;
   throttle: number;

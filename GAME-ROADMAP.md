@@ -11,11 +11,11 @@
 | Field | Value |
 | :--- | :--- |
 | **Current Phase** | **Phase 1 — Architecture Foundations, Generic Domain Models & Shared Contracts** |
-| **Current Step** | **Step 1.3 — Create `shared/contracts/events/` defining match and game event payloads** |
-| **Last Completed Step** | **Step 1.2 — Define typed network message contracts (`shared/contracts/network/`)** |
-| **Next Step** | **Step 1.3 — Define typed match and gameplay event contracts (`shared/contracts/events/`)** |
-| **Overall Status** | **Typed network protocol contracts established; ready for gameplay event contracts.** |
-| **Last Updated** | **2026-09-30** |
+| **Current Step** | **Step 1.5 — Establish shared character movement and rotation math utilities** |
+| **Last Completed Step** | **Step 1.4 — Transition shared player interfaces from vehicle terms to character actions** |
+| **Next Step** | **Step 1.5 — Create character movement and rotation math utilities (`shared/player/CharacterPhysicsMath.ts`)** |
+| **Overall Status** | **Character action contracts established; ready for character physics math routines.** |
+| **Last Updated** | **2026-10-01** |
 
 ---
 
@@ -373,8 +373,8 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 #### Steps
 - [x] 1.1 Create `shared/domain/` defining generic domain interfaces (`User`, `Player`, `Session`, `Match`, `MatchParticipant`, `MatchTeam`, `GameMode`, `LevelDefinition`, `Party`, `PartyMember`).
 - [x] 1.2 Create `shared/contracts/network/` defining typed client-to-server and server-to-client message schemas.
-- [ ] 1.3 Create `shared/contracts/events/` defining match and game event payloads (`PlayerJoined`, `DamageApplied`, `PlayerKilled`, `MatchEnded`).
-- [ ] 1.4 Refactor shared player physics interfaces from vehicle terms (`throttle`, `steering`, `brake`) to character movement actions (`moveX`, `moveZ`, `lookYaw`, `jump`, `sprint`).
+- [x] 1.3 Create `shared/contracts/events/` defining match and game event payloads (`PlayerJoined`, `DamageApplied`, `PlayerKilled`, `MatchEnded`).
+- [x] 1.4 Refactor shared player physics interfaces from vehicle terms (`throttle`, `steering`, `brake`) to character movement actions (`moveX`, `moveZ`, `lookYaw`, `jump`, `sprint`).
 - [ ] 1.5 Establish shared math utilities for 2D/3D character rotation, direction vectors, and normalized input clamping.
 
 #### Completion Criteria

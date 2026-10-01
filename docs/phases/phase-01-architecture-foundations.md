@@ -199,4 +199,54 @@ Declares the strict catalog of WebSocket messages dispatched from Colyseus to cl
 - **Path**: [`shared/contracts/network/index.ts`](file:///home/betovicio/Projects/thunder-dome-fighter/shared/contracts/network/index.ts)
 - **Primary Exports**: Barrel export of `ClientMessages.ts` and `ServerMessages.ts`.
 
+---
+
+### 10. `shared/contracts/events/MatchEvents.ts`
+
+- **Path**: [`shared/contracts/events/MatchEvents.ts`](file:///home/betovicio/Projects/thunder-dome-fighter/shared/contracts/events/MatchEvents.ts)
+- **Primary Exports**: `MatchEventType`, `MatchEventPayloadMap`, `MatchEventEnvelope`, individual event payloads (`PlayerJoinedEvent`, `DamageAppliedEvent`, `PlayerKilledEvent`, `ModifierChangedEvent`, `MatchEndedEvent`).
+
+#### What It Does:
+Defines discrete domain occurrences emitted by the authoritative server during a match to trigger audio, particles, damage numbers, kill feeds, and temporary kill upgrades.
+
+#### How It Works:
+- `MatchEventType`: Enumeration of all discrete combat and lifecycle occurrences (`DAMAGE_APPLIED`, `PLAYER_KILLED`, `MODIFIER_CHANGED`, etc.).
+- `DamageAppliedEvent`: Carries `hitPoint` and `knockbackForce` so the client spawns hit sparks and screenshake along the physical impact vector.
+- `PlayerKilledEvent`: Carries `killerKillStreak` and `isRingOut: boolean` for dynamic kill feed badges.
+- `ModifierChangedEvent`: Broadcasts active kill-streak attribute boosts (`speedMultiplier`, `forceMultiplier`) to update the player's HUD.
+- `MatchEventEnvelope`: Wraps every event with an authoritative `serverTick` and Unix `timestamp`.
+
+#### Why It Exists (Architectural Rationale):
+- **State vs. Events Distinction**: State tells you *what is currently true* (synchronized at 30 Hz in Colyseus schema); Events tell you *what just happened* at a specific instant in time.
+- **Physics Timeline Alignment**: Including `serverTick` in the envelope allows the client to align visual hit sparks and audio impacts to the exact physical frame the attack occurred.
+
+---
+
+### 11. `shared/contracts/events/index.ts`
+
+- **Path**: [`shared/contracts/events/index.ts`](file:///home/betovicio/Projects/thunder-dome-fighter/shared/contracts/events/index.ts)
+- **Primary Exports**: Barrel export of `MatchEvents.ts`.
+
+---
+
+### 12. `shared/player/PlayerConfig.ts` (Refactored)
+
+- **Path**: [`shared/player/PlayerConfig.ts`](file:///home/betovicio/Projects/thunder-dome-fighter/shared/player/PlayerConfig.ts)
+- **Primary Exports**: `CHARACTER_CAPSULE`, `CHARACTER_FORCES`, `CharacterActionInput`, `CharacterInputCommand`, `AttackActionType`, plus backwards-compatibility aliases (`PlayerInput`, `PlayerInputCommand`, `PLAYER_BOX_SIZE`).
+
+#### What It Does:
+Transitions the physics and input contracts from vehicular mechanics (`throttle`, `steering`, `brake`) to humanoid character actions (`moveX`, `moveZ`, `lookYaw`, `jump`, `sprint`, `attackAction`).
+
+#### How It Works:
+- `CHARACTER_CAPSULE`: Declares standard human upright dimensions (radius `0.4m`, height `1.8m`).
+- `CHARACTER_FORCES`: Establishes base run velocity (`6.0 m/s`), sprint boost (`1.35x`), jump impulse (`6.5 m/s`), and ground-check distances.
+- `CharacterActionInput`: Encapsulates 8-way directional movement inputs, look angle, jump, sprint, and attack action triggers.
+- `CharacterInputCommand`: Extends action input with a strictly monotonic `sequence` integer for authoritative client prediction and server jitter buffering.
+- Legacy Compatibility: Retains `@deprecated` vehicle interfaces so existing server simulations and client prediction loops continue to build cleanly without breaking changes.
+
+#### Why It Exists (Architectural Rationale):
+- **Strangler Fig Pattern**: In large refactors, introducing target contracts with backward-compatible aliases allows incremental upgrades across subsystems (Phase 1 domain/math $\rightarrow$ Phase 4 Havok physics) without ever breaking the build.
+
+
+
 
