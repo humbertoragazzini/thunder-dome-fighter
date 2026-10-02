@@ -397,7 +397,7 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 **Dependencies:** Phase 1.  
 
 #### Steps
-- [ ] 2.1 Initialize Prisma ORM with PostgreSQL schema (`schema.prisma`) defining `User`, `Player`, and `Session` models with migrations.
+- [ ] 2.1 Initialize Docker container environment (`docker-compose.yml` with PostgreSQL 16 Alpine and Redis 7 Alpine) and Prisma ORM with schema (`schema.prisma`) defining `User`, `Player`, and `Session` models with migrations.
 - [ ] 2.2 Implement secure password hashing using `argon2` (never store plaintext passwords).
 - [ ] 2.3 Set up Fastify HTTP server instance with route registration, CORS, error handling, and JSON Schema validation.
 - [ ] 2.4 Implement Fastify authentication routes (`/api/auth/register`, `/api/auth/login`) issuing cryptographically signed JWT tokens via `@fastify/jwt`.
@@ -1088,7 +1088,8 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 - [ ] 29.2 Profile CPU utilization, Node.js event-loop lag, and memory consumption under multi-room load.
 - [ ] 29.3 Verify zero memory leaks across repeated room creation and disposal cycles.
 - [ ] 29.4 Optimize garbage collection: eliminate temporary object allocations in hot physics and synchronization loops.
-- [ ] 29.5 Document maximum recommended room capacity per server core.
+- [ ] 29.5 Implement Colyseus Multi-Process Clustering with Redis Presence (`@colyseus/redis-presence`) to distribute room workloads evenly across independent worker processes.
+- [ ] 29.6 Document maximum recommended room capacity per server core and benchmark multi-process scaling limits.
 
 #### Completion Criteria
 - Single standard server node hosts at least 20 active 1v1 rooms or four 20-player FFA rooms maintaining steady 30 Hz tick rate.
@@ -1108,9 +1109,10 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 - [ ] 30.1 Implement structured JSON logging (Winston / Pino) with contextual `roomId`, `matchId`, and `playerId` tags.
 - [ ] 30.2 Implement health check endpoints (`/healthz`, `/readyz`) reporting Colyseus connection status and memory health.
 - [ ] 30.3 Create optimized multi-stage `Dockerfile` building headless Babylon/Havok server and static React client assets.
-- [ ] 30.4 Setup production environment configuration management (`.env.production`).
-- [ ] 30.5 Create CI/CD workflow (GitHub Actions) running linting, unit tests, build verification, and container publication.
-- [ ] 30.6 Document production deployment and scaling guide.
+- [ ] 30.4 Configure production Docker Compose topology with hard CPU Pinning (`cpuset`) per worker to eliminate CPU thread migration and L1/L2 cache invalidation.
+- [ ] 30.5 Setup production environment configuration management (`.env.production`).
+- [ ] 30.6 Create CI/CD workflow (GitHub Actions) running linting, unit tests, build verification, and container publication.
+- [ ] 30.7 Document production deployment, Docker fleet management, and multi-core scaling guide.
 
 #### Completion Criteria
 - Production Docker container builds cleanly, passes health checks, and can be deployed to cloud hosting (e.g., Fly.io, AWS, DigitalOcean).
@@ -1137,6 +1139,8 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 | **ADR-011** | **Exponential Visual Error Decay (100ms Time Constant)** | Reconciled physics discrepancies are smoothly absorbed into the visual mesh, eliminating abrupt visual snaps during network variance. | **Accepted** |
 | **ADR-012** | **Idempotent Match Finalization via Database Transactions** | Ensures match results and stat increments are applied exactly once, preventing double-counting if network retries occur. | **Accepted** |
 | **ADR-013** | **Atomic Party Cohesion & Bin-Packing Team Backfilling** | Friends in a party are treated as an indivisible unit in matchmaking and strictly assigned to the same team, with missing slots filled by solos. | **Accepted** |
+| **ADR-014** | **Multi-Core Physics Scaling via Multi-Process Clustering & Redis Presence** | Distributes Colyseus rooms across independent Node worker processes/containers, avoiding single-thread bottlenecks for Havok physics. | **Accepted** |
+| **ADR-015** | **Deterministic Physics via Docker CPU Pinning (`cpuset`) & L1/L2 Cache Affinity** | Locks server worker containers to specific physical CPU cores to eliminate OS thread migration and cache cold misses. | **Accepted** |
 
 ---
 
