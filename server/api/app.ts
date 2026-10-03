@@ -22,6 +22,7 @@ import "dotenv/config";
 import Fastify, { FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
+import { authRoutes } from "./routes/auth.ts";
 
 export interface AppOptions {
   logger?: boolean;
@@ -102,6 +103,11 @@ export async function buildApp(
       uptimeSeconds: Math.floor(process.uptime()),
     };
   });
+
+  // --------------------------------------------------
+  // 5. Mount API Routes
+  // --------------------------------------------------
+  await app.register(authRoutes, { prefix: "/api/auth" });
 
   return app;
 }

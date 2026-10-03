@@ -14,9 +14,9 @@
 //   to prevent trivial passwords and CPU-exhaustion DoS attacks.
 //
 // WHY IT EXISTS:
-// Plaintext passwords must NEVER be persisted in PostgreSQL. Unlike legacy
-// algorithms (MD5, SHA-256, or bcrypt), Argon2id requires significant RAM
-// per evaluation, rendering GPU/ASIC rainbow table cracking attacks useless.
+// Plaintext passwords must NEVER be persisted in PostgreSQL. In addition,
+// constant-time verification against a pre-computed dummy hash eliminates
+// side-channel timing attacks that attackers use for user enumeration.
 // ==================================================
 
 import argon2 from "argon2";
@@ -28,6 +28,28 @@ export const PASSWORD_POLICY = {
   MIN_LENGTH: 8,
   MAX_LENGTH: 128, // Prevents CPU-exhaustion Denial-of-Service attacks
 } as const;
+
+/**
+ * Pre-computed, genuine Argon2id hash computed once at server startup.
+ * Used during login failures when an email is not found, ensuring that
+ * missing users take the exact same ~80ms to verify as real users.
+ */
+const DUMMY_HASH_PROMISE: Promise<string> = argon2.hash(
+  "dummy-password-for-timing-attack-defense",
+  {
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 1,
+  },
+);
+
+/**
+ * Retrieves the pre-computed dummy Argon2id hash for timing defense.
+ */
+export async function getDummyHash(): Promise<string> {
+  return DUMMY_HASH_PROMISE;
+}
 
 /**
  * Validates basic password constraints before attempting expensive hashing.

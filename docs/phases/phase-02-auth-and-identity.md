@@ -93,6 +93,16 @@ The database schema directly maps the domain models defined in [`shared/domain/I
 - **Location:** [`server/api/index.ts`](../../server/api/index.ts)
 - **Role:** HTTP process entrypoint binding to `FASTIFY_HOST` and `FASTIFY_PORT` (3000) with graceful shutdown traps (`SIGINT`, `SIGTERM`).
 
+### Step 2.4: Fastify Authentication Routes & Timing Attack Defense
+
+#### 7. `server/api/routes/auth.ts`
+- **Location:** [`server/api/routes/auth.ts`](../../server/api/routes/auth.ts)
+- **Role:** REST routes for user registration, authentication, and session inspection.
+- **Atomic Creation:** `/register` wraps `User`, `Player`, and `PlayerStats` in an atomic `prisma.$transaction`. If a player name is taken, the transaction rolls back with zero orphaned accounts.
+- **Timing-Attack Defense (User Enumeration):** `/login` executes a pre-computed `DUMMY_ARGON2_HASH` when an email is not found. Both valid and invalid user lookups consume ~80ms of Argon2 processing time, preventing attackers from measuring response latency to deduce registered emails.
+- **Session Tracking:** Records issued JWT tokens in PostgreSQL (`sessions` table) with exact 24-hour expiration for instant server-side revocation.
+- **Profile Inspection:** `/me` verifies the JWT Bearer token, validates the session against the database, and dynamically computes derived ratios (`killDeathRatio`, `winRatePercentage`).
+
 ---
 
 ## Phase 2 Progress Tracker
@@ -100,7 +110,7 @@ The database schema directly maps the domain models defined in [`shared/domain/I
 - [x] **Step 2.1**: Initialize Docker environment (`docker-compose.yml`) and Prisma ORM with `schema.prisma`.
 - [x] **Step 2.2**: Implement secure Argon2 password hashing utility.
 - [x] **Step 2.3**: Set up Fastify HTTP server with CORS, JSON Schema validation, and error handlers.
-- [ ] **Step 2.4**: Implement Fastify auth routes (`/api/auth/register`, `/api/auth/login`) with `@fastify/jwt`.
+- [x] **Step 2.4**: Implement Fastify auth routes (`/api/auth/register`, `/api/auth/login`) with `@fastify/jwt`.
 - [ ] **Step 2.5**: Implement Colyseus `onAuth` WebSocket handshake token verification.
 - [ ] **Step 2.6**: Implement client-side authentication store in Zustand with token persistence.
 
