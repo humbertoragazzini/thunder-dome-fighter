@@ -10,11 +10,11 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 2 — User Authentication & Player Identity System** |
-| **Current Step** | **Step 2.6 — Implement client-side auth state in Zustand store with token persistence** |
-| **Last Completed Step** | **Step 2.5 — Implement token verification middleware for Colyseus connection handshake (onAuth hook)** |
-| **Next Step** | **Step 2.6 — Implement Zustand client auth store (`src/store/useAuthStore.ts`)** |
-| **Overall Status** | **Colyseus onAuth hook active and rejecting unauthenticated connections; ready for client auth store.** |
+| **Current Phase** | **Phase 3 — Application Shell, UI Navigation & Screen State Management** |
+| **Current Step** | **Step 3.1 — Design centralized application screen state machine in Zustand** |
+| **Last Completed Step** | **Step 2.6 — Implement client-side auth state in Zustand store with token persistence** |
+| **Next Step** | **Step 3.1 — Design centralized application screen state machine in `src/store/useAppStore.ts`** |
+| **Overall Status** | **Phase 2 (User Authentication & Player Identity System) 100% complete; moving to Phase 3.** |
 | **Last Updated** | **2026-10-03** |
 
 ---
@@ -392,7 +392,7 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 2 — User Authentication & Player Identity System
 
-**Status:** In Progress `[~]`  
+**Status:** Completed `[x]`  
 **Goal:** Simple, secure account registration, authentication, and distinct Player identity creation.  
 **Dependencies:** Phase 1.  
 
@@ -402,7 +402,7 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 - [x] 2.3 Set up Fastify HTTP server instance with route registration, CORS, error handling, and JSON Schema validation.
 - [x] 2.4 Implement Fastify authentication routes (`/api/auth/register`, `/api/auth/login`) issuing cryptographically signed JWT tokens via `@fastify/jwt`.
 - [x] 2.5 Implement token verification middleware for Colyseus connection handshake (`onAuth` hook in `GameRoom`) to validate JWT sessions before allowing room joins.
-- [ ] 2.6 Implement client-side auth state in Zustand store with token persistence in `localStorage`.
+- [x] 2.6 Implement client-side auth state in Zustand store with token persistence in `localStorage`.
 
 #### Completion Criteria
 - User can register with email, player name, and password.
@@ -1179,11 +1179,11 @@ To maintain development velocity and prevent architectural bloat, the following 
 ```
 Phase 0: Assessment & Audit [x]
    ↓
-Phase 1: Architecture Foundations & Shared Contracts [~]
+Phase 1: Architecture Foundations & Shared Contracts [x]
    ↓
-Phase 2: User Authentication & Player Identity
+Phase 2: User Authentication & Player Identity [x]
    ↓
-Phase 3: Application Shell & UI Navigation
+Phase 3: Application Shell & UI Navigation [~]
    ↓
 Phase 4: Authoritative Character Controller & Humanoid Movement
    ↓

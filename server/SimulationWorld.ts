@@ -17,7 +17,6 @@ import { fileURLToPath } from "node:url";
 import HavokPhysics from "@babylonjs/havok";
 
 import {
-    PHYSICS_HZ,
     PHYSICS_DT_MS,
     PLAYER_BOX_SIZE,
     PLAYER_SPAWN_POSITION,
@@ -495,5 +494,14 @@ export class SimulatorWorld {
         // ==================================================
 
         console.log("world initialized");
+    }
+
+    public dispose(): void {
+        if (this.scheduler) {
+            clearInterval(this.scheduler);
+            this.scheduler = null;
+        }
+        this.scene?.dispose();
+        this.engine?.dispose();
     }
 }

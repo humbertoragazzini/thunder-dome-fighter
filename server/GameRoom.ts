@@ -18,7 +18,7 @@
 // physics, positions, health, and outcomes; clients stream inputs only.
 // ==================================================
 
-import { Client, Room, ServerError } from "colyseus";
+import { type Client, Room, ServerError } from "colyseus";
 import { GameState, PlayerState } from "./GameState";
 import { SimulatorWorld } from "./SimulationWorld";
 import type { PlayerInputCommand } from "../shared/player/PlayerConfig";
@@ -167,7 +167,7 @@ export class GameRoom extends Room {
   // WEBSOCKET AUTHENTICATION HOOK
   // ==================================================
 
-  async onAuth(client: Client, options: unknown): Promise<AuthenticatedUser> {
+  async onAuth(_client: Client, options: unknown): Promise<AuthenticatedUser> {
     const token =
       typeof options === "object" && options !== null && "token" in options
         ? (options as { token: unknown }).token

@@ -116,6 +116,25 @@ The database schema directly maps the domain models defined in [`shared/domain/I
 - **Handshake Gate (`onAuth`):** Intercepts client connection requests, extracts `{ token }` from join options, calls `verifySessionToken()`, and attaches authenticated player data (`userId`, `playerId`, `playerName`) to `client.auth`. Rejects unauthenticated connections with `ServerError(401)`.
 - **Identity Binding:** `onJoin` associates the verified database player identity with the client's simulation session.
 
+### Step 2.6: Client-Side Auth State (Zustand) & Arena Connection Integration
+
+#### 10. `src/store/useAuthStore.ts`
+- **Location:** [`src/store/useAuthStore.ts`](../../src/store/useAuthStore.ts)
+- **Role:** Centralized reactive client-side authentication store built with Zustand.
+- **State Properties:** `token`, `user`, `player`, `stats`, `derivedStats`, `isAuthenticated`, `isLoading`, and `error`.
+- **Token Persistence:** Synchronizes JWT to `localStorage` under `thunder_dome_auth_token` for seamless reloads.
+- **Auto-Hydration (`checkAuth`):** Validates stored token on application boot via `GET /api/auth/me` and loads lifetime player statistics.
+- **Authentication Actions:**
+  - `register(credentials)`: Dispatches `POST /api/auth/register`, sets active token, and populates player profile.
+  - `login(credentials)`: Dispatches `POST /api/auth/login`, saves JWT, and updates authenticated state.
+  - `logout()`: Clears in-memory auth state and purges the token from browser storage.
+
+#### 11. `src/components/ConnectToColyseus.tsx`
+- **Location:** [`src/components/ConnectToColyseus.tsx`](../../src/components/ConnectToColyseus.tsx)
+- **Role:** Connection controller UI component linking the client to the authoritative server.
+- **Token Transmission:** Reads `token` from `useAuthStore.getState()` and supplies `{ token }` during `client.join("game", { token })`, fulfilling the Colyseus `onAuth` handshake requirement.
+- **Environment Integration:** Uses `VITE_COLYSEUS_URL` falling back to `ws://localhost:2567`.
+
 ---
 
 ## Phase 2 Progress Tracker
@@ -125,5 +144,6 @@ The database schema directly maps the domain models defined in [`shared/domain/I
 - [x] **Step 2.3**: Set up Fastify HTTP server with CORS, JSON Schema validation, and error handlers.
 - [x] **Step 2.4**: Implement Fastify auth routes (`/api/auth/register`, `/api/auth/login`) with `@fastify/jwt`.
 - [x] **Step 2.5**: Implement Colyseus `onAuth` WebSocket handshake token verification.
-- [ ] **Step 2.6**: Implement client-side authentication store in Zustand with token persistence.
+- [x] **Step 2.6**: Implement client-side authentication store in Zustand with token persistence.
+
 

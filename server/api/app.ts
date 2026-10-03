@@ -19,7 +19,7 @@
 // ==================================================
 
 import "dotenv/config";
-import Fastify, { FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import { authRoutes } from "./routes/auth.ts";
@@ -69,7 +69,7 @@ export async function buildApp(
   // --------------------------------------------------
   // 3. Centralized Error Handler
   // --------------------------------------------------
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: FastifyError, request, reply) => {
     // Catch JSON schema validation failures (Ajv)
     if (error.validation) {
       reply.status(400).send({
