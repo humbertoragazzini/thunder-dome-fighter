@@ -79,13 +79,27 @@ The database schema directly maps the domain models defined in [`shared/domain/I
 - **Parameters:** Argon2id with 64 MiB memory hardness (`memoryCost: 65536`), 3 iterations (`timeCost: 3`), and single-thread parallelism (`parallelism: 1`).
 - **DoS Mitigation:** Enforces length constraints (8–128 characters) to prevent CPU-exhaustion Denial-of-Service attacks from oversized payloads.
 
+### Step 2.3: Fastify HTTP Server Setup
+
+#### 5. `server/api/app.ts`
+- **Location:** [`server/api/app.ts`](../../server/api/app.ts)
+- **Role:** Fastify Application Factory (`buildApp`) establishing REST middleware and plugin hierarchy.
+- **CORS:** Configured for Vite frontend origins (`localhost:5173`, `127.0.0.1:5173`).
+- **JWT:** Registered via `@fastify/jwt` using `JWT_SECRET` with configurable token lifetime defaulting to 24 hours (`JWT_EXPIRES_IN=24h`).
+- **Error Handling:** Centralized handler formatting Ajv JSON Schema validation failures (400) and runtime exceptions into consistent JSON error envelopes.
+- **Routes:** `GET /api/health` providing service status, ISO timestamp, and process uptime.
+
+#### 6. `server/api/index.ts`
+- **Location:** [`server/api/index.ts`](../../server/api/index.ts)
+- **Role:** HTTP process entrypoint binding to `FASTIFY_HOST` and `FASTIFY_PORT` (3000) with graceful shutdown traps (`SIGINT`, `SIGTERM`).
+
 ---
 
 ## Phase 2 Progress Tracker
 
 - [x] **Step 2.1**: Initialize Docker environment (`docker-compose.yml`) and Prisma ORM with `schema.prisma`.
 - [x] **Step 2.2**: Implement secure Argon2 password hashing utility.
-- [ ] **Step 2.3**: Set up Fastify HTTP server with CORS, JSON Schema validation, and error handlers.
+- [x] **Step 2.3**: Set up Fastify HTTP server with CORS, JSON Schema validation, and error handlers.
 - [ ] **Step 2.4**: Implement Fastify auth routes (`/api/auth/register`, `/api/auth/login`) with `@fastify/jwt`.
 - [ ] **Step 2.5**: Implement Colyseus `onAuth` WebSocket handshake token verification.
 - [ ] **Step 2.6**: Implement client-side authentication store in Zustand with token persistence.

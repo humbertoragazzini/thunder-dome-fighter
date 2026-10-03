@@ -11,10 +11,10 @@
 | Field | Value |
 | :--- | :--- |
 | **Current Phase** | **Phase 2 — User Authentication & Player Identity System** |
-| **Current Step** | **Step 2.3 — Set up Fastify HTTP server instance with route registration, CORS, error handling, and JSON Schema validation** |
-| **Last Completed Step** | **Step 2.2 — Implement secure password hashing using argon2 (`server/auth/PasswordHasher.ts`)** |
-| **Next Step** | **Step 2.3 — Set up Fastify HTTP server instance (`server/api/server.ts`)** |
-| **Overall Status** | **Argon2id password hashing implemented; ready for Fastify HTTP server setup.** |
+| **Current Step** | **Step 2.4 — Implement Fastify authentication routes (/api/auth/register, /api/auth/login) with @fastify/jwt** |
+| **Last Completed Step** | **Step 2.3 — Set up Fastify HTTP server instance with CORS, JWT, error handling, and health check** |
+| **Next Step** | **Step 2.4 — Implement Fastify auth routes (`server/api/routes/auth.ts`)** |
+| **Overall Status** | **Fastify HTTP application factory operational; ready for registration & login auth routes.** |
 | **Last Updated** | **2026-10-03** |
 
 ---
@@ -399,7 +399,7 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 #### Steps
 - [x] 2.1 Initialize Docker container environment (`docker-compose.yml` with PostgreSQL 16 Alpine and Redis 7 Alpine) and Prisma ORM with schema (`schema.prisma`) defining `User`, `Player`, and `Session` models with migrations.
 - [x] 2.2 Implement secure password hashing using `argon2` (never store plaintext passwords).
-- [ ] 2.3 Set up Fastify HTTP server instance with route registration, CORS, error handling, and JSON Schema validation.
+- [x] 2.3 Set up Fastify HTTP server instance with route registration, CORS, error handling, and JSON Schema validation.
 - [ ] 2.4 Implement Fastify authentication routes (`/api/auth/register`, `/api/auth/login`) issuing cryptographically signed JWT tokens via `@fastify/jwt`.
 - [ ] 2.5 Implement token verification middleware for Colyseus connection handshake (`onAuth` hook in `GameRoom`) to validate JWT sessions before allowing room joins.
 - [ ] 2.6 Implement client-side auth state in Zustand store with token persistence in `localStorage`.
