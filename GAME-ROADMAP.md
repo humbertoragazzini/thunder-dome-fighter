@@ -10,11 +10,11 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 3 — Application Shell, UI Navigation & Screen State Management** |
-| **Current Step** | **Step 3.1 — Design centralized application screen state machine in Zustand** |
-| **Last Completed Step** | **Step 2.6 — Implement client-side auth state in Zustand store with token persistence** |
-| **Next Step** | **Step 3.1 — Design centralized application screen state machine in `src/store/useAppStore.ts`** |
-| **Overall Status** | **Phase 2 (User Authentication & Player Identity System) 100% complete; moving to Phase 3.** |
+| **Current Phase** | **Phase 4 — Authoritative Player Entity & Humanoid Movement** |
+| **Current Step** | **Step 4.1 — Replace vehicle box physics body with upright humanoid capsule collider** |
+| **Last Completed Step** | **Step 3.6 — Implement global ErrorDialog and in-game HUD overlay** |
+| **Next Step** | **Step 4.1 — Implement upright character capsule kinematics and 8-way movement model** |
+| **Overall Status** | **Phase 3 (Application Shell & UI Navigation) 100% complete; moving to Phase 4.** |
 | **Last Updated** | **2026-10-03** |
 
 ---
@@ -417,17 +417,17 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 3 — Application Shell, UI Navigation & Screen State Management
 
-**Status:** Not Started `[ ]`  
+**Status:** Completed `[x]`  
 **Goal:** Create a polished React frontend application shell with structured screen navigation and error boundaries.  
 **Dependencies:** Phase 2.  
 
 #### Steps
-- [ ] 3.1 Design centralized application screen state machine in Zustand (`UNAUTHENTICATED`, `MAIN_MENU`, `PLAY_MENU`, `MATCHMAKING`, `LOBBY`, `MATCH_LOADING`, `IN_GAME`, `MATCH_RESULTS`).
-- [ ] 3.2 Build reusable UI component library using Tailwind CSS (buttons, cards, modals, form inputs, status badges).
-- [ ] 3.3 Implement `AuthScreen` (Tabs for Login & Registration with clear error handling).
-- [ ] 3.4 Implement `MainMenuScreen` navigation hub (`PLAY`, `CHAMPIONSHIPS`, `CUSTOM ROOMS`, `PROFILE`, `SETTINGS`).
-- [ ] 3.5 Implement `LoadingScreen` with animated indicators and connection state progress feedback.
-- [ ] 3.6 Implement global `ErrorModal` displaying user-friendly error messages (network drops, invalid tokens, server full).
+- [x] 3.1 Design centralized application screen state machine in Zustand (`UNAUTHENTICATED`, `MAIN_MENU`, `PLAY_MENU`, `MATCHMAKING`, `LOBBY`, `MATCH_LOADING`, `IN_GAME`, `MATCH_RESULTS`).
+- [x] 3.2 Build reusable UI component library using Tailwind CSS (buttons, cards, modals, form inputs, status badges).
+- [x] 3.3 Implement `AuthScreen` (Tabs for Login & Registration with clear error handling).
+- [x] 3.4 Implement `MainMenuScreen` navigation hub (`PLAY`, `CHAMPIONSHIPS`, `CUSTOM ROOMS`, `PROFILE`, `SETTINGS`).
+- [x] 3.5 Implement `LoadingScreen` with animated indicators and connection state progress feedback.
+- [x] 3.6 Implement global `ErrorModal` displaying user-friendly error messages (network drops, invalid tokens, server full).
 
 #### Completion Criteria
 - Smooth, reactive navigation between auth, main menu, loading, and canvas containers.
@@ -1183,9 +1183,9 @@ Phase 1: Architecture Foundations & Shared Contracts [x]
    ↓
 Phase 2: User Authentication & Player Identity [x]
    ↓
-Phase 3: Application Shell & UI Navigation [~]
+Phase 3: Application Shell & UI Navigation [x]
    ↓
-Phase 4: Authoritative Character Controller & Humanoid Movement
+Phase 4: Authoritative Character Controller & Humanoid Movement [~]
    ↓
 Phase 5: Client Character Visuals & GLB Animation System
    ↓

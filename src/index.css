@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@theme {
+  --font-game: "Luckiest Guy", cursive;
+  --font-arcade: "Bangers", cursive;
+  --font-tech: "Chakra Petch", sans-serif;
+}
+
 html,
 body,
 #root {
@@ -8,5 +14,18 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
+  font-family: var(--font-tech);
+  background-color: #020617;
+  color: #f8fafc;
 }
+
+/* Arcade text shadow utility */
+.text-shadow-arcade {
+  text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.8), 0 0 10px rgba(245, 158, 11, 0.5);
+}
+
+.text-shadow-punch {
+  text-shadow: 3px 3px 0px #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+
 

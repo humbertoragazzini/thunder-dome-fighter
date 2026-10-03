@@ -105,6 +105,17 @@ Every source file created or significantly modified must begin with a structured
 
 ---
 
+### 8. Infrastructure Invariant: Self-Hosted Dedicated Server Only
+* **No Public Cloud Lock-In**: Under no circumstances will we use AWS, Google Cloud, Fly.io, or proprietary cloud services.
+* **Target Environment**: All production deployment targets **Beto's own dedicated Linux server (Bare Metal)**.
+* **Production Stack**:
+  * **Docker Compose Production Topology** (isolated PostgreSQL, Redis, API, and Game Server containers).
+  * **Reverse Proxy**: Nginx or Caddy with automated SSL/TLS termination and WebSocket upgrade tunneling.
+  * **Multi-Core Scaling**: Leveraging the dedicated server's physical CPU cores via multi-process clustering and Redis presence.
+  * **Host Bind Mounts**: Persistent database data stored directly on the dedicated host filesystem.
+
+---
+
 ### Summary Checklist for Every Interaction
 
 - [x] Did the AI refrain from touching project code directly?

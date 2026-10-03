@@ -1,36 +1,85 @@
+// ==================================================
+// ROOT APPLICATION SHELL & SCREEN ROUTER
+//
+// WHAT IT DOES:
+// Serves as the top-level React root container, coordinating authentication
+// auto-hydration, screen transitions, global modals, and 3D Babylon.js viewport mounting.
+//
+// HOW IT WORKS:
+// - On mount, invokes `useAuthStore.getState().checkAuth()` to validate existing JWTs
+//   stored in `localStorage` and loads player stats.
+// - Once authenticated, automatically advances the screen state machine to `MAIN_MENU`.
+// - Dynamically mounts the active screen (`AUTH`, `MAIN_MENU`, `PLAY_MENU`, `MATCH_LOADING`, `IN_GAME`).
+// - Mounts `BabylonCanvas` strictly when joining or playing in an authoritative room.
+// - Mounts global dialog overlays (`ProfileModal`, `ErrorDialog`).
+//
+// WHY IT EXISTS:
+// Eliminates raw canvas overlays and provides a production-grade fighting game shell.
+// ==================================================
+
+import { useEffect } from "react";
 import { BabylonCanvas } from "./components/BabylonCanvas";
-import ConnectToColyseus from "./components/ConnectToColyseus";
+import { AuthScreen } from "./components/screens/AuthScreen";
+import { InGameOverlay } from "./components/screens/InGameOverlay";
+import { MainMenuScreen } from "./components/screens/MainMenuScreen";
+import { MatchLoadingScreen } from "./components/screens/MatchLoadingScreen";
+import { PlayMenuScreen } from "./components/screens/PlayMenuScreen";
+import { ErrorDialog } from "./components/ui/organisms/ErrorDialog";
+import { ProfileModal } from "./components/ui/organisms/ProfileModal";
 import { useAppStore } from "./store/useAppStore";
+import { useAuthStore } from "./store/useAuthStore";
+import { useNavigationStore } from "./store/useNavigationStore";
 
 export default function App() {
-  const { title, isSceneReady } = useAppStore();
+  const currentScreen = useNavigationStore((state) => state.currentScreen);
+  const navigateTo = useNavigationStore((state) => state.navigateTo);
+  const checkAuth = useAuthStore((state) => state.checkAuth);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const room = useAppStore((state) => state.room);
 
+  // Auto-hydrate session from localStorage on application boot
+  useEffect(() => {
+    async function hydrate() {
+      await checkAuth();
+      if (useAuthStore.getState().isAuthenticated) {
+        navigateTo("MAIN_MENU");
+      }
+    }
+    hydrate();
+  }, [checkAuth, navigateTo]);
+
+  // Sync auth changes: If logged out while in menus/game, send to AUTH
+  useEffect(() => {
+    if (!isAuthenticated && currentScreen !== "AUTH") {
+      navigateTo("AUTH");
+    }
+  }, [isAuthenticated, currentScreen, navigateTo]);
+
+  const shouldRenderCanvas =
+    (currentScreen === "IN_GAME" || currentScreen === "MATCH_LOADING") &&
+    Boolean(room?.roomId);
+
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans">
-
-      {/* Colyseum */}
-      <ConnectToColyseus></ConnectToColyseus>
-
-      {/* 3D Babylon.js Canvas */}
-
-      {room?.roomId && <BabylonCanvas />}
-
-      {/* Lightweight Tailwind Overlay Header */}
-      <div className="absolute top-4 left-4 pointer-events-none select-none z-10 flex flex-col gap-1.5 bg-slate-900/80 backdrop-blur-sm border border-slate-800/80 px-4 py-3 rounded-lg shadow-lg">
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2.5 h-2.5 rounded-full transition-colors ${isSceneReady ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
-              }`}
-          />
-          <h1 className="text-sm font-semibold tracking-wide text-slate-100">
-            {title}
-          </h1>
+    <div className="relative w-screen h-screen overflow-hidden bg-slate-950 select-none">
+      {/* 3D Babylon.js Canvas Layer */}
+      {shouldRenderCanvas && (
+        <div className="absolute inset-0 z-0">
+          <BabylonCanvas />
         </div>
-        <p className="text-xs text-slate-400">
-          Scene ready • Empty canvas without meshes
-        </p>
+      )}
+
+      {/* Screen Router Layer */}
+      <div className="relative z-10 w-full h-full">
+        {currentScreen === "AUTH" && <AuthScreen />}
+        {currentScreen === "MAIN_MENU" && <MainMenuScreen />}
+        {currentScreen === "PLAY_MENU" && <PlayMenuScreen />}
+        {currentScreen === "MATCH_LOADING" && <MatchLoadingScreen />}
+        {currentScreen === "IN_GAME" && <InGameOverlay />}
       </div>
+
+      {/* Global Modals */}
+      <ProfileModal />
+      <ErrorDialog />
     </div>
   );
 }
