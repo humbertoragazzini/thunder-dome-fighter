@@ -71,12 +71,20 @@ The database schema directly maps the domain models defined in [`shared/domain/I
 - **Role:** Singleton database client using `pg.Pool` connection pool wrapped in `@prisma/adapter-pg` driver.
 - **Design Invariant:** Guarantees Fastify routes and Colyseus game room hooks share a single pooled connection manager.
 
+### Step 2.2: Secure Password Hashing (Argon2id)
+
+#### 4. `server/auth/PasswordHasher.ts`
+- **Location:** [`server/auth/PasswordHasher.ts`](../../server/auth/PasswordHasher.ts)
+- **Role:** Cryptographically secure password hashing, constant-time verification, and input bounds enforcement using `argon2`.
+- **Parameters:** Argon2id with 64 MiB memory hardness (`memoryCost: 65536`), 3 iterations (`timeCost: 3`), and single-thread parallelism (`parallelism: 1`).
+- **DoS Mitigation:** Enforces length constraints (8–128 characters) to prevent CPU-exhaustion Denial-of-Service attacks from oversized payloads.
+
 ---
 
 ## Phase 2 Progress Tracker
 
 - [x] **Step 2.1**: Initialize Docker environment (`docker-compose.yml`) and Prisma ORM with `schema.prisma`.
-- [ ] **Step 2.2**: Implement secure Argon2 password hashing utility.
+- [x] **Step 2.2**: Implement secure Argon2 password hashing utility.
 - [ ] **Step 2.3**: Set up Fastify HTTP server with CORS, JSON Schema validation, and error handlers.
 - [ ] **Step 2.4**: Implement Fastify auth routes (`/api/auth/register`, `/api/auth/login`) with `@fastify/jwt`.
 - [ ] **Step 2.5**: Implement Colyseus `onAuth` WebSocket handshake token verification.
