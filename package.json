@@ -15,19 +15,24 @@
     "@babylonjs/loaders": "^9.25.0",
     "@colyseus/sdk": "^0.18.2",
     "@colyseus/ws-transport": "^0.18.2",
+    "@prisma/adapter-pg": "^7.10.0",
     "@tailwindcss/vite": "^4.3.3",
     "colyseus": "^0.18.5",
+    "pg": "^8.23.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@prisma/client": "^7.10.0",
     "@types/node": "^24.13.3",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
     "oxlint": "^1.79.0",
+    "prisma": "^7.10.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"
   }

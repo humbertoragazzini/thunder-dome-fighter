@@ -1,0 +1,46 @@
+services:
+  # ==================================================
+  # PostgreSQL 16: Primary Relational Data Store
+  # Holds: Users, Players, Sessions, Lifetime Stats
+  # ==================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: thunder-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-thunder_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-thunder_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-thunder_dome_fighter}
+    ports:
+      - "5433:5432"
+    volumes:
+      - thunder_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-thunder_dev} -d ${POSTGRES_DB:-thunder_dome_fighter}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ==================================================
+  # Redis 7: Cache & Colyseus Cluster Presence Driver
+  # Coordinates multi-process room distribution across CPU cores
+  # ==================================================
+  redis:
+    image: redis:7-alpine
+    container_name: thunder-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - thunder_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  thunder_pg_data:
+    name: thunder_pg_data
+  thunder_redis_data:
+    name: thunder_redis_data
