@@ -45,7 +45,27 @@ Okay Beto, create `[filename]` in the `[directory/path/]` directory and paste th
 
 ---
 
-### 4. Continuous Research & Modern Industry Standards
+### 4. File Header Documentation Standard (In-Code Pedagogical Headers)
+Every source file created or significantly modified must begin with a structured comment block explaining its role to anyone reading the codebase:
+
+```typescript
+// ==================================================
+// [MODULE TITLE]
+//
+// WHAT IT DOES:
+// Concise summary of the module's responsibilities and public exports.
+//
+// HOW IT WORKS:
+// The underlying mechanics, algorithms, state flow, and interactions.
+//
+// WHY IT EXISTS:
+// Architectural rationale, relevant ADRs, and key system invariants.
+// ==================================================
+```
+
+---
+
+### 5. Continuous Research & Modern Industry Standards
 * Never rely on outdated patterns or unverified assumptions.
 * The AI must continuously consult up-to-date documentation and web sources to ensure we are using the **latest, idiomatic best practices** for:
   * **Babylon.js (v9+)** & **Havok Physics WASM** (3D Client & Server Physics)
@@ -58,7 +78,7 @@ Okay Beto, create `[filename]` in the `[directory/path/]` directory and paste th
 
 ---
 
-### 5. Git Commit Protocol & Progress Tracking
+### 6. Git Commit Protocol & Progress Tracking
 * Every logical step or milestone must be captured with a clean, descriptive Git commit.
 * The AI will provide the exact `git add` and `git commit` command for Beto to execute.
 * Commits will follow **Conventional Commits** syntax with clear context:
@@ -74,7 +94,7 @@ Okay Beto, create `[filename]` in the `[directory/path/]` directory and paste th
 
 ---
 
-### 6. The Learning Journey
+### 7. The Learning Journey
 * Building this game is not a race to paste lines of code; it is a masterclass in:
   1. **Multiplayer Architecture**: Authoritative servers, client-side prediction, epsilon-based reconciliation, remote entity interpolation, tick-rate synchronization.
   2. **High-Performance API Design with Fastify**: Low-overhead HTTP routing, schema-based request validation (TypeBox/Ajv), JWT authentication middleware, and co-hosting WebSockets and REST on unified ports.

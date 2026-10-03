@@ -46,11 +46,39 @@ The database schema directly maps the domain models defined in [`shared/domain/I
 
 ---
 
+---
+
+## 3. Implemented Files & Components
+
+### Step 2.1: Persistence Infrastructure & Database Schema
+
+#### 1. `docker-compose.yml`
+- **Location:** [`docker-compose.yml`](../../docker-compose.yml)
+- **Role:** Declares `thunder-postgres` (PostgreSQL 16 Alpine mapped to host `5433:5432`) and `thunder-redis` (Redis 7 Alpine mapped to host `6379:6379`) with healthchecks and named volumes.
+- **Port Isolation:** Port `5433` avoids collisions with host services or existing developer containers on standard port `5432`.
+
+#### 2. `prisma.config.ts` & `prisma/schema.prisma`
+- **Location:** [`prisma.config.ts`](../../prisma.config.ts) & [`prisma/schema.prisma`](../../prisma/schema.prisma)
+- **Role:** Implements Prisma 7 configuration decoupled from the schema file.
+- **Tables Generated:**
+  - `users` (credentials, email unique constraint, Argon2 hash)
+  - `players` (persona, unique playerName, 1-to-1 foreign key to users)
+  - `sessions` (active JWTs, indices on `token`, `user_id`, `expires_at`)
+  - `player_stats` (lifetime competitive stats, 1-to-1 foreign key to players)
+
+#### 3. `server/db/prisma.ts`
+- **Location:** [`server/db/prisma.ts`](../../server/db/prisma.ts)
+- **Role:** Singleton database client using `pg.Pool` connection pool wrapped in `@prisma/adapter-pg` driver.
+- **Design Invariant:** Guarantees Fastify routes and Colyseus game room hooks share a single pooled connection manager.
+
+---
+
 ## Phase 2 Progress Tracker
 
-- [ ] **Step 2.1**: Initialize Docker environment (`docker-compose.yml`) and Prisma ORM with `schema.prisma`.
+- [x] **Step 2.1**: Initialize Docker environment (`docker-compose.yml`) and Prisma ORM with `schema.prisma`.
 - [ ] **Step 2.2**: Implement secure Argon2 password hashing utility.
 - [ ] **Step 2.3**: Set up Fastify HTTP server with CORS, JSON Schema validation, and error handlers.
 - [ ] **Step 2.4**: Implement Fastify auth routes (`/api/auth/register`, `/api/auth/login`) with `@fastify/jwt`.
 - [ ] **Step 2.5**: Implement Colyseus `onAuth` WebSocket handshake token verification.
 - [ ] **Step 2.6**: Implement client-side authentication store in Zustand with token persistence.
+

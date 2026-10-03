@@ -11,11 +11,11 @@
 | Field | Value |
 | :--- | :--- |
 | **Current Phase** | **Phase 2 — User Authentication & Player Identity System** |
-| **Current Step** | **Step 2.1 — Initialize Prisma ORM with PostgreSQL schema defining User, Player, and Session** |
-| **Last Completed Step** | **Phase 1 — Architecture Foundations, Generic Domain Models & Shared Contracts (Completed)** |
-| **Next Step** | **Step 2.1 — Install & configure Prisma ORM with PostgreSQL schema and migrations** |
-| **Overall Status** | **Phase 1 100% complete; starting Phase 2 (Fastify + Prisma authentication and database persistence).** |
-| **Last Updated** | **2026-10-01** |
+| **Current Step** | **Step 2.2 — Implement secure password hashing using argon2** |
+| **Last Completed Step** | **Step 2.1 — Initialize Docker environment & Prisma ORM with PostgreSQL migrations** |
+| **Next Step** | **Step 2.2 — Implement Argon2 password hashing utility (`server/auth/PasswordHasher.ts`)** |
+| **Overall Status** | **PostgreSQL & Redis running in Docker; Prisma schema migrated; database client initialized.** |
+| **Last Updated** | **2026-10-03** |
 
 ---
 
@@ -392,12 +392,12 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 2 — User Authentication & Player Identity System
 
-**Status:** Not Started `[ ]`  
+**Status:** In Progress `[~]`  
 **Goal:** Simple, secure account registration, authentication, and distinct Player identity creation.  
 **Dependencies:** Phase 1.  
 
 #### Steps
-- [ ] 2.1 Initialize Docker container environment (`docker-compose.yml` with PostgreSQL 16 Alpine and Redis 7 Alpine) and Prisma ORM with schema (`schema.prisma`) defining `User`, `Player`, and `Session` models with migrations.
+- [x] 2.1 Initialize Docker container environment (`docker-compose.yml` with PostgreSQL 16 Alpine and Redis 7 Alpine) and Prisma ORM with schema (`schema.prisma`) defining `User`, `Player`, and `Session` models with migrations.
 - [ ] 2.2 Implement secure password hashing using `argon2` (never store plaintext passwords).
 - [ ] 2.3 Set up Fastify HTTP server instance with route registration, CORS, error handling, and JSON Schema validation.
 - [ ] 2.4 Implement Fastify authentication routes (`/api/auth/register`, `/api/auth/login`) issuing cryptographically signed JWT tokens via `@fastify/jwt`.
