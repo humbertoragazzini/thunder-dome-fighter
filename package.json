@@ -17,6 +17,7 @@
     "@colyseus/ws-transport": "^0.18.2",
     "@prisma/adapter-pg": "^7.10.0",
     "@tailwindcss/vite": "^4.3.3",
+    "argon2": "^0.45.1",
     "colyseus": "^0.18.5",
     "pg": "^8.23.1",
     "react": "^19.2.8",

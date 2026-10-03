@@ -1,13 +1,19 @@
 // ==================================================
 // GENERIC DOMAIN CONTRACTS: IDENTITY & ACCOUNTS
 //
-// Pure TypeScript interfaces shared across:
-// - Fastify HTTP API (Auth & Profiles)
-// - Colyseus Server (Session validation in onAuth)
-// - Prisma Persistence layer
-// - React Client (Zustand state & UI screens)
+// WHAT IT DOES:
+// Declares the core identity domain types (User, Player, Session,
+// PlayerStats, and PlayerProfileView) for authentication and profiles.
 //
-// Invariant: ZERO dependencies on DOM, React, Babylon, or Colyseus.
+// HOW IT WORKS:
+// Defines strict TypeScript interfaces shared across Fastify API, Prisma
+// persistence, Colyseus onAuth handshake, and React Zustand stores without
+// any runtime dependencies.
+//
+// WHY IT EXISTS:
+// Enforces ADR-004 (Decoupled User vs. Player Identity). Decoupling
+// security credentials from in-game player personas prevents credential
+// leaks and allows future multi-persona or multi-character accounts.
 // ==================================================
 
 /**

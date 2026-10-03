@@ -1,11 +1,19 @@
 // ==================================================
 // GENERIC DOMAIN CONTRACTS: LEVELS & ARENAS
 //
-// Declarative definitions of game environments, arena boundaries,
-// and team/individual spawn coordinates.
+// WHAT IT DOES:
+// Declares level geometry data structures (Vector3D, BoundingBox3D, SpawnPoint,
+// ItemSpawnPoint, LevelDefinition) and the standard arena registry.
 //
-// Invariant: Pure TypeScript math representations (Vector3D)
-// with ZERO engine dependencies (no Babylon or Three.js).
+// HOW IT WORKS:
+// Uses engine-agnostic vector representations to declare spawn points,
+// item pickups, and kill boundaries (ring-out envelopes) loaded by both
+// the Havok physics server and Babylon client scene.
+//
+// WHY IT EXISTS:
+// Enforces ADR-006 (Generic Domain Models). Keeps environment definitions
+// decoupled from rendering engines and physics systems so arena configs can
+// be loaded dynamically from database or static manifests.
 // ==================================================
 
 /**

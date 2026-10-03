@@ -1,8 +1,17 @@
 // ==================================================
 // NETWORK CONTRACTS: CLIENT TO SERVER MESSAGES
 //
-// Typed WebSocket messages dispatched from the client to Colyseus.
-// Invariant: ZERO dependencies on engine, DOM, or React.
+// WHAT IT DOES:
+// Defines typed message constants (ClientMessageType) and mapped payload
+// interfaces (ClientMessagePayloadMap) for client-to-server WebSocket events.
+//
+// HOW IT WORKS:
+// Pairs each message type string (e.g. "player-input") with its exact payload
+// schema, enabling compile-time type checking on client `room.send()` calls.
+//
+// WHY IT EXISTS:
+// Eliminates magic strings in WebSocket communication. Enforces strict client
+// intention boundaries (clients send inputs, not authoritative game outcomes).
 // ==================================================
 
 import type { GameModeId } from "../../domain/GameMode.ts";

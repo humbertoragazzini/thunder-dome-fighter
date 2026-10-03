@@ -1,10 +1,18 @@
 // ==================================================
 // GENERIC DOMAIN CONTRACTS: PARTIES & GROUP MATCHMAKING
 //
-// Social grouping for friends to assemble and enter
-// matchmaking queues as an indivisible atomic team unit.
+// WHAT IT DOES:
+// Declares Party, PartyMember, and MatchmakingTicket models for social
+// grouping and multi-player queue entry.
 //
-// Invariant: ZERO dependencies on Colyseus, Fastify, or React.
+// HOW IT WORKS:
+// Assembles friends into a party unit under a leader, tracks readiness,
+// and packages players into an indivisible MatchmakingTicket for the matchmaker.
+//
+// WHY IT EXISTS:
+// Enforces ADR-013 (Atomic Party Cohesion & Bin-Packing Team Backfilling).
+// Guarantees parties are never fragmented onto opposing teams during match
+// creation or queue backfilling.
 // ==================================================
 
 import type { EntityId } from "./Identity.ts";

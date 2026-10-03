@@ -1,12 +1,18 @@
 // ==================================================
 // HUMANOID CHARACTER PHYSICS & ROTATION MATH
 //
-// Pure TypeScript deterministic routines for:
-// - Diagonal input vector normalization
-// - Relative-to-world velocity transformations
-// - Shortest angular path rotations
+// WHAT IT DOES:
+// Pure deterministic math routines for character input clamping,
+// local-to-world velocity projection, and angular normalization.
 //
-// Invariant: ZERO external engine or DOM dependencies.
+// HOW IT WORKS:
+// - clampInputVector: bounds diagonal inputs to unit length (prevents 1.414x speed exploit).
+// - calculateCharacterTargetVelocity: projects local WASD into world vectors via lookYaw.
+// - normalizeAngle & calculateShortestAngleDelta: computes shortest rotational delta [-PI, +PI].
+//
+// WHY IT EXISTS:
+// Ensures 100% mathematical parity between client prediction and server
+// authoritative Havok simulation. Server clamping prevents client speed hacks.
 // ==================================================
 
 import { CHARACTER_FORCES } from "./PlayerConfig.ts";

@@ -1,9 +1,19 @@
 // ==================================================
 // GENERIC DOMAIN CONTRACTS: MATCH & STATE MACHINE
 //
-// Lifecycle states, participant records, and live match scoring.
+// WHAT IT DOES:
+// Declares the 9-state MatchStatus state machine, MatchParticipant,
+// MatchTeam, Match summary models, and live scoreboard structures.
 //
-// Invariant: ZERO dependencies on Colyseus, Babylon, or React.
+// HOW IT WORKS:
+// Governs the match lifecycle (CREATED -> WAITING -> PLAYING -> FINALIZING -> CLOSED)
+// and tracks in-match participant statistics (kills, deaths, damage) decoupled
+// from persistent lifetime stats.
+//
+// WHY IT EXISTS:
+// Enforces ADR-005 (Temporary match progression is strictly runtime state)
+// and ADR-012 (Idempotent match finalization). Prevents illegal state transitions
+// like taking damage during countdown or after match end.
 // ==================================================
 
 import type { EntityId } from "./Identity.ts";

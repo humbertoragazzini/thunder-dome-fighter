@@ -1,8 +1,17 @@
 // ==================================================
 // NETWORK CONTRACTS: SERVER TO CLIENT MESSAGES
 //
-// Typed WebSocket messages dispatched from Colyseus to connected clients.
-// Invariant: ZERO dependencies on engine, DOM, or React.
+// WHAT IT DOES:
+// Defines typed message constants (ServerMessageType) and mapped payload
+// interfaces (ServerMessagePayloadMap) for server-to-client WebSocket events.
+//
+// HOW IT WORKS:
+// Formats authoritative server broadcasts (match status transitions, countdowns,
+// error alerts, match summaries) into strictly typed payloads parsed by clients.
+//
+// WHY IT EXISTS:
+// Enforces server authority (the server informs the client of lifecycle
+// changes, errors, and match outcomes, never vice-versa).
 // ==================================================
 
 import type { MatchStatus, MatchSummaryView } from "../../domain/Match.ts";

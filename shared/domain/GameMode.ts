@@ -1,10 +1,19 @@
 // ==================================================
 // GENERIC DOMAIN CONTRACTS: GAME MODES
 //
-// Declarative configuration governing match rules, player limits,
-// team structures, scoring objectives, and respawn behavior.
+// WHAT IT DOES:
+// Defines the GameMode interface and the GAME_MODES registry providing
+// declarative rulebooks for match formats (1v1, 3v3, 4v4, FFA).
 //
-// Invariant: ZERO dependencies on Colyseus, Babylon, or DOM.
+// HOW IT WORKS:
+// Supplies immutable configuration parameters (min/max players, team count,
+// score to win, match duration, respawn delays, friendly fire) injected
+// into Colyseus rooms upon creation.
+//
+// WHY IT EXISTS:
+// Enforces ADR-006 (Generic Domain Models). Enables the game server to support
+// varied match rules and formats dynamically without subclassing or duplicating
+// room server code.
 // ==================================================
 
 /**

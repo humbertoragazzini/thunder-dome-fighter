@@ -1,10 +1,20 @@
 // ==================================================
 // GAMEPLAY CONTRACTS: MATCH & COMBAT EVENTS
 //
-// Typed event definitions emitted by the authoritative server
-// to trigger sound effects, particles, kill feeds, and HUD updates.
+// WHAT IT DOES:
+// Defines discrete match event constants (MatchEventType), detailed event
+// payloads (DamageApplied, PlayerKilled, ModifierChanged, etc.), and the
+// MatchEvent envelope interface.
 //
-// Invariant: ZERO dependencies on Babylon.js, Colyseus, or DOM.
+// HOW IT WORKS:
+// Wraps gameplay events in a timestamped envelope (`serverTick`, `eventId`,
+// `payload`) dispatched over WebSocket to trigger audio, particles, damage numbers,
+// kill notifications, and UI animations.
+//
+// WHY IT EXISTS:
+// Distinguishes continuous 30 Hz transform snapshots (position/rotation) from
+// discrete occurrences. Events are guaranteed not to be lost or blended away
+// during visual interpolation.
 // ==================================================
 
 import type { EntityId } from "../../domain/Identity.ts";

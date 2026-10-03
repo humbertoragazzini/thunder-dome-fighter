@@ -1,9 +1,18 @@
 // ==================================================
 // PLAYER, PHYSICS & NETWORKING SHARED CONFIGURATION
 //
-// Pure TypeScript constants and interfaces shared between
-// client prediction and server simulation.
-// No Babylon, Scene, React, or Colyseus dependencies.
+// WHAT IT DOES:
+// Declares physics constants (30 Hz), character capsule geometry, movement
+// forces, input command interfaces, and legacy vehicle aliases.
+//
+// HOW IT WORKS:
+// Exports pure, immutable configuration objects and types shared identically
+// between client prediction and server Havok simulation.
+//
+// WHY IT EXISTS:
+// Enforces ADR-010 (30 Hz server simulation) and Strangler Fig pattern for
+// vehicle-to-humanoid transition. Ensures deterministic parity between client
+// and server physics calculations.
 // ==================================================
 
 // ==================================================
