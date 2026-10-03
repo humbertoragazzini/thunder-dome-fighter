@@ -1,7 +1,28 @@
-import { Client, Room } from "colyseus";
+// ==================================================
+// AUTHORITATIVE MULTIPLAYER GAME ROOM
+//
+// WHAT IT DOES:
+// Manages the real-time Colyseus room lifecycle, WebSocket authentication
+// handshake, input ingestion, and synchronized authoritative game state.
+//
+// HOW IT WORKS:
+// - onAuth: Verifies JWT token and active PostgreSQL session before connection.
+// - onJoin: Spawns Havok character capsule and initializes network state.
+// - handlePlayerInput: Validates sequence numbers, sanitizes inputs, and
+//   enqueues commands into the Havok simulation accumulator at 30 Hz.
+// - syncSimulationState: Broadcasts physics body transforms to all clients at 30 Hz.
+// - onLeave: Despawns entities and tears down session tracking.
+//
+// WHY IT EXISTS:
+// Serves as the authoritative master simulation node. The server dictates
+// physics, positions, health, and outcomes; clients stream inputs only.
+// ==================================================
+
+import { Client, Room, ServerError } from "colyseus";
 import { GameState, PlayerState } from "./GameState";
 import { SimulatorWorld } from "./SimulationWorld";
 import type { PlayerInputCommand } from "../shared/player/PlayerConfig";
+import { verifySessionToken, type AuthenticatedUser } from "./auth/TokenVerifier.ts";
 
 // ==================================================
 // INPUT VALIDATION & CLAMPING
@@ -143,6 +164,28 @@ export class GameRoom extends Room {
   }
 
   // ==================================================
+  // WEBSOCKET AUTHENTICATION HOOK
+  // ==================================================
+
+  async onAuth(client: Client, options: unknown): Promise<AuthenticatedUser> {
+    const token =
+      typeof options === "object" && options !== null && "token" in options
+        ? (options as { token: unknown }).token
+        : undefined;
+
+    if (!token || typeof token !== "string") {
+      throw new ServerError(401, "Authentication token required to enter arena.");
+    }
+
+    try {
+      return await verifySessionToken(token);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Invalid session token.";
+      throw new ServerError(401, message);
+    }
+  }
+
+  // ==================================================
   // PLAYER INPUT HANDLING
   // ==================================================
 
@@ -167,11 +210,13 @@ export class GameRoom extends Room {
   // ==================================================
 
   onJoin(client: Client) {
-    console.log("Player joined:", client.sessionId);
+    const auth = client.auth as AuthenticatedUser;
+    console.log(`🎮 Player joined: ${auth.playerName} (${auth.playerId}) [Session: ${client.sessionId}]`);
+
     this.simulationWorld.spawnEntity(client.sessionId);
+
     // Create the network state for this player.
     const playerState = new PlayerState();
-
     playerState.playerId = client.sessionId;
 
     // Add it to the synchronized players map.
@@ -186,7 +231,9 @@ export class GameRoom extends Room {
   // ==================================================
 
   onLeave(client: Client) {
-    console.log("Player leaving:", client.sessionId);
+    const auth = client.auth as AuthenticatedUser | undefined;
+    const playerName = auth?.playerName ?? client.sessionId;
+    console.log(`👋 Player leaving: ${playerName} [Session: ${client.sessionId}]`);
 
     this.simulationWorld.removeEntity(client.sessionId);
 

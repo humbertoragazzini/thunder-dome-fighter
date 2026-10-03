@@ -103,6 +103,19 @@ The database schema directly maps the domain models defined in [`shared/domain/I
 - **Session Tracking:** Records issued JWT tokens in PostgreSQL (`sessions` table) with exact 24-hour expiration for instant server-side revocation.
 - **Profile Inspection:** `/me` verifies the JWT Bearer token, validates the session against the database, and dynamically computes derived ratios (`killDeathRatio`, `winRatePercentage`).
 
+### Step 2.5: Colyseus onAuth Handshake Token Verification
+
+#### 8. `server/auth/TokenVerifier.ts`
+- **Location:** [`server/auth/TokenVerifier.ts`](../../server/auth/TokenVerifier.ts)
+- **Role:** Independent JWT verification routine used by Colyseus WebSocket handshakes.
+- **Dual Verification:** Cryptographically validates HMAC signature with `fast-jwt`, then queries PostgreSQL `sessions` to ensure the session exists, has not expired, and has not been revoked.
+
+#### 9. `server/GameRoom.ts`
+- **Location:** [`server/GameRoom.ts`](../../server/GameRoom.ts)
+- **Role:** Authoritative game room lifecycle controller.
+- **Handshake Gate (`onAuth`):** Intercepts client connection requests, extracts `{ token }` from join options, calls `verifySessionToken()`, and attaches authenticated player data (`userId`, `playerId`, `playerName`) to `client.auth`. Rejects unauthenticated connections with `ServerError(401)`.
+- **Identity Binding:** `onJoin` associates the verified database player identity with the client's simulation session.
+
 ---
 
 ## Phase 2 Progress Tracker
@@ -111,6 +124,6 @@ The database schema directly maps the domain models defined in [`shared/domain/I
 - [x] **Step 2.2**: Implement secure Argon2 password hashing utility.
 - [x] **Step 2.3**: Set up Fastify HTTP server with CORS, JSON Schema validation, and error handlers.
 - [x] **Step 2.4**: Implement Fastify auth routes (`/api/auth/register`, `/api/auth/login`) with `@fastify/jwt`.
-- [ ] **Step 2.5**: Implement Colyseus `onAuth` WebSocket handshake token verification.
+- [x] **Step 2.5**: Implement Colyseus `onAuth` WebSocket handshake token verification.
 - [ ] **Step 2.6**: Implement client-side authentication store in Zustand with token persistence.
 

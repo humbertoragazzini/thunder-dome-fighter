@@ -11,10 +11,10 @@
 | Field | Value |
 | :--- | :--- |
 | **Current Phase** | **Phase 2 — User Authentication & Player Identity System** |
-| **Current Step** | **Step 2.5 — Implement token verification middleware for Colyseus connection handshake (onAuth hook)** |
-| **Last Completed Step** | **Step 2.4 — Implement Fastify auth routes (/api/auth/register, /api/auth/login, /api/auth/me) with timing defense** |
-| **Next Step** | **Step 2.5 — Connect Colyseus onAuth hook to verify JWT and active database session (`server/GameRoom.ts`)** |
-| **Overall Status** | **Fastify auth endpoints operational with timing-attack defense; ready for Colyseus onAuth hook.** |
+| **Current Step** | **Step 2.6 — Implement client-side auth state in Zustand store with token persistence** |
+| **Last Completed Step** | **Step 2.5 — Implement token verification middleware for Colyseus connection handshake (onAuth hook)** |
+| **Next Step** | **Step 2.6 — Implement Zustand client auth store (`src/store/useAuthStore.ts`)** |
+| **Overall Status** | **Colyseus onAuth hook active and rejecting unauthenticated connections; ready for client auth store.** |
 | **Last Updated** | **2026-10-03** |
 
 ---
@@ -401,7 +401,7 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 - [x] 2.2 Implement secure password hashing using `argon2` (never store plaintext passwords).
 - [x] 2.3 Set up Fastify HTTP server instance with route registration, CORS, error handling, and JSON Schema validation.
 - [x] 2.4 Implement Fastify authentication routes (`/api/auth/register`, `/api/auth/login`) issuing cryptographically signed JWT tokens via `@fastify/jwt`.
-- [ ] 2.5 Implement token verification middleware for Colyseus connection handshake (`onAuth` hook in `GameRoom`) to validate JWT sessions before allowing room joins.
+- [x] 2.5 Implement token verification middleware for Colyseus connection handshake (`onAuth` hook in `GameRoom`) to validate JWT sessions before allowing room joins.
 - [ ] 2.6 Implement client-side auth state in Zustand store with token persistence in `localStorage`.
 
 #### Completion Criteria
