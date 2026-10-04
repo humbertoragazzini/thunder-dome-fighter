@@ -446,7 +446,7 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 **Dependencies:** Phase 1, Phase 3.  
 
 #### Steps
-- [ ] 4.1 Update `SimulationWorld.ts` player physics body from box to upright capsule shape (radius: 0.4m, total height: 1.8m).
+- [ ] 4.1 Update `SimulationWorld.ts` player physics body from box to upright capsule shape (radius: 0.4m, total height: 1.8m), calibrated as the physical locomotion motor anchoring the upcoming Phase 5 articulated cube rig.
 - [ ] 4.2 Lock physical rotation on X and Z axes (prevent tipping over); rotation yaw is controlled explicitly around Y.
 - [ ] 4.3 Implement grounded detection via Havok downward raycast or contact collector.
 - [ ] 4.4 Implement 8-way directional movement forces/impulses based on player look yaw and camera heading.
@@ -465,26 +465,30 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ---
 
-### Phase 5 — Client Character Rendering & GLB Animation System
+### Phase 5 — Client Character Visuals & Hierarchical Articulated Cube Rig (Approach B)
 
 **Status:** Not Started `[ ]`  
-**Goal:** Replace primitive boxes with 3D character GLBs, skeletal rigs, AnimationGroups, and a state machine.  
+**Goal:** Build a modular 15-cube articulated character hierarchy in Babylon.js (Torso, Head, 3-joint Arms, 3-joint Legs) anchored to the Phase 4 capsule, with procedural joint swing animations (Idle, Walk, Run, Jump, Punch, Kick) and customizable materials.  
 **Dependencies:** Phase 4.  
 
 #### Steps
-- [ ] 5.1 Implement asset loading manager using `@babylonjs/loaders` supporting GLTF/GLB models.
-- [ ] 5.2 Extract and bind standard `AnimationGroup` tracks from character GLB: `Idle`, `Walk`, `Run`, `JumpStart`, `JumpApex`, `Land`, `PunchLight`, `Kick`, `HitReact`, `Death`.
-- [ ] 5.3 Implement client-side `CharacterAnimationStateMachine` driven purely by authoritative gameplay state flags.
-- [ ] 5.4 Configure animation cross-fading and blending (e.g., 0.15s transition between Idle and Run).
-- [ ] 5.5 Bind remote player visual instances to their own independent animation state machines.
-- [ ] 5.6 Verify complete decoupling: animations never dictate physics or collision timing.
+- [ ] 5.1 Construct 15-cube articulated transform hierarchy in Babylon.js:
+  - Root: Torso cube anchored to the Havok locomotion capsule.
+  - Head: Attached via neck pivot.
+  - Left & Right Arms (3 joints each): Shoulder joint → Upper Arm cube → Elbow joint → Forearm cube → Wrist joint → Hand/Fist cube.
+  - Left & Right Legs (3 joints each): Hip joint → Thigh cube → Knee joint → Shin cube → Ankle joint → Foot cube.
+- [ ] 5.2 Calibrate anatomical joint pivot offsets to enable natural rotational range of motion without visual clipping.
+- [ ] 5.3 Implement client-side `CharacterProceduralAnimator` driving joint rotations via trigonometric curves based on speed and movement state (`Idle`, `Walk`, `Run`, `Jump`, `Fall`, `Land`).
+- [ ] 5.4 Bind root visual transform to the client-predicted capsule transform, absorbing position/yaw updates seamlessly.
+- [ ] 5.5 Support material styling & player color palettes (Player 1 Red/Amber, Player 2 Cyan/Blue, team shaders).
+- [ ] 5.6 Bind remote player visual instances to their own independent articulated cube rigs driven by interpolated network state.
 
 #### Completion Criteria
-- Local and remote characters render as 3D humanoid models with continuous, blended animations.
-- Animation transitions occur instantly upon server state transitions with zero glitching.
+- Local and remote characters render as expressive, 15-cube articulated humanoid fighters with procedural walking, running, and jumping limb swings.
+- Limb swings react dynamically to movement speed with zero desync between visuals and Havok physics capsule.
 
 #### Verification
-- Visual inspection: Local player transitions from Idle to Run to Jump smoothly; remote player mirrors actions accurately.
+- Visual inspection: Local player walks/runs/jumps with coordinated arm and leg swings; remote players mirror animations accurately over the network.
 
 ---
 
@@ -591,11 +595,12 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 #### Steps
 - [ ] 10.1 Define combat configuration in `shared/combat/CombatConfig.ts` (light attack, heavy attack, damage values, active frame windows, recovery frames).
-- [ ] 10.2 Implement authoritative server hitbox generation attached to attacking character's transform during active attack frames.
-- [ ] 10.3 Implement hurtbox registration on all characters (capsule volume matching physical body).
+- [ ] 10.2 Implement authoritative server hitbox generation attached to attacking character's Fist/Hand cubes (punches) and Foot cubes (kicks) during active attack frames.
+- [ ] 10.3 Implement discrete hurtbox registration across body cubes: Head cube (critical damage), Torso cube (standard body), and Limbs (glancing damage).
 - [ ] 10.4 Implement server hit resolution: check spatial overlap, verify attacker is not in stun, apply damage, compute horizontal and vertical knockback impulses.
 - [ ] 10.5 Implement temporary hit stun state (briefly locks movement and attack intentions for victim).
 - [ ] 10.6 Dispatch authoritative combat events to client: play hit reaction animation, spawn visual impact particles, play sound effects.
+- [ ] 10.7 Implement Knockout Ragdoll Collapse: When fighter HP reaches 0, activate physical Havok 6DOF constraints between the 15 articulated cubes for a satisfying physical ragdoll defeat.
 
 #### Completion Criteria
 - Hits register reliably on server regardless of client frame rate.
@@ -1141,6 +1146,8 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 | **ADR-013** | **Atomic Party Cohesion & Bin-Packing Team Backfilling** | Friends in a party are treated as an indivisible unit in matchmaking and strictly assigned to the same team, with missing slots filled by solos. | **Accepted** |
 | **ADR-014** | **Multi-Core Physics Scaling via Multi-Process Clustering & Redis Presence** | Distributes Colyseus rooms across independent Node worker processes/containers, avoiding single-thread bottlenecks for Havok physics. | **Accepted** |
 | **ADR-015** | **Deterministic Physics via Docker CPU Pinning (`cpuset`) & L1/L2 Cache Affinity** | Locks server worker containers to specific physical CPU cores to eliminate OS thread migration and cache cold misses. | **Accepted** |
+| **ADR-016** | **Hierarchical Articulated Cube Rig for Character Representation (Approach B)** | Decouples locomotion physics from the visual skeleton: an authoritative Havok capsule handles floor/wall locomotion, while a 15-cube hierarchical joint rig (Torso, Head, 3-joint Arms, 3-joint Legs) renders procedural limb animation, attaches combat hitboxes/hurtboxes, and unlocks full physical ragdoll on knockout. | **Accepted** |
+| **ADR-017** | **Self-Hosted Dedicated Server Topology (No Public Cloud Lock-In)** | All deployment targets Beto's own dedicated Linux bare-metal hardware using Docker Compose, reverse proxy (Caddy/Nginx), and multi-core CPU process clustering, eliminating cloud virtualization jitter and egress costs. | **Accepted** |
 
 ---
 

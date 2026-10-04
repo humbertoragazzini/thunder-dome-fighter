@@ -29,7 +29,7 @@ export const PHYSICS_DT_SECONDS = 1 / PHYSICS_HZ;
 
 export const CHARACTER_CAPSULE = {
   radius: 0.4, // 0.4m radius (0.8m diameter shoulder-to-shoulder)
-  totalHeight: 1.8, // 1.8m standard human height
+  totalHeight: 1.1, // 1.8m standard human height
 } as const;
 
 export const CHARACTER_FORCES = {
