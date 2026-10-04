@@ -4,11 +4,13 @@ import {
   Quaternion,
   Mesh,
   MeshBuilder,
+  StandardMaterial,
+  Color3,
 } from "@babylonjs/core";
 
 import {
   PHYSICS_DT_SECONDS,
-  PLAYER_BOX_SIZE,
+  CHARACTER_CAPSULE,
   REMOTE_INTERPOLATION_TARGET_DELAY_TICKS,
   REMOTE_INTERPOLATION_DELAY_TOLERANCE_TICKS,
   REMOTE_MAX_SNAPSHOTS,
@@ -137,15 +139,24 @@ export class RemotePlayerInterpolation {
 
       // First time remote player appears: spawn visual mesh immediately
       if (!visual) {
-        const mesh = MeshBuilder.CreateBox(
+        const mesh = MeshBuilder.CreateCapsule(
           `remote-player-${playerId}`,
           {
-            width: PLAYER_BOX_SIZE.width,
-            height: PLAYER_BOX_SIZE.height,
-            depth: PLAYER_BOX_SIZE.depth,
+            radius: CHARACTER_CAPSULE.radius,
+            height: CHARACTER_CAPSULE.totalHeight,
+            tessellation: 16,
+            subdivisions: 1,
           },
           scene,
         );
+
+        const remoteMat = new StandardMaterial(
+          `remote-mat-${playerId}`,
+          scene,
+        );
+        remoteMat.diffuseColor = new Color3(0.9, 0.25, 0.25);
+        remoteMat.specularColor = new Color3(0.2, 0.2, 0.2);
+        mesh.material = remoteMat;
 
         mesh.position.set(playerState.x, playerState.y, playerState.z);
         mesh.rotationQuaternion = new Quaternion(
@@ -206,6 +217,7 @@ export class RemotePlayerInterpolation {
     // Dispose remote players no longer present
     for (const [playerId, visual] of this.remotePlayers) {
       if (!activeRemotePlayerIds.has(playerId)) {
+        visual.mesh.material?.dispose();
         visual.mesh.dispose();
         this.remotePlayers.delete(playerId);
       }
@@ -332,6 +344,7 @@ export class RemotePlayerInterpolation {
 
   dispose() {
     for (const visual of this.remotePlayers.values()) {
+      visual.mesh.material?.dispose();
       visual.mesh.dispose();
     }
     this.remotePlayers.clear();

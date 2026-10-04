@@ -21,13 +21,14 @@ import { Client, type Room } from "@colyseus/sdk";
 import { useEffect, useState } from "react";
 import { useAppStore } from "../store/useAppStore";
 import { useAuthStore } from "../store/useAuthStore";
+import { getColyseusUrl } from "../config/network";
 
 // ==================================================
 // CONNECT
 // ==================================================
 
 async function connect() {
-  const colyseusUrl = import.meta.env.VITE_COLYSEUS_URL ?? "ws://localhost:2567";
+  const colyseusUrl = getColyseusUrl();
   const token = useAuthStore.getState().token;
 
   if (!token) {

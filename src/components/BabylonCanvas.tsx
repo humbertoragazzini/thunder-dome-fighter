@@ -1,4 +1,25 @@
-import { useEffect, useRef } from "react";
+// ==================================================
+// BABYLON CANVAS 3D VIEWPORT & PREDICTION HOST
+//
+// WHAT IT DOES:
+// Mounts the authoritative Babylon.js WebGL/WebGPU engine, initializes local
+// Havok physics prediction, manages remote opponent interpolation, and orchestrates
+// centralized multi-device player input (keyboard, gamepad, touchscreen).
+//
+// HOW IT WORKS:
+// - Initializes headless Havok wasm plugin on the Babylon Scene with manual stepping.
+// - Spawns upright humanoid capsule visual mesh (1.1m height, 0.4m radius) for local player.
+// - Integrates CharacterInputController to poll hot-swappable keyboard/mouse, physical gamepad,
+//   and mobile TouchGamepadOverlay virtual controls.
+// - Advances 30 Hz fixed local prediction and decays visual discrepancy offsets.
+// - Drives remote player monotonic snapshot interpolation with time dilation.
+//
+// WHY IT EXISTS:
+// Primary game screen viewport. Bridges high-frequency input sampling, client prediction,
+// authoritative network states, and smooth 60+ FPS visual rendering.
+// ==================================================
+
+import { useEffect, useRef, useState } from "react";
 
 import {
   Engine,
@@ -7,9 +28,11 @@ import {
   Vector3,
   HemisphericLight,
   Color4,
+  Color3,
   MeshBuilder,
   Quaternion,
   HavokPlugin,
+  StandardMaterial,
 } from "@babylonjs/core";
 
 import HavokPhysics from "@babylonjs/havok";
@@ -17,12 +40,15 @@ import HavokPhysics from "@babylonjs/havok";
 import { useAppStore } from "../store/useAppStore";
 import { LocalPlayerPrediction } from "./LocalPlayerPrediction";
 import { RemotePlayerInterpolation } from "./RemotePlayerInterpolation";
+import { CharacterInputController } from "../input/CharacterInputController";
+import type { TouchVirtualGamepadProvider } from "../input/providers/TouchVirtualGamepadProvider";
+import { TouchGamepadOverlay } from "./ui/organisms/TouchGamepadOverlay";
 import {
-  PLAYER_BOX_SIZE,
+  CHARACTER_CAPSULE,
   FLOOR_SIZE,
   FLOOR_POSITION,
   GRAVITY,
-  type PlayerInput,
+  type CharacterInputCommand,
   type PlayerInputCommand,
 } from "../../shared/player/PlayerConfig";
 
@@ -38,7 +64,10 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
 
   const localPredictionRef = useRef<LocalPlayerPrediction | null>(null);
   const remoteInterpolationRef = useRef<RemotePlayerInterpolation | null>(null);
+  const inputControllerRef = useRef<CharacterInputController | null>(null);
   const stateChangeHandlerRef = useRef<((state: any) => void) | null>(null);
+
+  const [touchProvider, setTouchProvider] = useState<TouchVirtualGamepadProvider | null>(null);
 
   const room = useAppStore((state) => state.room);
   const setReady = useAppStore((state) => state.setReady);
@@ -52,33 +81,11 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
 
     let disposed = false;
 
-    // Track currently held keyboard inputs
-    const activeCodes = new Set<string>();
-    const currentHeldInput: PlayerInput = {
-      throttle: 0,
-      steering: 0,
-      brake: 0,
-    };
-
-    const updateHeldInput = () => {
-      const isW = activeCodes.has("KeyW");
-      const isS = activeCodes.has("KeyS");
-      const isA = activeCodes.has("KeyA");
-      const isD = activeCodes.has("KeyD");
-
-      currentHeldInput.throttle = isW ? 1 : 0;
-      currentHeldInput.brake = isS ? 1 : 0;
-
-      if (isA && isD) {
-        currentHeldInput.steering = 0;
-      } else if (isA) {
-        currentHeldInput.steering = -1;
-      } else if (isD) {
-        currentHeldInput.steering = 1;
-      } else {
-        currentHeldInput.steering = 0;
-      }
-    };
+    // Centralized multi-device input controller
+    const inputController = new CharacterInputController();
+    inputController.initialize();
+    inputControllerRef.current = inputController;
+    setTouchProvider(inputController.touch);
 
     async function initializeBabylon() {
       // ==================================================
@@ -118,19 +125,25 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
       // VISUAL MESHES
       // ==================================================
 
-      // Visible local player mesh (smoothly follows predicted present state)
-      const localPlayerMesh = MeshBuilder.CreateBox(
+      // Visible local player humanoid capsule (smoothly follows predicted present state)
+      const localPlayerMesh = MeshBuilder.CreateCapsule(
         "local-player",
         {
-          width: PLAYER_BOX_SIZE.width,
-          height: PLAYER_BOX_SIZE.height,
-          depth: PLAYER_BOX_SIZE.depth,
+          radius: CHARACTER_CAPSULE.radius,
+          height: CHARACTER_CAPSULE.totalHeight,
+          tessellation: 16,
+          subdivisions: 1,
         },
         scene,
       );
 
       localPlayerMesh.position.set(0, 1, 0);
       localPlayerMesh.rotationQuaternion = Quaternion.Identity();
+
+      const localMat = new StandardMaterial("local-player-mat", scene);
+      localMat.diffuseColor = new Color3(0.2, 0.6, 1.0); // Vibrant blue/cyan
+      localMat.specularColor = new Color3(0.3, 0.3, 0.3);
+      localPlayerMesh.material = localMat;
 
       // Static floor visual mesh
       const floor = MeshBuilder.CreateBox(
@@ -149,6 +162,11 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
         FLOOR_POSITION.z,
       );
 
+      const floorMat = new StandardMaterial("floor-mat", scene);
+      floorMat.diffuseColor = new Color3(0.12, 0.14, 0.18);
+      floorMat.specularColor = new Color3(0.05, 0.05, 0.05);
+      floor.material = floorMat;
+
       // ==================================================
       // CAMERA & LIGHT
       // ==================================================
@@ -164,7 +182,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
 
       camera.attachControl(canvas, true);
 
-      // Prevent WASD from rotating the camera
+      // Prevent WASD and Arrow keys from rotating the camera
       camera.inputs.removeByType("ArcRotateCameraKeyboardMoveInput");
 
       const light = new HemisphericLight(
@@ -181,7 +199,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
       const localPrediction = new LocalPlayerPrediction(
         scene,
         havokPlugin,
-        (command: PlayerInputCommand) => {
+        (command: CharacterInputCommand | PlayerInputCommand) => {
           room?.send("player-input", command);
         },
       );
@@ -250,9 +268,10 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
 
       engine.runRenderLoop(() => {
         const deltaSeconds = engine.getDeltaTime() / 1000;
+        const currentInput = inputController.pollInput();
 
         // 1. Fixed 30 Hz local prediction loop
-        localPrediction.updatePrediction(currentHeldInput, deltaSeconds);
+        localPrediction.updatePrediction(currentInput, deltaSeconds);
 
         // 2. Frame-rate-independent visual smoothing
         localPrediction.updateVisualSmoothing(
@@ -271,51 +290,19 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
     initializeBabylon();
 
     // ==================================================
-    // WINDOW & INPUT EVENT LISTENERS
+    // WINDOW LISTENERS
     // ==================================================
 
     const handleResize = () => {
       engineRef.current?.resize();
     };
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.code === "KeyW" ||
-        event.code === "KeyA" ||
-        event.code === "KeyS" ||
-        event.code === "KeyD"
-      ) {
-        activeCodes.add(event.code);
-        updateHeldInput();
-      }
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (
-        event.code === "KeyW" ||
-        event.code === "KeyA" ||
-        event.code === "KeyS" ||
-        event.code === "KeyD"
-      ) {
-        activeCodes.delete(event.code);
-        updateHeldInput();
-      }
-    };
-
-    // Prevent stuck throttle / steering when browser loses focus
+    // Dispatches immediate neutral command over WebSocket without unsimulated pendingInputs push
     const handleBlur = () => {
-      activeCodes.clear();
-      currentHeldInput.throttle = 0;
-      currentHeldInput.steering = 0;
-      currentHeldInput.brake = 0;
-
-      // Dispatches immediate neutral command over WebSocket without unsimulated pendingInputs push
       localPredictionRef.current?.sendNeutralInput();
     };
 
     window.addEventListener("resize", handleResize);
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
     window.addEventListener("blur", handleBlur);
 
     // ==================================================
@@ -326,9 +313,11 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
       disposed = true;
 
       window.removeEventListener("resize", handleResize);
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleBlur);
+
+      inputController.dispose();
+      inputControllerRef.current = null;
+      setTouchProvider(null);
 
       // Clean up Colyseus signal listener explicitly without removeAllListeners()
       if (room && stateChangeHandlerRef.current) {
@@ -353,9 +342,12 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
   }, [room, onSceneReady, setReady]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="w-full h-full block outline-none touch-none"
-    />
+    <div className="relative w-full h-full select-none overflow-hidden">
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full block outline-none touch-none"
+      />
+      {touchProvider && <TouchGamepadOverlay touchProvider={touchProvider} />}
+    </div>
   );
 }

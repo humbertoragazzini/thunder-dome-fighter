@@ -1,3 +1,19 @@
+// ==================================================
+// AUTHORITATIVE SERVER PHYSICS SIMULATION WORLD
+//
+// WHAT IT DOES:
+// Runs a headless Havok physics scene (30 Hz fixed step) managing player
+// capsule colliders, static arena geometry, and FIFO input queues.
+//
+// HOW IT WORKS:
+// Consumes client input packets from a jitter buffer, applies movement forces
+// and yaw steering, steps physics via createPhysicsAccumulator, and exports state.
+//
+// WHY IT EXISTS:
+// Enforces server authority (ADR-010). Ensures client inputs cannot cheat physics,
+// glitch through walls, or produce desync across connected peers.
+// ==================================================
+
 import {
   NullEngine,
   Scene,
@@ -9,6 +25,7 @@ import {
   PhysicsMotionType,
   PhysicsShapeBox,
   PhysicsShapeCapsule,
+  PhysicsRaycastResult,
 } from "@babylonjs/core";
 
 import { readFile } from "node:fs/promises";
@@ -20,6 +37,7 @@ import HavokPhysics from "@babylonjs/havok";
 import {
   PHYSICS_DT_MS,
   CHARACTER_CAPSULE,
+  CHARACTER_FORCES,
   PLAYER_SPAWN_POSITION,
   PLAYER_MASS,
   LINEAR_DAMPING,
@@ -31,25 +49,33 @@ import {
   SERVER_INPUT_BUFFER_TARGET,
   type PlayerInput,
   type PlayerInputCommand,
+  type CharacterActionInput,
+  type CharacterInputCommand,
 } from "../shared/player/PlayerConfig";
 
 import {
   calculateThrottleForce,
   calculateSteeringTorque,
   calculateBrakeForce,
+  calculateHumanoidMovementForce,
+  calculateJumpImpulse,
 } from "../shared/player/PlayerPhysicsMath";
 
 // ==================================================
 // ENTITIES CONFIGURATION
 // ==================================================
-interface SimulationEntity {
+export interface SimulationEntity {
   playerId: string;
   node: TransformNode;
   body: PhysicsBody;
-  currentInput: PlayerInput;
-  pendingInputCommands: PlayerInputCommand[];
+  currentInput: CharacterActionInput | PlayerInput;
+  pendingInputCommands: (CharacterInputCommand | PlayerInputCommand)[];
   inputBufferPrimed: boolean;
   lastProcessedInputSequence: number;
+  isGrounded: boolean;
+  leftLegGrounded: boolean;
+  rightLegGrounded: boolean;
+  jumpConsumed: boolean;
 }
 
 // ==================================================
@@ -101,9 +127,17 @@ function createPhysicsAccumulator(
 export class SimulatorWorld {
   private engine: NullEngine;
   private scene: Scene;
+  private havokPlugin!: HavokPlugin;
   private scheduler: ReturnType<typeof setInterval> | null = null;
   private entities = new Map<string, SimulationEntity>();
   private serverTick = 0;
+
+  // Zero-allocation scratch buffers for 3-point downward ground probe
+  private raycastResultCenter = new PhysicsRaycastResult();
+  private raycastResultLeft = new PhysicsRaycastResult();
+  private raycastResultRight = new PhysicsRaycastResult();
+  private rayFrom = new Vector3();
+  private rayTo = new Vector3();
 
   // ==================================================
   // CONSTRUCTOR
@@ -197,8 +231,8 @@ export class SimulatorWorld {
       this.scene,
     );
 
-    // Upright humanoid capsule geometry (radius: 0.4m, total height: 1.8m)
-    // Cylinder height = totalHeight - (2 * radius) = 1.0m
+    // Upright humanoid capsule geometry (radius: 0.4m, total height: 1.1m)
+    // Cylinder height = totalHeight - (2 * radius) = 0.3m
     const cylinderHeight =
       CHARACTER_CAPSULE.totalHeight - 2 * CHARACTER_CAPSULE.radius;
 
@@ -218,8 +252,10 @@ export class SimulatorWorld {
 
     playerBody.setMassProperties({
       mass: PLAYER_MASS,
-      // Locking inertia prevents physical collisions from tumbling the fighter
-      inertia: new Vector3(0, 0, 0),
+      // In Havok, an inertia axis set to 0 yields infinite rotational resistance.
+      // Locking X (pitch = 0) and Z (roll = 0) keeps the fighter permanently upright.
+      // Y = 1 gives finite unit inertia so steering torque can rotate the character around the vertical axis.
+      inertia: new Vector3(0, 1, 0),
     });
 
     // Locomotion tuning damping
@@ -231,13 +267,23 @@ export class SimulatorWorld {
       node: playerNode,
       body: playerBody,
       currentInput: {
+        moveX: 0,
+        moveZ: 0,
+        lookYaw: 0,
+        jump: false,
+        sprint: false,
+        attackAction: "NONE",
         throttle: 0,
         steering: 0,
         brake: 0,
-      },
+      } as CharacterActionInput & PlayerInput,
       pendingInputCommands: [],
       inputBufferPrimed: false,
       lastProcessedInputSequence: 0,
+      isGrounded: false,
+      leftLegGrounded: false,
+      rightLegGrounded: false,
+      jumpConsumed: false,
     };
 
     this.entities.set(playerId, newPlayer);
@@ -283,7 +329,10 @@ export class SimulatorWorld {
   // PLAYER INPUT & CONTROLS
   // ==================================================
 
-  enqueueEntityInput(playerId: string, command: PlayerInputCommand) {
+  enqueueEntityInput(
+    playerId: string,
+    command: CharacterInputCommand | PlayerInputCommand,
+  ) {
     const entity = this.entities.get(playerId);
 
     if (!entity) {
@@ -302,6 +351,95 @@ export class SimulatorWorld {
     entity.pendingInputCommands.push(command);
   }
 
+  /**
+   * Performs 3-point downward ray probe (Center, Left Leg, Right Leg) to detect walkable ground contact.
+   * Reuses pre-allocated raycast buffers to ensure zero memory allocations during 30 Hz ticks.
+   */
+  public checkGrounded(entity: SimulationEntity): boolean {
+    const footLateralOffset = 0.2; // 0.2m lateral offset for feet
+    const capsuleHalfHeight = CHARACTER_CAPSULE.totalHeight / 2;
+    const totalProbeLength =
+      capsuleHalfHeight + CHARACTER_FORCES.GROUND_CHECK_DISTANCE;
+    const minWalkableNormalY = Math.cos(CHARACTER_FORCES.MAX_SLOPE_RADIANS); // ~0.7071 (45 degrees)
+
+    const posX = entity.node.position.x;
+    const posY = entity.node.position.y;
+    const posZ = entity.node.position.z;
+
+    // Determine current yaw angle
+    let currentYaw = 0;
+    if (
+      "lookYaw" in entity.currentInput &&
+      typeof entity.currentInput.lookYaw === "number"
+    ) {
+      currentYaw = entity.currentInput.lookYaw;
+    } else if (entity.node.rotationQuaternion) {
+      currentYaw = entity.node.rotationQuaternion.toEulerAngles().y;
+    }
+
+    const cosYaw = Math.cos(currentYaw);
+    const sinYaw = Math.sin(currentYaw);
+
+    // 1. Center Probe
+    this.rayFrom.set(posX, posY, posZ);
+    this.rayTo.set(posX, posY - totalProbeLength, posZ);
+    this.raycastResultCenter.reset();
+    this.havokPlugin.raycast(
+      this.rayFrom,
+      this.rayTo,
+      this.raycastResultCenter,
+      {
+        ignoreBody: entity.body,
+      },
+    );
+    const centerGrounded =
+      this.raycastResultCenter.hasHit &&
+      this.raycastResultCenter.hitNormalWorld.y >= minWalkableNormalY;
+
+    // 2. Left Leg Probe (offset along local -X)
+    const leftOffsetX = -footLateralOffset * cosYaw;
+    const leftOffsetZ = footLateralOffset * sinYaw;
+    this.rayFrom.set(posX + leftOffsetX, posY, posZ + leftOffsetZ);
+    this.rayTo.set(
+      posX + leftOffsetX,
+      posY - totalProbeLength,
+      posZ + leftOffsetZ,
+    );
+    this.raycastResultLeft.reset();
+    this.havokPlugin.raycast(this.rayFrom, this.rayTo, this.raycastResultLeft, {
+      ignoreBody: entity.body,
+    });
+    entity.leftLegGrounded =
+      this.raycastResultLeft.hasHit &&
+      this.raycastResultLeft.hitNormalWorld.y >= minWalkableNormalY;
+
+    // 3. Right Leg Probe (offset along local +X)
+    const rightOffsetX = footLateralOffset * cosYaw;
+    const rightOffsetZ = -footLateralOffset * sinYaw;
+    this.rayFrom.set(posX + rightOffsetX, posY, posZ + rightOffsetZ);
+    this.rayTo.set(
+      posX + rightOffsetX,
+      posY - totalProbeLength,
+      posZ + rightOffsetZ,
+    );
+    this.raycastResultRight.reset();
+    this.havokPlugin.raycast(
+      this.rayFrom,
+      this.rayTo,
+      this.raycastResultRight,
+      {
+        ignoreBody: entity.body,
+      },
+    );
+    entity.rightLegGrounded =
+      this.raycastResultRight.hasHit &&
+      this.raycastResultRight.hitNormalWorld.y >= minWalkableNormalY;
+
+    entity.isGrounded =
+      centerGrounded || entity.leftLegGrounded || entity.rightLegGrounded;
+    return entity.isGrounded;
+  }
+
   private applyEntityInputs() {
     for (const entity of this.entities.values()) {
       // Buffer Priming & Jitter Margin Management:
@@ -316,11 +454,7 @@ export class SimulatorWorld {
       // If buffer is primed and has commands, consume at most ONE command per physics tick
       if (entity.inputBufferPrimed && entity.pendingInputCommands.length > 0) {
         const nextCommand = entity.pendingInputCommands.shift()!;
-        entity.currentInput = {
-          throttle: nextCommand.throttle,
-          steering: nextCommand.steering,
-          brake: nextCommand.brake,
-        };
+        entity.currentInput = nextCommand;
         entity.lastProcessedInputSequence = nextCommand.sequence;
       } else if (
         entity.inputBufferPrimed &&
@@ -335,33 +469,74 @@ export class SimulatorWorld {
         entity.inputBufferPrimed = false;
       }
 
+      // Perform 3-point downward ground detection
+      this.checkGrounded(entity);
+
       const currentInput = entity.currentInput;
-      const currentRotation =
-        entity.node.rotationQuaternion ?? Quaternion.Identity();
 
-      // 1. THROTTLE: Apply forward force along entity heading
-      if (currentInput.throttle > 0) {
-        const throttleForce = calculateThrottleForce(
-          currentRotation,
-          currentInput.throttle,
+      // Handle Modern Humanoid Input (CharacterActionInput)
+      if ("moveX" in currentInput && typeof currentInput.moveX === "number") {
+        const charInput = currentInput as CharacterActionInput;
+        const currentLinearVelocity = entity.body.getLinearVelocity();
+
+        // 1. 8-Way Directional Locomotion Force
+        const movementForce = calculateHumanoidMovementForce(
+          charInput.moveX,
+          charInput.moveZ,
+          charInput.lookYaw,
+          charInput.sprint,
+          currentLinearVelocity,
+          entity.isGrounded,
         );
-        entity.body.applyForce(throttleForce, entity.node.position);
-      }
+        entity.body.applyForce(movementForce, entity.node.position);
 
-      // 2. STEERING: Apply torque around vertical Y axis
-      if (currentInput.steering !== 0) {
-        const steeringTorque = calculateSteeringTorque(currentInput.steering);
-        entity.body.applyTorque(steeringTorque);
-      }
+        // 2. Yaw Orientation (rotate body around vertical Y-axis to match lookYaw)
+        const currentYaw = entity.node.rotationQuaternion
+          ? entity.node.rotationQuaternion.toEulerAngles().y
+          : 0;
+        let diffYaw = charInput.lookYaw - currentYaw;
+        while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
+        while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
+        const targetAngularVelY = diffYaw * 30; // 30 Hz target response
+        entity.body.setAngularVelocity(new Vector3(0, targetAngularVelY, 0));
 
-      // 3. BRAKE: Apply opposing force to horizontal velocity
-      if (currentInput.brake > 0) {
-        const linearVelocity = entity.body.getLinearVelocity();
-        const brakeForce = calculateBrakeForce(
-          linearVelocity,
-          currentInput.brake,
-        );
-        entity.body.applyForce(brakeForce, entity.node.position);
+        // 3. Discrete Jump Impulse when Grounded
+        if (charInput.jump) {
+          if (!entity.jumpConsumed && entity.isGrounded) {
+            const jumpImpulse = calculateJumpImpulse(true, true);
+            entity.body.applyImpulse(jumpImpulse, entity.node.position);
+            entity.jumpConsumed = true;
+          }
+        } else {
+          entity.jumpConsumed = false;
+        }
+      } else {
+        // Fallback: Legacy Vehicle Inputs (throttle, steering, brake)
+        const vehicleInput = currentInput as PlayerInput;
+        const currentRotation =
+          entity.node.rotationQuaternion ?? Quaternion.Identity();
+
+        if (vehicleInput.throttle > 0) {
+          const throttleForce = calculateThrottleForce(
+            currentRotation,
+            vehicleInput.throttle,
+          );
+          entity.body.applyForce(throttleForce, entity.node.position);
+        }
+
+        if (vehicleInput.steering !== 0) {
+          const steeringTorque = calculateSteeringTorque(vehicleInput.steering);
+          entity.body.applyTorque(steeringTorque);
+        }
+
+        if (vehicleInput.brake > 0) {
+          const linearVelocity = entity.body.getLinearVelocity();
+          const brakeForce = calculateBrakeForce(
+            linearVelocity,
+            vehicleInput.brake,
+          );
+          entity.body.applyForce(brakeForce, entity.node.position);
+        }
       }
     }
   }
@@ -410,12 +585,12 @@ export class SimulatorWorld {
     // ==================================================
 
     // Babylon bridge to Havok.
-    const havokPlugin = new HavokPlugin(true, havokInstance);
+    this.havokPlugin = new HavokPlugin(true, havokInstance);
 
     // Enable physics with Earth-like gravity.
     this.scene.enablePhysics(
       new Vector3(GRAVITY.x, GRAVITY.y, GRAVITY.z),
-      havokPlugin,
+      this.havokPlugin,
     );
 
     // ==================================================

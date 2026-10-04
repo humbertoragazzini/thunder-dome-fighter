@@ -22,9 +22,10 @@
 
 import { create } from "zustand";
 import type { PlayerStats } from "../../shared/domain/Identity.ts";
+import { getApiUrl } from "../config/network";
 
 const TOKEN_STORAGE_KEY = "thunder_dome_auth_token";
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+const API_URL = getApiUrl();
 
 export interface AuthUser {
   id: string;

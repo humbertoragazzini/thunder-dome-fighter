@@ -99,7 +99,7 @@ export function InGameOverlay() {
           <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800/80 px-3.5 py-2 rounded-xl text-xs text-slate-300 shadow-lg">
             <GiGamepad className="text-amber-400 text-lg" />
             <span style={{ fontFamily: "var(--font-tech)" }}>
-              Drive/Move: <strong className="text-amber-400">WASD</strong> or <strong className="text-amber-400">Arrow Keys</strong>
+              Move: <strong className="text-amber-400">WASD</strong> • Jump: <strong className="text-amber-400">SPACE</strong> • Sprint: <strong className="text-amber-400">SHIFT</strong> • Fight: <strong className="text-amber-400">J/K/L</strong>
             </span>
           </div>
 

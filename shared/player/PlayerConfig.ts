@@ -29,7 +29,7 @@ export const PHYSICS_DT_SECONDS = 1 / PHYSICS_HZ;
 
 export const CHARACTER_CAPSULE = {
   radius: 0.4, // 0.4m radius (0.8m diameter shoulder-to-shoulder)
-  totalHeight: 1.1, // 1.8m standard human height
+  totalHeight: 1.1, // 1.1m cartoon humanoid brawler height
 } as const;
 
 export const CHARACTER_FORCES = {
@@ -47,6 +47,12 @@ export const CHARACTER_FORCES = {
 
   /** Maximum walkable ground slope in radians (~45 degrees) */
   MAX_SLOPE_RADIANS: Math.PI / 4,
+
+  /** Maximum horizontal acceleration force applied to reach target speed */
+  MAX_ACCELERATION_FORCE: 60.0,
+
+  /** Air control responsiveness multiplier [0.0 - 1.0] when not grounded */
+  AIR_CONTROL_FACTOR: 0.25,
 } as const;
 
 // ==================================================

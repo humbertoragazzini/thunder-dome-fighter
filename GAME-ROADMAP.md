@@ -10,12 +10,12 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 4 — Authoritative Player Entity & Humanoid Movement** |
-| **Current Step** | **Step 4.1 — Replace vehicle box physics body with upright humanoid capsule collider** |
-| **Last Completed Step** | **Step 3.6 — Implement global ErrorDialog and in-game HUD overlay** |
-| **Next Step** | **Step 4.1 — Implement upright character capsule kinematics and 8-way movement model** |
-| **Overall Status** | **Phase 3 (Application Shell & UI Navigation) 100% complete; moving to Phase 4.** |
-| **Last Updated** | **2026-10-03** |
+| **Current Phase** | **Phase 5 — Client Character Visuals & Hierarchical Articulated Cube Rig (Approach B)** |
+| **Current Step** | **Step 5.1 — Construct 15-cube articulated transform hierarchy in Babylon.js** |
+| **Last Completed Step** | **Step 4.7 — Update RemotePlayerInterpolation to interpolate humanoid capsule positions and yaw rotations** |
+| **Next Step** | **Step 5.1 — Construct 15-cube articulated transform hierarchy in Babylon.js** |
+| **Overall Status** | **Phase 4 (Authoritative Player Entity & Humanoid Movement) 100% complete; moving to Phase 5.** |
+| **Last Updated** | **2026-10-04** |
 
 ---
 
@@ -441,27 +441,28 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 4 — Authoritative Player Entity & Humanoid Movement
 
-**Status:** Not Started `[ ]`  
-**Goal:** Transition physics from vehicular mechanics to an upright humanoid character controller with 8-way movement and jump.  
+**Status:** Completed `[x]`  
+**Goal:** Transition physics from vehicular mechanics to an upright humanoid character controller with 8-way movement, jump, and centralized multi-device input.  
 **Dependencies:** Phase 1, Phase 3.  
 
 #### Steps
-- [ ] 4.1 Update `SimulationWorld.ts` player physics body from box to upright capsule shape (radius: 0.4m, total height: 1.8m), calibrated as the physical locomotion motor anchoring the upcoming Phase 5 articulated cube rig.
-- [ ] 4.2 Lock physical rotation on X and Z axes (prevent tipping over); rotation yaw is controlled explicitly around Y.
-- [ ] 4.3 Implement grounded detection via Havok downward raycast or contact collector.
-- [ ] 4.4 Implement 8-way directional movement forces/impulses based on player look yaw and camera heading.
-- [ ] 4.5 Implement discrete jump impulse when grounded.
-- [ ] 4.6 Update `LocalPlayerPrediction.ts` with matching capsule physics and jump prediction.
-- [ ] 4.7 Update `RemotePlayerInterpolation.ts` to interpolate humanoid capsule positions and yaw rotations.
+- [x] 4.1 Update `SimulationWorld.ts` player physics body from box to upright capsule shape (radius: 0.4m, total height: 1.1m), calibrated as the physical locomotion motor anchoring the upcoming Phase 5 articulated cube rig.
+- [x] 4.2 Lock physical rotation on X and Z axes (prevent tipping over); rotation yaw is controlled explicitly around Y via angular velocity (`setAngularVelocity(new Vector3(0, diffYaw * 30, 0))`).
+- [x] 4.3 Implement grounded detection via zero-allocation 3-point Havok downward raycast probe (Center, Left Leg -0.2m, Right Leg +0.2m) with walkable slope angle threshold.
+- [x] 4.4 Implement 8-way directional movement forces/impulses based on player look yaw and camera heading (`MAX_ACCELERATION_FORCE = 60.0 N`, `AIR_CONTROL_FACTOR = 0.25`).
+- [x] 4.5 Implement discrete jump impulse when grounded (`JUMP_IMPULSE = 6.5 N·s`).
+- [x] 4.6 Update `LocalPlayerPrediction.ts` with matching capsule physics, 3-point ground probe, centralized input controller, and mobile touch overlay (`virtual-gamepad-lib`).
+- [x] 4.7 Update `RemotePlayerInterpolation.ts` to interpolate humanoid capsule positions and yaw rotations.
 
 #### Completion Criteria
 - Player moves fluidly forward, backward, strafes left/right, and jumps.
 - Server-authoritative position matches client prediction with zero jitter during continuous running.
 - Player cannot walk through physical obstacles or floor.
+- Centralized input system seamlessly hot-swaps between Keyboard/Mouse, Gamepad, and Touchscreen.
 
 #### Verification
-- Automated headless test: Send movement commands, assert velocity and position advance authoritatively.
-- Manual verification: Move character with WASD and Spacebar, confirm smooth motion and responsive jumping.
+- Automated headless test (`scratch/test_humanoid_physics.ts`): Settle on floor, 3-point ground probe, jump impulse launch, apex & landing, locomotion sprint reaching 7.517 m/s. All 4 tests passed.
+- Client build (`npm run build && npm run lint && npx tsc --noEmit`): Compiles cleanly with zero errors.
 
 ---
 

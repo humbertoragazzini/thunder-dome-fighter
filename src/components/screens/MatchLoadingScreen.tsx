@@ -23,6 +23,7 @@ import { GiLightningTrio } from "react-icons/gi";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useNavigationStore } from "../../store/useNavigationStore";
+import { getColyseusUrl } from "../../config/network";
 import { Heading } from "../ui/atoms/Heading";
 import { Spinner } from "../ui/atoms/Spinner";
 import { ScreenLayout } from "../ui/templates/ScreenLayout";
@@ -71,7 +72,7 @@ export function MatchLoadingScreen() {
         return;
       }
 
-      const colyseusUrl = import.meta.env.VITE_COLYSEUS_URL ?? "ws://localhost:2567";
+      const colyseusUrl = getColyseusUrl();
       setLoadingStep(`Connecting to Thunder Dome at ${colyseusUrl}...`);
 
       try {

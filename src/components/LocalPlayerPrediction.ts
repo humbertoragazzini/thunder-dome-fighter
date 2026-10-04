@@ -3,6 +3,8 @@ import {
   TransformNode,
   PhysicsBody,
   PhysicsShapeBox,
+  PhysicsShapeCapsule,
+  PhysicsRaycastResult,
   PhysicsMotionType,
   PhysicsPrestepType,
   Vector3,
@@ -13,7 +15,8 @@ import {
 
 import {
   PHYSICS_DT_MS,
-  PLAYER_BOX_SIZE,
+  CHARACTER_CAPSULE,
+  CHARACTER_FORCES,
   PLAYER_MASS,
   LINEAR_DAMPING,
   ANGULAR_DAMPING,
@@ -25,12 +28,16 @@ import {
   LOCAL_HARD_SNAP_DISTANCE,
   type PlayerInput,
   type PlayerInputCommand,
+  type CharacterActionInput,
+  type CharacterInputCommand,
 } from "../../shared/player/PlayerConfig";
 
 import {
   calculateThrottleForce,
   calculateSteeringTorque,
   calculateBrakeForce,
+  calculateHumanoidMovementForce,
+  calculateJumpImpulse,
 } from "../../shared/player/PlayerPhysicsMath";
 
 import {
@@ -75,7 +82,9 @@ export interface AuthoritativePlayerState {
 export class LocalPlayerPrediction {
   private scene: Scene;
   private havokPlugin: HavokPlugin;
-  private onSendInput: (command: PlayerInputCommand) => void;
+  private onSendInput: (
+    command: CharacterInputCommand | PlayerInputCommand,
+  ) => void;
 
   // Local prediction physics representation (hidden from camera)
   private predictionNode: TransformNode;
@@ -90,7 +99,7 @@ export class LocalPlayerPrediction {
   // currentPredictionTick: physical fixed 30 Hz steps synchronized from server baseline
   private nextInputSequence = 1;
   private currentPredictionTick = 0;
-  private pendingInputs: PlayerInputCommand[] = [];
+  private pendingInputs: (CharacterInputCommand | PlayerInputCommand)[] = [];
   private predictionHistory: PredictedHistoryFrame[] = [];
 
   // Fixed timestep accumulator
@@ -99,6 +108,17 @@ export class LocalPlayerPrediction {
   // State guards
   private hasReceivedInitialAuthoritativeState = false;
   private lastReconciledServerTick = -1;
+
+  // 3-point ground probe state
+  private isGrounded = false;
+  private leftLegGrounded = false;
+  private rightLegGrounded = false;
+  private jumpConsumed = false;
+  private raycastResultCenter = new PhysicsRaycastResult();
+  private raycastResultLeft = new PhysicsRaycastResult();
+  private raycastResultRight = new PhysicsRaycastResult();
+  private rayFrom = new Vector3();
+  private rayTo = new Vector3();
 
   // Visual error offset smoothing:
   // Normal movement is 1:1 with physics (zero constant lag).
@@ -109,7 +129,7 @@ export class LocalPlayerPrediction {
   constructor(
     scene: Scene,
     havokPlugin: HavokPlugin,
-    onSendInput: (command: PlayerInputCommand) => void,
+    onSendInput: (command: CharacterInputCommand | PlayerInputCommand) => void,
   ) {
     this.scene = scene;
     this.havokPlugin = havokPlugin;
@@ -142,7 +162,7 @@ export class LocalPlayerPrediction {
     this.floorBody.shape = floorShape;
 
     // --------------------------------------------------
-    // Local dynamic box prediction body
+    // Local dynamic humanoid capsule prediction body
     // --------------------------------------------------
     this.predictionNode = new TransformNode("local-prediction-node", scene);
     this.predictionNode.rotationQuaternion = Quaternion.Identity();
@@ -154,23 +174,104 @@ export class LocalPlayerPrediction {
       scene,
     );
 
-    const boxShape = new PhysicsShapeBox(
-      Vector3.Zero(),
-      Quaternion.Identity(),
-      new Vector3(
-        PLAYER_BOX_SIZE.width,
-        PLAYER_BOX_SIZE.height,
-        PLAYER_BOX_SIZE.depth,
-      ),
+    const cylinderHeight =
+      CHARACTER_CAPSULE.totalHeight - 2 * CHARACTER_CAPSULE.radius;
+
+    const capsuleShape = new PhysicsShapeCapsule(
+      new Vector3(0, -cylinderHeight / 2, 0),
+      new Vector3(0, cylinderHeight / 2, 0),
+      CHARACTER_CAPSULE.radius,
       scene,
     );
-    this.predictionBody.shape = boxShape;
+    this.predictionBody.shape = capsuleShape;
 
     this.predictionBody.setMassProperties({
       mass: PLAYER_MASS,
+      inertia: new Vector3(0, 1, 0),
     });
     this.predictionBody.setLinearDamping(LINEAR_DAMPING);
     this.predictionBody.setAngularDamping(ANGULAR_DAMPING);
+  }
+
+  /**
+   * Performs 3-point downward ray probe (Center, Left Leg, Right Leg) to detect walkable ground contact.
+   */
+  public checkGrounded(): boolean {
+    const footLateralOffset = 0.2;
+    const capsuleHalfHeight = CHARACTER_CAPSULE.totalHeight / 2;
+    const totalProbeLength =
+      capsuleHalfHeight + CHARACTER_FORCES.GROUND_CHECK_DISTANCE;
+    const minWalkableNormalY = Math.cos(CHARACTER_FORCES.MAX_SLOPE_RADIANS);
+
+    const posX = this.predictionNode.position.x;
+    const posY = this.predictionNode.position.y;
+    const posZ = this.predictionNode.position.z;
+
+    const currentYaw = this.predictionNode.rotationQuaternion
+      ? this.predictionNode.rotationQuaternion.toEulerAngles().y
+      : 0;
+
+    const cosYaw = Math.cos(currentYaw);
+    const sinYaw = Math.sin(currentYaw);
+
+    // 1. Center Probe
+    this.rayFrom.set(posX, posY, posZ);
+    this.rayTo.set(posX, posY - totalProbeLength, posZ);
+    this.raycastResultCenter.reset();
+    this.havokPlugin.raycast(
+      this.rayFrom,
+      this.rayTo,
+      this.raycastResultCenter,
+      {
+        ignoreBody: this.predictionBody,
+      },
+    );
+    const centerGrounded =
+      this.raycastResultCenter.hasHit &&
+      this.raycastResultCenter.hitNormalWorld.y >= minWalkableNormalY;
+
+    // 2. Left Leg Probe
+    const leftOffsetX = -footLateralOffset * cosYaw;
+    const leftOffsetZ = footLateralOffset * sinYaw;
+    this.rayFrom.set(posX + leftOffsetX, posY, posZ + leftOffsetZ);
+    this.rayTo.set(
+      posX + leftOffsetX,
+      posY - totalProbeLength,
+      posZ + leftOffsetZ,
+    );
+    this.raycastResultLeft.reset();
+    this.havokPlugin.raycast(this.rayFrom, this.rayTo, this.raycastResultLeft, {
+      ignoreBody: this.predictionBody,
+    });
+    this.leftLegGrounded =
+      this.raycastResultLeft.hasHit &&
+      this.raycastResultLeft.hitNormalWorld.y >= minWalkableNormalY;
+
+    // 3. Right Leg Probe
+    const rightOffsetX = footLateralOffset * cosYaw;
+    const rightOffsetZ = -footLateralOffset * sinYaw;
+    this.rayFrom.set(posX + rightOffsetX, posY, posZ + rightOffsetZ);
+    this.rayTo.set(
+      posX + rightOffsetX,
+      posY - totalProbeLength,
+      posZ + rightOffsetZ,
+    );
+    this.raycastResultRight.reset();
+    this.havokPlugin.raycast(
+      this.rayFrom,
+      this.rayTo,
+      this.raycastResultRight,
+      {
+        ignoreBody: this.predictionBody,
+      },
+    );
+    this.rightLegGrounded =
+      this.raycastResultRight.hasHit &&
+      this.raycastResultRight.hitNormalWorld.y >= minWalkableNormalY;
+
+    this.isGrounded =
+      centerGrounded || this.leftLegGrounded || this.rightLegGrounded;
+    return this.isGrounded;
   }
 
   // ==================================================
@@ -185,11 +286,16 @@ export class LocalPlayerPrediction {
       return;
     }
 
-    const command: PlayerInputCommand = {
+    const command: CharacterInputCommand = {
       sequence: this.nextInputSequence++,
-      throttle: 0,
-      steering: 0,
-      brake: 0,
+      moveX: 0,
+      moveZ: 0,
+      lookYaw: this.predictionNode.rotationQuaternion
+        ? this.predictionNode.rotationQuaternion.toEulerAngles().y
+        : 0,
+      jump: false,
+      sprint: false,
+      attackAction: "NONE",
     };
 
     this.onSendInput(command);
@@ -204,36 +310,79 @@ export class LocalPlayerPrediction {
   // ==================================================
 
   private simulatePredictionStep(
-    command: PlayerInputCommand,
+    command: CharacterInputCommand | PlayerInputCommand,
     dtMs: number,
     recordHistory: boolean = false,
   ): void {
-    const currentRotation =
-      this.predictionNode.rotationQuaternion ?? Quaternion.Identity();
+    this.checkGrounded();
 
-    // 1. Throttle: delegate force calculation to PlayerPhysicsMath
-    if (command.throttle > 0) {
-      const throttleForce = calculateThrottleForce(
-        currentRotation,
-        command.throttle,
+    if ("moveX" in command && typeof command.moveX === "number") {
+      const charCmd = command as CharacterInputCommand;
+      const currentLinearVelocity = this.predictionBody.getLinearVelocity();
+
+      // 1. 8-Way Locomotion Force
+      const movementForce = calculateHumanoidMovementForce(
+        charCmd.moveX,
+        charCmd.moveZ,
+        charCmd.lookYaw,
+        charCmd.sprint,
+        currentLinearVelocity,
+        this.isGrounded,
       );
       this.predictionBody.applyForce(
-        throttleForce,
+        movementForce,
         this.predictionNode.position,
       );
-    }
 
-    // 2. Steering: delegate torque calculation to PlayerPhysicsMath
-    if (command.steering !== 0) {
-      const steeringTorque = calculateSteeringTorque(command.steering);
-      this.predictionBody.applyTorque(steeringTorque);
-    }
+      // 2. Yaw Orientation via angular velocity
+      const currentYaw = this.predictionNode.rotationQuaternion
+        ? this.predictionNode.rotationQuaternion.toEulerAngles().y
+        : 0;
+      let diffYaw = charCmd.lookYaw - currentYaw;
+      while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
+      while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
+      const targetAngularVelY = diffYaw * 30;
+      this.predictionBody.setAngularVelocity(new Vector3(0, targetAngularVelY, 0));
 
-    // 3. Brake: delegate brake force calculation to PlayerPhysicsMath
-    if (command.brake > 0) {
-      const linearVelocity = this.predictionBody.getLinearVelocity();
-      const brakeForce = calculateBrakeForce(linearVelocity, command.brake);
-      this.predictionBody.applyForce(brakeForce, this.predictionNode.position);
+      // 3. Jump Impulse
+      if (charCmd.jump) {
+        if (!this.jumpConsumed && this.isGrounded) {
+          const jumpImpulse = calculateJumpImpulse(true, true);
+          this.predictionBody.applyImpulse(
+            jumpImpulse,
+            this.predictionNode.position,
+          );
+          this.jumpConsumed = true;
+        }
+      } else {
+        this.jumpConsumed = false;
+      }
+    } else {
+      const vehicleCmd = command as PlayerInputCommand;
+      const currentRotation =
+        this.predictionNode.rotationQuaternion ?? Quaternion.Identity();
+
+      if (vehicleCmd.throttle > 0) {
+        const throttleForce = calculateThrottleForce(
+          currentRotation,
+          vehicleCmd.throttle,
+        );
+        this.predictionBody.applyForce(
+          throttleForce,
+          this.predictionNode.position,
+        );
+      }
+
+      if (vehicleCmd.steering !== 0) {
+        const steeringTorque = calculateSteeringTorque(vehicleCmd.steering);
+        this.predictionBody.applyTorque(steeringTorque);
+      }
+
+      if (vehicleCmd.brake > 0) {
+        const linearVelocity = this.predictionBody.getLinearVelocity();
+        const brakeForce = calculateBrakeForce(linearVelocity, vehicleCmd.brake);
+        this.predictionBody.applyForce(brakeForce, this.predictionNode.position);
+      }
     }
 
     // Advance local client Havok by exactly one fixed physics step
@@ -269,7 +418,10 @@ export class LocalPlayerPrediction {
   // LOCAL PREDICTION LOOP (30 Hz)
   // ==================================================
 
-  updatePrediction(heldInput: PlayerInput, deltaSeconds: number) {
+  updatePrediction(
+    heldInput: CharacterActionInput | PlayerInput,
+    deltaSeconds: number,
+  ) {
     if (!this.hasReceivedInitialAuthoritativeState) {
       return;
     }
@@ -283,12 +435,27 @@ export class LocalPlayerPrediction {
     }
 
     while (this.accumulator >= PHYSICS_DT_MS) {
-      const command: PlayerInputCommand = {
-        sequence: this.nextInputSequence++,
-        throttle: heldInput.throttle,
-        steering: heldInput.steering,
-        brake: heldInput.brake,
-      };
+      let command: CharacterInputCommand | PlayerInputCommand;
+
+      if ("moveX" in heldInput && typeof heldInput.moveX === "number") {
+        command = {
+          sequence: this.nextInputSequence++,
+          moveX: heldInput.moveX,
+          moveZ: heldInput.moveZ,
+          lookYaw: heldInput.lookYaw,
+          jump: heldInput.jump,
+          sprint: heldInput.sprint,
+          attackAction: heldInput.attackAction,
+        };
+      } else {
+        const veh = heldInput as PlayerInput;
+        command = {
+          sequence: this.nextInputSequence++,
+          throttle: veh.throttle,
+          steering: veh.steering,
+          brake: veh.brake,
+        };
+      }
 
       this.pendingInputs.push(command);
       this.onSendInput(command);

@@ -42,11 +42,21 @@ export async function buildApp(
   // 1. CORS Configuration
   // --------------------------------------------------
   await app.register(cors, {
-    origin: [
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      /localhost:\d+$/,
-    ],
+    origin: (origin, cb) => {
+      // Allow non-browser requests (native tools, curl, internal tests)
+      if (!origin) {
+        return cb(null, true);
+      }
+      // Allow localhost, 127.0.0.1, and private LAN IP ranges (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+      const isLanOrLocal =
+        /^(https?:\/\/)?(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(
+          origin,
+        );
+      if (isLanOrLocal || process.env.NODE_ENV !== "production") {
+        return cb(null, true);
+      }
+      return cb(new Error("CORS origin not allowed"), false);
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   });

@@ -21,7 +21,11 @@
 import { type Client, Room, ServerError } from "colyseus";
 import { GameState, PlayerState } from "./GameState";
 import { SimulatorWorld } from "./SimulationWorld";
-import type { PlayerInputCommand } from "../shared/player/PlayerConfig";
+import type {
+  PlayerInputCommand,
+  CharacterInputCommand,
+  AttackActionType,
+} from "../shared/player/PlayerConfig";
 import { verifySessionToken, type AuthenticatedUser } from "./auth/TokenVerifier.ts";
 
 // ==================================================
@@ -31,12 +35,13 @@ import { verifySessionToken, type AuthenticatedUser } from "./auth/TokenVerifier
 export function validateAndClampPlayerInputCommand(
   rawInput: unknown,
   lastAcceptedSequence: number,
-): PlayerInputCommand | null {
+): CharacterInputCommand | PlayerInputCommand | null {
   if (!rawInput || typeof rawInput !== "object") {
     return null;
   }
 
-  const { sequence, throttle, steering, brake } = rawInput as Record<string, unknown>;
+  const data = rawInput as Record<string, unknown>;
+  const sequence = data.sequence;
 
   // Validate sequence: finite positive integer strictly newer than previously accepted sequence
   if (
@@ -48,26 +53,63 @@ export function validateAndClampPlayerInputCommand(
     return null;
   }
 
-  // Validate presence, numeric type, and finite values.
-  // Reject NaN, Infinity, -Infinity, strings, null, etc.
+  // Modern humanoid input detection (moveX or moveZ or lookYaw present)
+  if ("moveX" in data || "moveZ" in data) {
+    const moveX =
+      typeof data.moveX === "number" && Number.isFinite(data.moveX)
+        ? data.moveX
+        : 0;
+    const moveZ =
+      typeof data.moveZ === "number" && Number.isFinite(data.moveZ)
+        ? data.moveZ
+        : 0;
+    const lookYaw =
+      typeof data.lookYaw === "number" && Number.isFinite(data.lookYaw)
+        ? data.lookYaw
+        : 0;
+    const jump = typeof data.jump === "boolean" ? data.jump : false;
+    const sprint = typeof data.sprint === "boolean" ? data.sprint : false;
+    const attackAction =
+      typeof data.attackAction === "string" &&
+      ["NONE", "LIGHT_PUNCH", "HEAVY_PUNCH", "KICK", "BLOCK"].includes(
+        data.attackAction,
+      )
+        ? (data.attackAction as AttackActionType)
+        : "NONE";
+
+    // Normalize lookYaw to [0, 2*PI)
+    const twoPi = Math.PI * 2;
+    const normalizedYaw = ((lookYaw % twoPi) + twoPi) % twoPi;
+
+    return {
+      sequence,
+      moveX: Math.max(-1, Math.min(1, moveX)),
+      moveZ: Math.max(-1, Math.min(1, moveZ)),
+      lookYaw: normalizedYaw,
+      jump,
+      sprint,
+      attackAction,
+    };
+  }
+
+  // Fallback: Legacy vehicle input validation
+  const { throttle, steering, brake } = data;
   if (
-    typeof throttle !== "number" || !Number.isFinite(throttle) ||
-    typeof steering !== "number" || !Number.isFinite(steering) ||
-    typeof brake !== "number" || !Number.isFinite(brake)
+    typeof throttle !== "number" ||
+    !Number.isFinite(throttle) ||
+    typeof steering !== "number" ||
+    !Number.isFinite(steering) ||
+    typeof brake !== "number" ||
+    !Number.isFinite(brake)
   ) {
     return null;
   }
 
-  // Clamp values to their authoritative physical intention ranges.
-  const sanitizedThrottle = Math.max(0, Math.min(1, throttle));
-  const sanitizedSteering = Math.max(-1, Math.min(1, steering));
-  const sanitizedBrake = Math.max(0, Math.min(1, brake));
-
   return {
     sequence,
-    throttle: sanitizedThrottle,
-    steering: sanitizedSteering,
-    brake: sanitizedBrake,
+    throttle: Math.max(0, Math.min(1, throttle)),
+    steering: Math.max(-1, Math.min(1, steering)),
+    brake: Math.max(0, Math.min(1, brake)),
   };
 }
 
