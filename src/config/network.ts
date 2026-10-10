@@ -18,7 +18,7 @@
 // ==================================================
 
 export function getApiUrl(): string {
-  const envUrl = import.meta.env.VITE_API_URL;
+  const envUrl = (import.meta as any).env?.VITE_API_URL;
   if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
     return envUrl;
   }
@@ -31,7 +31,7 @@ export function getApiUrl(): string {
 }
 
 export function getColyseusUrl(): string {
-  const envUrl = import.meta.env.VITE_COLYSEUS_URL;
+  const envUrl = (import.meta as any).env?.VITE_COLYSEUS_URL;
   if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
     return envUrl;
   }

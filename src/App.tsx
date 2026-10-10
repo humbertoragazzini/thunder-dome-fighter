@@ -11,7 +11,8 @@
 // - Once authenticated, automatically advances the screen state machine to `MAIN_MENU`.
 // - Dynamically mounts the active screen (`AUTH`, `MAIN_MENU`, `PLAY_MENU`, `MATCH_LOADING`, `IN_GAME`).
 // - Mounts `BabylonCanvas` strictly when joining or playing in an authoritative room.
-// - Mounts global dialog overlays (`ProfileModal`, `ErrorDialog`).
+// - Initializes `useSingleTabStore` to enforce single-active-browser-tab via BroadcastChannel.
+// - Mounts global dialog overlays (`ProfileModal`, `ErrorDialog`, `DuplicateTabDialog`).
 //
 // WHY IT EXISTS:
 // Eliminates raw canvas overlays and provides a production-grade fighting game shell.
@@ -24,11 +25,13 @@ import { InGameOverlay } from "./components/screens/InGameOverlay";
 import { MainMenuScreen } from "./components/screens/MainMenuScreen";
 import { MatchLoadingScreen } from "./components/screens/MatchLoadingScreen";
 import { PlayMenuScreen } from "./components/screens/PlayMenuScreen";
+import { DuplicateTabDialog } from "./components/ui/organisms/DuplicateTabDialog";
 import { ErrorDialog } from "./components/ui/organisms/ErrorDialog";
 import { ProfileModal } from "./components/ui/organisms/ProfileModal";
 import { useAppStore } from "./store/useAppStore";
 import { useAuthStore } from "./store/useAuthStore";
 import { useNavigationStore } from "./store/useNavigationStore";
+import { useSingleTabStore } from "./store/useSingleTabStore";
 
 export default function App() {
   const currentScreen = useNavigationStore((state) => state.currentScreen);
@@ -36,6 +39,17 @@ export default function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const room = useAppStore((state) => state.room);
+
+  const initializeTabEnforcer = useSingleTabStore((state) => state.initialize);
+  const cleanupTabEnforcer = useSingleTabStore((state) => state.cleanup);
+
+  // Initialize single-active-tab coordination
+  useEffect(() => {
+    initializeTabEnforcer();
+    return () => {
+      cleanupTabEnforcer();
+    };
+  }, [initializeTabEnforcer, cleanupTabEnforcer]);
 
   // Auto-hydrate session from localStorage on application boot
   useEffect(() => {
@@ -77,9 +91,10 @@ export default function App() {
         {currentScreen === "IN_GAME" && <InGameOverlay />}
       </div>
 
-      {/* Global Modals */}
+      {/* Global Modals & Tab Enforcer */}
       <ProfileModal />
       <ErrorDialog />
+      <DuplicateTabDialog />
     </div>
   );
 }

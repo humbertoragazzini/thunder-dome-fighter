@@ -74,7 +74,7 @@ export interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  token: localStorage.getItem(TOKEN_STORAGE_KEY),
+  token: typeof localStorage !== "undefined" ? localStorage.getItem(TOKEN_STORAGE_KEY) : null,
   user: null,
   player: null,
   stats: null,
@@ -172,7 +172,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
     set({
       token: null,
       user: null,
@@ -186,7 +188,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   checkAuth: async (): Promise<void> => {
-    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const token = typeof localStorage !== "undefined" ? localStorage.getItem(TOKEN_STORAGE_KEY) : null;
 
     if (!token) {
       set({
