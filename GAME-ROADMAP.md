@@ -10,11 +10,11 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 7 — Generic Match & GameMode Architecture** |
-| **Current Step** | **Step 7.1 — Implement shared/domain/GameMode.ts definition schema** |
-| **Last Completed Step** | **Step 6.6 — Implement level cleanup and asset unloading routines upon room teardown** |
-| **Next Step** | **Step 7.1 — Implement shared/domain/GameMode.ts definition schema** |
-| **Overall Status** | **Phase 6 (Generic Level & Arena System) 100% complete; moving to Phase 7.** |
+| **Current Phase** | **Phase 8 — Match State Machine & Room Lifecycle Management** |
+| **Current Step** | **Step 8.1 — Define Match States (CREATED, WAITING_FOR_PLAYERS, COUNTDOWN, PLAYING, etc.)** |
+| **Last Completed Step** | **Step 7.4 — Implement generic team assignment logic and spawn slot distribution** |
+| **Next Step** | **Step 8.1 — Define Match States (CREATED, WAITING_FOR_PLAYERS, COUNTDOWN, PLAYING, etc.)** |
+| **Overall Status** | **Phase 7 (Generic Match & GameMode Architecture) 100% complete; moving to Phase 8.** |
 | **Last Updated** | **2026-10-10** |
 
 ---
@@ -523,25 +523,23 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 7 — Generic Match & GameMode Architecture
 
-**Status:** Not Started `[ ]`  
+**Status:** Complete `[x]`  
 **Goal:** Declarative `GameMode` architecture supporting 1v1, team modes, and FFA without duplicating room logic.  
 **Dependencies:** Phase 6.  
 
 #### Steps
-- [ ] 7.1 Implement `shared/domain/GameMode.ts` definition schema (mode ID, min/max players, team count, team size, score limit, time limit, respawn rules).
-- [ ] 7.2 Implement initial GameMode configurations:
-  - `MODE_1V1`: 2 players, 0 teams (or 2 solo teams), score limit 3 kills, respawn enabled.
-  - `MODE_3V3`: 6 players, 2 teams of 3, score limit 10 team kills, respawn enabled.
-  - `MODE_4V4`: 8 players, 2 teams of 4, score limit 15 team kills, respawn enabled.
-  - `MODE_FFA`: 2-20 players, individual scoring, time limit 10 minutes.
-- [ ] 7.3 Decouple `GameRoom.ts` from hardcoded options; inject selected `GameModeDefinition` and `LevelDefinition` on creation.
-- [ ] 7.4 Implement generic team assignment logic and spawn slot distribution.
+- [x] 7.1 Implement `shared/domain/GameMode.ts` definition schema (mode ID, min/max players, team count, team size, score limit, time limit, respawn rules).
+- [x] 7.2 Implement initial GameMode configurations (`1v1`, `3v3`, `4v4`, `ffa`).
+- [x] 7.3 Decouple `GameRoom.ts` from hardcoded options; inject selected `GameMode` and `LevelDefinition` on creation.
+- [x] 7.4 Implement generic team assignment logic (`TeamAssignment.ts`), team-aligned spawn transforms, and network schema synchronization (`modeId`, `levelId`, `teamIndex`).
 
 #### Completion Criteria
-- Single `GameRoom` class successfully initializes any registered game mode based on launch configuration.
+- Single `GameRoom` class successfully initializes any registered game mode dynamically based on launch configuration.
+- Players automatically balanced across team slots and spawned facing opponents.
 
 #### Verification
-- Unit test creating `GameRoom` with different mode configs; assert player capacity, team slots, and win conditions.
+- Headless automated test suite (`scratch/test_gamemode_lifecycle.ts`): All 5 test suites passed (1v1, 3v3, 4v4, FFA, Leave & Re-balance).
+- Code quality & builds: `npm run lint`, `npx tsc --noEmit`, and `npm run build` all pass with 0 errors.
 
 ---
 
@@ -1203,7 +1201,7 @@ Phase 5: Client Character Visuals & Hierarchical Articulated Cube Rig [x]
    ↓
 Phase 6: Generic Level & Arena System [x]
    ↓
-Phase 7: Generic Match & GameMode Architecture
+Phase 7: Generic Match & GameMode Architecture [x]
    ↓
 Phase 8: Match State Machine & Room Lifecycle
    ↓
