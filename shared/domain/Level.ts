@@ -61,6 +61,46 @@ export interface ItemSpawnPoint {
 }
 
 /**
+ * Collision shape type recognized by physics loaders.
+ */
+export type CollisionShapeType = "BOX" | "CYLINDER";
+
+/**
+ * Functional role of a physical collision surface.
+ */
+export type SurfaceRole = "FLOOR" | "PLATFORM" | "WALL" | "HAZARD";
+
+/**
+ * Pure geometric declaration of a physical collision hull in the level.
+ * Can be loaded directly by Havok or matched against Blender `COL_*` nodes.
+ */
+export interface CollisionHullDefinition {
+  id: string;
+  shapeType: CollisionShapeType;
+  role: SurfaceRole;
+  position: Vector3D;
+  rotationEuler?: Vector3D;
+  boxDimensions?: Vector3D;
+  cylinderRadius?: number;
+  cylinderHeight?: number;
+  blenderNodeName?: string;
+}
+
+/**
+ * Visual styling theme configuration for rendering in Babylon.js.
+ */
+export interface VisualThemeDefinition {
+  primaryFloorColor: string;
+  secondaryFloorColor: string;
+  accentGlowColor: string;
+  forcefieldColor: string;
+  forcefieldAlpha: number;
+  skyboxTheme: "CYBER_DOME" | "DEEP_SPACE" | "NEON_CITY";
+  ambientLightColor: string;
+  spotlightColor: string;
+}
+
+/**
  * LevelDefinition: Master specification for an arena environment.
  */
 export interface LevelDefinition {
@@ -77,6 +117,12 @@ export interface LevelDefinition {
   /** Weapon / powerup spawn positions */
   itemSpawns: ItemSpawnPoint[];
 
+  /** Declarative physical collision hulls loaded by Havok (NullEngine safe) */
+  collisionHulls: CollisionHullDefinition[];
+
+  /** Aesthetic theme parameters for client visual environment */
+  visualTheme: VisualThemeDefinition;
+
   /** Path or identifier for server low-poly physics collision hulls */
   serverPhysicsAsset: string;
 
@@ -88,38 +134,67 @@ export interface LevelDefinition {
 // DEFAULT ARENA: THUNDER DOME ALPHA
 // ==================================================
 
+function generateCircularPerimeterWalls(
+  radius: number,
+  segmentCount: number,
+  height: number,
+  thickness: number,
+): CollisionHullDefinition[] {
+  const walls: CollisionHullDefinition[] = [];
+  const angleStep = (2 * Math.PI) / segmentCount;
+  const chordLength = 2 * radius * Math.sin(angleStep / 2) * 1.06;
+
+  for (let i = 0; i < segmentCount; i++) {
+    const angle = i * angleStep;
+    const x = Math.sin(angle) * radius;
+    const z = Math.cos(angle) * radius;
+    const y = height / 2;
+
+    walls.push({
+      id: `hull-wall-${i}`,
+      shapeType: "BOX",
+      role: "WALL",
+      position: { x, y, z },
+      rotationEuler: { x: 0, y: angle, z: 0 },
+      boxDimensions: { x: chordLength, y: height, z: thickness },
+      blenderNodeName: `COL_Wall_${i}`,
+    });
+  }
+  return walls;
+}
+
 export const LEVEL_THUNDER_DOME_ALPHA: LevelDefinition = {
   id: "thunder-dome-alpha",
   name: "Thunder Dome Alpha",
   description:
     "The premier circular combat arena surrounded by forcefield perimeter walls.",
   boundaries: {
-    min: { x: -30, y: -5, z: -30 },
-    max: { x: 30, y: 25, z: 30 },
+    min: { x: -25, y: -5, z: -25 },
+    max: { x: 25, y: 25, z: 25 },
   },
   playerSpawns: [
     // Team Alpha / Player 1 spawns (West side facing East)
     {
       id: "spawn-alpha-1",
-      position: { x: -15, y: 0.5, z: 0 },
+      position: { x: -10, y: 0.55, z: 0 },
       rotationYaw: Math.PI / 2,
       teamIndex: 0,
     },
     {
       id: "spawn-alpha-2",
-      position: { x: -15, y: 0.5, z: 5 },
+      position: { x: -10, y: 0.55, z: 4 },
       rotationYaw: Math.PI / 2,
       teamIndex: 0,
     },
     {
       id: "spawn-alpha-3",
-      position: { x: -15, y: 0.5, z: -5 },
+      position: { x: -10, y: 0.55, z: -4 },
       rotationYaw: Math.PI / 2,
       teamIndex: 0,
     },
     {
       id: "spawn-alpha-4",
-      position: { x: -18, y: 0.5, z: 2.5 },
+      position: { x: -12, y: 0.55, z: 0 },
       rotationYaw: Math.PI / 2,
       teamIndex: 0,
     },
@@ -127,25 +202,25 @@ export const LEVEL_THUNDER_DOME_ALPHA: LevelDefinition = {
     // Team Beta / Player 2 spawns (East side facing West)
     {
       id: "spawn-beta-1",
-      position: { x: 15, y: 0.5, z: 0 },
+      position: { x: 10, y: 0.55, z: 0 },
       rotationYaw: -Math.PI / 2,
       teamIndex: 1,
     },
     {
       id: "spawn-beta-2",
-      position: { x: 15, y: 0.5, z: 5 },
+      position: { x: 10, y: 0.55, z: 4 },
       rotationYaw: -Math.PI / 2,
       teamIndex: 1,
     },
     {
       id: "spawn-beta-3",
-      position: { x: 15, y: 0.5, z: -5 },
+      position: { x: 10, y: 0.55, z: -4 },
       rotationYaw: -Math.PI / 2,
       teamIndex: 1,
     },
     {
       id: "spawn-beta-4",
-      position: { x: 18, y: 0.5, z: -2.5 },
+      position: { x: 12, y: 0.55, z: 0 },
       rotationYaw: -Math.PI / 2,
       teamIndex: 1,
     },
@@ -159,17 +234,59 @@ export const LEVEL_THUNDER_DOME_ALPHA: LevelDefinition = {
     },
     {
       id: "item-north",
-      position: { x: 0, y: 0.5, z: 12 },
+      position: { x: 0, y: 1.5, z: 7.5 },
       allowedCategories: ["WEAPON", "POWERUP"],
       respawnSeconds: 20,
     },
     {
       id: "item-south",
-      position: { x: 0, y: 0.5, z: -12 },
+      position: { x: 0, y: 1.5, z: -7.5 },
       allowedCategories: ["WEAPON", "POWERUP"],
       respawnSeconds: 20,
     },
   ],
+  collisionHulls: [
+    // 1. Main circular combat arena floor (R = 16m, top surface at Y = 0)
+    {
+      id: "hull-floor",
+      shapeType: "CYLINDER",
+      role: "FLOOR",
+      position: { x: 0, y: -0.5, z: 0 },
+      cylinderRadius: 16.0,
+      cylinderHeight: 1.0,
+      blenderNodeName: "COL_Floor",
+    },
+    // 2. Elevated sparring platform North (top surface at Y = 1.2m)
+    {
+      id: "hull-platform-north",
+      shapeType: "BOX",
+      role: "PLATFORM",
+      position: { x: 0, y: 0.9, z: 7.5 },
+      boxDimensions: { x: 4.0, y: 0.6, z: 4.0 },
+      blenderNodeName: "COL_Platform_N",
+    },
+    // 3. Elevated sparring platform South (top surface at Y = 1.2m)
+    {
+      id: "hull-platform-south",
+      shapeType: "BOX",
+      role: "PLATFORM",
+      position: { x: 0, y: 0.9, z: -7.5 },
+      boxDimensions: { x: 4.0, y: 0.6, z: 4.0 },
+      blenderNodeName: "COL_Platform_S",
+    },
+    // 4. Perimeter forcefield barrier walls (16 tangent box segments at R = 16m)
+    ...generateCircularPerimeterWalls(16.0, 16, 6.0, 0.6),
+  ],
+  visualTheme: {
+    primaryFloorColor: "#111827",
+    secondaryFloorColor: "#1f2937",
+    accentGlowColor: "#00e5ff",
+    forcefieldColor: "#00e5ff",
+    forcefieldAlpha: 0.22,
+    skyboxTheme: "CYBER_DOME",
+    ambientLightColor: "#334155",
+    spotlightColor: "#f8fafc",
+  },
   serverPhysicsAsset: "arenas/thunder-dome-alpha.physics.json",
   clientVisualAsset: "arenas/thunder-dome-alpha.glb",
 };
