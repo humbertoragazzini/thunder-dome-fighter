@@ -91,8 +91,10 @@ export class KeyboardMouseInputProvider implements IInputProvider {
   pollInput(): Partial<CharacterActionInput> | null {
     const isW = this.activeKeys.has("KeyW") || this.activeKeys.has("ArrowUp");
     const isS = this.activeKeys.has("KeyS") || this.activeKeys.has("ArrowDown");
-    const isA = this.activeKeys.has("KeyA") || this.activeKeys.has("ArrowLeft");
-    const isD = this.activeKeys.has("KeyD") || this.activeKeys.has("ArrowRight");
+    const isQ = this.activeKeys.has("KeyQ");
+    const isE = this.activeKeys.has("KeyE");
+    const isTurnLeft = this.activeKeys.has("KeyA") || this.activeKeys.has("ArrowLeft");
+    const isTurnRight = this.activeKeys.has("KeyD") || this.activeKeys.has("ArrowRight");
 
     let moveX = 0;
     let moveZ = 0;
@@ -100,14 +102,15 @@ export class KeyboardMouseInputProvider implements IInputProvider {
     if (isW && !isS) moveZ = 1;
     else if (isS && !isW) moveZ = -1;
 
-    if (isA && !isD) moveX = -1;
-    else if (isD && !isA) moveX = 1;
+    // Lateral strafe via Q/E
+    if (isQ && !isE) moveX = -1;
+    else if (isE && !isQ) moveX = 1;
 
-    // Optional keyboard yaw steering (Q/E for turning if mouse is inactive)
-    if (this.activeKeys.has("KeyQ")) {
+    // Keyboard yaw steering via A/D (or Left/Right Arrows)
+    if (isTurnLeft) {
       this.currentYaw -= 0.05;
     }
-    if (this.activeKeys.has("KeyE")) {
+    if (isTurnRight) {
       this.currentYaw += 0.05;
     }
 
@@ -115,7 +118,7 @@ export class KeyboardMouseInputProvider implements IInputProvider {
     const jump = this.jumpPressed;
     const attackAction = this.currentAttack;
 
-    if (moveX !== 0 || moveZ !== 0 || jump || sprint || attackAction !== "NONE") {
+    if (moveX !== 0 || moveZ !== 0 || isTurnLeft || isTurnRight || jump || sprint || attackAction !== "NONE") {
       this.active = true;
     }
 

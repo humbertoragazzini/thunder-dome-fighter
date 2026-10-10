@@ -29,7 +29,7 @@ import { Spinner } from "../ui/atoms/Spinner";
 import { ScreenLayout } from "../ui/templates/ScreenLayout";
 
 const TIPS = [
-  "Tip: Inputs are authoritatively simulated at 30 Hz on the server.",
+  "Tip: Inputs are authoritatively simulated on the server.",
   "Tip: Rolling back mispredictions is smoothed by visual error-decay interpolation.",
   "Tip: Maintain high ground in the arena to control opponent sightlines.",
   "Tip: All competitive statistics update directly in PostgreSQL upon match end.",

@@ -93,19 +93,14 @@ export function InGameOverlay() {
           </div>
         </div>
 
-        {/* Bottom Bar: Controls Guide & Engine Badge */}
+        {/* Bottom Bar: Controls Guide */}
         <div className="flex items-end justify-between w-full">
           {/* Controls Hints */}
           <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800/80 px-3.5 py-2 rounded-xl text-xs text-slate-300 shadow-lg">
             <GiGamepad className="text-amber-400 text-lg" />
             <span style={{ fontFamily: "var(--font-tech)" }}>
-              Move: <strong className="text-amber-400">WASD</strong> • Jump: <strong className="text-amber-400">SPACE</strong> • Sprint: <strong className="text-amber-400">SHIFT</strong> • Fight: <strong className="text-amber-400">J/K/L</strong>
+              Move: <strong className="text-amber-400">W/S</strong> • Turn: <strong className="text-amber-400">A/D</strong> • Strafe: <strong className="text-amber-400">Q/E</strong> • Jump: <strong className="text-amber-400">SPACE</strong> • Sprint: <strong className="text-amber-400">SHIFT</strong> • Fight: <strong className="text-amber-400">J/K/L</strong>
             </span>
-          </div>
-
-          {/* Physics Tick Badge */}
-          <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800/80 px-3 py-1.5 rounded-xl text-[11px] text-slate-400 font-mono shadow-lg">
-            Authoritative Havok • 30 Hz Sync
           </div>
         </div>
       </div>

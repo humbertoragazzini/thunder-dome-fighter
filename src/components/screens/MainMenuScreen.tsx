@@ -33,7 +33,7 @@ export function MainMenuScreen() {
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span style={{ fontFamily: "var(--font-tech)" }}>
-              Authoritative Simulation Cluster Online • 30 Hz Havok
+              Authoritative Simulation Cluster Online
             </span>
           </div>
           <span
