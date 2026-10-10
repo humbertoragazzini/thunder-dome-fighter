@@ -214,12 +214,14 @@ export class GameRoom extends Room {
     this.state.modeId = this.gameMode.id;
     this.state.levelId = this.level.id;
 
-    this.metadata = {
-      serverName: options.serverName ?? "Thunder Dome Arena",
-      serverSlot: options.serverSlot ?? 1,
-      modeId: this.gameMode.id,
-      levelId: this.level.id,
-    };
+    if ((this as any)._listing) {
+      this.metadata = {
+        serverName: options.serverName ?? "Thunder Dome Arena",
+        serverSlot: options.serverSlot ?? 1,
+        modeId: this.gameMode.id,
+        levelId: this.level.id,
+      };
+    }
 
     this.simulationWorld = new SimulatorWorld(this.level);
 
