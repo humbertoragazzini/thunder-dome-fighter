@@ -130,6 +130,7 @@ function createPhysicsAccumulator(
 // ==================================================
 
 export class SimulatorWorld {
+  public isGameplayActive: boolean = false;
   private engine: NullEngine;
   private scene: Scene;
   private havokPlugin!: HavokPlugin;
@@ -453,6 +454,16 @@ export class SimulatorWorld {
 
   private applyEntityInputs() {
     for (const entity of this.entities.values()) {
+      // If gameplay is not active (e.g. WAITING_FOR_PLAYERS or COUNTDOWN),
+      // drain queued commands and zero horizontal velocity to prevent pre-match drift.
+      if (!this.isGameplayActive) {
+        entity.pendingInputCommands.length = 0;
+        const currentVel = entity.body.getLinearVelocity();
+        entity.body.setLinearVelocity(new Vector3(0, currentVel.y, 0));
+        entity.body.setAngularVelocity(Vector3.Zero());
+        continue;
+      }
+
       // Buffer Priming & Jitter Margin Management:
       // On startup or after starvation, wait until SERVER_INPUT_BUFFER_TARGET commands
       // are buffered to absorb normal network arrival jitter.
@@ -644,13 +655,27 @@ export class SimulatorWorld {
     console.log("world initialized");
   }
 
+  public setGameplayActive(active: boolean): void {
+    this.isGameplayActive = active;
+  }
+
   public dispose(): void {
     if (this.scheduler) {
       clearInterval(this.scheduler);
       this.scheduler = null;
     }
+
+    // Clean up all entity bodies and transform nodes
+    const playerIds = Array.from(this.entities.keys());
+    for (const id of playerIds) {
+      this.removeEntity(id);
+    }
+    this.entities.clear();
+
     this.levelCollisionLoader?.dispose();
     this.levelCollisionLoader = null;
+    this.havokPlugin?.dispose();
+    this.havokPlugin = null as any;
     this.scene?.dispose();
     this.engine?.dispose();
   }
