@@ -29,6 +29,16 @@ import {
 } from "../shared/player/PlayerConfig";
 import { verifySessionToken, type AuthenticatedUser } from "./auth/TokenVerifier.ts";
 import { resolveSpawnPoint } from "../shared/levels/SpawnPointResolver";
+import { GAME_MODES, type GameMode, type GameModeId } from "../shared/domain/GameMode";
+import { LEVELS, type LevelDefinition } from "../shared/domain/Level";
+import { assignPlayerTeam } from "../shared/match/TeamAssignment";
+
+export interface GameRoomOptions {
+  serverName?: string;
+  serverSlot?: number;
+  modeId?: GameModeId;
+  levelId?: string;
+}
 
 // ==================================================
 // INPUT VALIDATION & CLAMPING
@@ -128,10 +138,20 @@ export class GameRoom extends Room {
   private lastAcceptedSequenceBySessionId = new Map<string, number>();
 
   // ==================================================
-  // SERVER PHYSICS WORLD
+  // SERVER PHYSICS WORLD & GAME RULES
   // ==================================================
 
   private simulationWorld!: SimulatorWorld;
+  private gameMode!: GameMode;
+  private level!: LevelDefinition;
+
+  getGameMode(): GameMode {
+    return this.gameMode;
+  }
+
+  getLevel(): LevelDefinition {
+    return this.level;
+  }
 
   private syncSimulationState() {
     this.state.serverTick = this.simulationWorld.getServerTick();
@@ -180,22 +200,28 @@ export class GameRoom extends Room {
   // ROOM CREATION
   // ==================================================
 
-  async onCreate(options: {
-    serverName: string;
-    serverSlot: number;
-  }) {
-    this.maxClients = 25;
+  async onCreate(options: GameRoomOptions = {}) {
+    const requestedModeId = options.modeId && options.modeId in GAME_MODES ? options.modeId : "1v1";
+    this.gameMode = GAME_MODES[requestedModeId];
 
+    const requestedLevelId = options.levelId && options.levelId in LEVELS ? options.levelId : "thunder-dome-alpha";
+    this.level = LEVELS[requestedLevelId];
+
+    this.maxClients = this.gameMode.maxPlayers;
     this.autoDispose = false;
-
     this.patchRate = PHYSICS_DT_MS;
 
+    this.state.modeId = this.gameMode.id;
+    this.state.levelId = this.level.id;
+
     this.metadata = {
-      serverName: options.serverName,
-      serverSlot: options.serverSlot,
+      serverName: options.serverName ?? "Thunder Dome Arena",
+      serverSlot: options.serverSlot ?? 1,
+      modeId: this.gameMode.id,
+      levelId: this.level.id,
     };
 
-    this.simulationWorld = new SimulatorWorld();
+    this.simulationWorld = new SimulatorWorld(this.level);
 
     await this.simulationWorld.initialize(() => {
       this.syncSimulationState();
@@ -253,15 +279,31 @@ export class GameRoom extends Room {
   // PLAYER JOIN
   // ==================================================
 
-  onJoin(client: Client) {
+  onJoin(client: Client, options?: unknown) {
     const auth = client.auth as AuthenticatedUser;
     console.log(`🎮 Player joined: ${auth.playerName} (${auth.playerId}) [Session: ${client.sessionId}]`);
 
-    // Deterministically resolve starting spawn location based on player slot
-    const playerIndex = this.state.players.size;
+    // Optional requested team index from client join options
+    const requestedTeam =
+      typeof options === "object" &&
+      options !== null &&
+      "teamIndex" in options &&
+      typeof (options as Record<string, unknown>).teamIndex === "number"
+        ? (options as { teamIndex: number }).teamIndex
+        : undefined;
+
+    // Deterministically assign player to a team and slot
+    const teamAssignment = assignPlayerTeam(
+      this.gameMode,
+      this.state.players.values(),
+      requestedTeam,
+    );
+
+    // Deterministically resolve starting spawn location based on team affinity and slot
     const spawnPoint = resolveSpawnPoint(
-      this.simulationWorld.getLevel(),
-      playerIndex,
+      this.level,
+      teamAssignment.slotInTeam,
+      teamAssignment.teamIndex >= 0 ? teamAssignment.teamIndex : undefined,
     );
 
     this.simulationWorld.spawnEntity(client.sessionId, spawnPoint);
@@ -269,6 +311,7 @@ export class GameRoom extends Room {
     // Create the network state for this player.
     const playerState = new PlayerState();
     playerState.playerId = client.sessionId;
+    playerState.teamIndex = teamAssignment.teamIndex;
     playerState.x = spawnPoint.position.x;
     playerState.y = spawnPoint.position.y;
     playerState.z = spawnPoint.position.z;
