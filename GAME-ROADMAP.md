@@ -560,10 +560,13 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 #### Completion Criteria
 - Room strictly enforces state rules; physics simulation cannot advance gameplay before `PLAYING`.
+- Single active connection invariant enforced: duplicate connections with the same `playerId` are rejected with HTTP 409.
+- Single active tab enforced in browser via `BroadcastChannel` to prevent GPU drain and concurrent session desynchronization.
 - Zero memory leaks upon room closure (Havok WASM instances and Babylon nodes destroyed).
 
 #### Verification
 - Automated room test: Simulate lifecycle from creation to match end; assert timers, state broadcasts, and object disposal.
+- Automated duplicate test (`test_duplicate_connection.ts` and `test_single_tab_enforcer.ts`): Assert duplicate connection rejection and tab takeover.
 
 ---
 
