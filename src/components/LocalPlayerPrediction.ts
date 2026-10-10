@@ -2,7 +2,6 @@ import {
   Scene,
   TransformNode,
   PhysicsBody,
-  PhysicsShapeBox,
   PhysicsShapeCapsule,
   PhysicsRaycastResult,
   PhysicsMotionType,
@@ -19,8 +18,6 @@ import {
   PLAYER_MASS,
   LINEAR_DAMPING,
   ANGULAR_DAMPING,
-  FLOOR_SIZE,
-  FLOOR_POSITION,
   MAX_PREDICTION_STEPS_PER_UPDATE,
   PREDICTION_HISTORY_MAX_FRAMES,
   VISUAL_CORRECTION_TIME_CONSTANT_MS,
@@ -30,6 +27,12 @@ import {
   type CharacterActionInput,
   type CharacterInputCommand,
 } from "../../shared/player/PlayerConfig";
+
+import { LevelCollisionLoader } from "../../shared/levels/LevelCollisionLoader";
+import {
+  LEVEL_THUNDER_DOME_ALPHA,
+  type LevelDefinition,
+} from "../../shared/domain/Level";
 
 import {
   calculateThrottleForce,
@@ -89,9 +92,8 @@ export class LocalPlayerPrediction {
   private predictionNode: TransformNode;
   private predictionBody: PhysicsBody;
 
-  // Static prediction floor collider
-  private floorNode: TransformNode;
-  private floorBody: PhysicsBody;
+  // Static level collision hulls for local prediction parity
+  private levelCollisionLoader: LevelCollisionLoader;
 
   // Dual timeline tracking:
   // sequence: order of user input commands
@@ -129,36 +131,16 @@ export class LocalPlayerPrediction {
     scene: Scene,
     havokPlugin: HavokPlugin,
     onSendInput: (command: CharacterInputCommand | PlayerInputCommand) => void,
+    level: LevelDefinition = LEVEL_THUNDER_DOME_ALPHA,
   ) {
     this.scene = scene;
     this.havokPlugin = havokPlugin;
     this.onSendInput = onSendInput;
 
     // --------------------------------------------------
-    // Static floor collider for local prediction world
+    // Modular static level collision hulls for prediction
     // --------------------------------------------------
-    this.floorNode = new TransformNode("prediction-floor", scene);
-    this.floorNode.position.set(
-      FLOOR_POSITION.x,
-      FLOOR_POSITION.y,
-      FLOOR_POSITION.z,
-    );
-    this.floorNode.rotationQuaternion = Quaternion.Identity();
-
-    this.floorBody = new PhysicsBody(
-      this.floorNode,
-      PhysicsMotionType.STATIC,
-      true,
-      scene,
-    );
-
-    const floorShape = new PhysicsShapeBox(
-      Vector3.Zero(),
-      Quaternion.Identity(),
-      new Vector3(FLOOR_SIZE.width, FLOOR_SIZE.height, FLOOR_SIZE.depth),
-      scene,
-    );
-    this.floorBody.shape = floorShape;
+    this.levelCollisionLoader = new LevelCollisionLoader(level, scene);
 
     // --------------------------------------------------
     // Local dynamic humanoid capsule prediction body
@@ -717,9 +699,7 @@ export class LocalPlayerPrediction {
     this.predictionBody.dispose();
     this.predictionNode.dispose();
 
-    this.floorBody.shape?.dispose();
-    this.floorBody.dispose();
-    this.floorNode.dispose();
+    this.levelCollisionLoader.dispose();
 
     this.pendingInputs = [];
     this.predictionHistory = [];

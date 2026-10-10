@@ -28,11 +28,8 @@ import {
   Vector3,
   HemisphericLight,
   Color4,
-  Color3,
-  MeshBuilder,
   Quaternion,
   HavokPlugin,
-  StandardMaterial,
 } from "@babylonjs/core";
 
 import HavokPhysics from "@babylonjs/havok";
@@ -45,9 +42,8 @@ import type { TouchVirtualGamepadProvider } from "../input/providers/TouchVirtua
 import { TouchGamepadOverlay } from "./ui/organisms/TouchGamepadOverlay";
 import { CharacterVisualRig } from "../visuals/character/CharacterVisualRig";
 import { HERO_PALETTE } from "../visuals/character/CharacterRigConfig";
+import { LevelVisualLoader } from "../visuals/level/LevelVisualLoader";
 import {
-  FLOOR_SIZE,
-  FLOOR_POSITION,
   GRAVITY,
   type CharacterInputCommand,
   type PlayerInputCommand,
@@ -67,6 +63,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
   const remoteInterpolationRef = useRef<RemotePlayerInterpolation | null>(null);
   const inputControllerRef = useRef<CharacterInputController | null>(null);
   const localPlayerRigRef = useRef<CharacterVisualRig | null>(null);
+  const levelVisualLoaderRef = useRef<LevelVisualLoader | null>(null);
   const stateChangeHandlerRef = useRef<((state: any) => void) | null>(null);
 
   const [touchProvider, setTouchProvider] = useState<TouchVirtualGamepadProvider | null>(null);
@@ -137,27 +134,9 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
       localPlayerRig.rootNode.rotationQuaternion = Quaternion.Identity();
       localPlayerRigRef.current = localPlayerRig;
 
-      // Static floor visual mesh
-      const floor = MeshBuilder.CreateBox(
-        "floor",
-        {
-          width: FLOOR_SIZE.width,
-          height: FLOOR_SIZE.height,
-          depth: FLOOR_SIZE.depth,
-        },
-        scene,
-      );
-
-      floor.position.set(
-        FLOOR_POSITION.x,
-        FLOOR_POSITION.y,
-        FLOOR_POSITION.z,
-      );
-
-      const floorMat = new StandardMaterial("floor-mat", scene);
-      floorMat.diffuseColor = new Color3(0.12, 0.14, 0.18);
-      floorMat.specularColor = new Color3(0.05, 0.05, 0.05);
-      floor.material = floorMat;
+      // Modular Arena Environment Visuals (Circular floor, platforms, forcefield, sky, lights)
+      const levelVisualLoader = new LevelVisualLoader(scene);
+      levelVisualLoaderRef.current = levelVisualLoader;
 
       // ==================================================
       // CAMERA & LIGHT
@@ -172,6 +151,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
         scene,
       );
 
+      camera.lockedTarget = localPlayerRig.rootNode;
       camera.attachControl(canvas, true);
 
       // Prevent WASD and Arrow keys from rotating the camera
@@ -330,6 +310,9 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
 
       localPlayerRigRef.current?.dispose();
       localPlayerRigRef.current = null;
+
+      levelVisualLoaderRef.current?.dispose();
+      levelVisualLoaderRef.current = null;
 
       localPredictionRef.current?.dispose();
       localPredictionRef.current = null;
