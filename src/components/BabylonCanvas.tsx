@@ -206,6 +206,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
           state,
           room.sessionId,
           scene,
+          localState?.teamIndex,
         );
       };
 

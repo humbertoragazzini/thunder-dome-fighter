@@ -20,7 +20,7 @@ import {
 } from "../../shared/networking/InterpolationMath";
 
 import { CharacterVisualRig } from "../visuals/character/CharacterVisualRig";
-import { OPPONENT_PALETTE } from "../visuals/character/CharacterRigConfig";
+import { HERO_PALETTE, OPPONENT_PALETTE } from "../visuals/character/CharacterRigConfig";
 
 export interface RemotePlayerSnapshot {
   serverTick: number;
@@ -66,6 +66,7 @@ export class RemotePlayerInterpolation {
     },
     localSessionId: string,
     scene: Scene,
+    localTeamIndex?: number,
   ) {
     if (!state?.players) {
       return;
@@ -135,12 +136,22 @@ export class RemotePlayerInterpolation {
         playerState.vz ?? 0,
       );
 
+      // Determine palette based on team affinity
+      const isTeammate =
+        localTeamIndex !== undefined &&
+        localTeamIndex >= 0 &&
+        playerState.teamIndex !== undefined &&
+        playerState.teamIndex >= 0 &&
+        playerState.teamIndex === localTeamIndex;
+
+      const palette = isTeammate ? HERO_PALETTE : OPPONENT_PALETTE;
+
       // First time remote player appears: spawn visual rig immediately
       if (!visual) {
         const rig = new CharacterVisualRig(
           `remote-player-${playerId}`,
           scene,
-          OPPONENT_PALETTE,
+          palette,
         );
 
         rig.rootNode.position.set(playerState.x, playerState.y, playerState.z);
