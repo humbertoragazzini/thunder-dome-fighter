@@ -10,11 +10,11 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 5 — Client Character Visuals & Hierarchical Articulated Cube Rig (Approach B)** |
-| **Current Step** | **Step 5.1 — Construct 15-cube articulated transform hierarchy in Babylon.js** |
-| **Last Completed Step** | **Step 4.7 — Update RemotePlayerInterpolation to interpolate humanoid capsule positions and yaw rotations** |
-| **Next Step** | **Step 5.1 — Construct 15-cube articulated transform hierarchy in Babylon.js** |
-| **Overall Status** | **Phase 4 (Authoritative Player Entity & Humanoid Movement) 100% complete; moving to Phase 5.** |
+| **Current Phase** | **Phase 6 — Generic Level & Arena System** |
+| **Current Step** | **Step 6.1 — Create shared/domain/LevelDefinition.ts schema** |
+| **Last Completed Step** | **Step 5.6 — Bind remote player visual instances to independent articulated cube rigs** |
+| **Next Step** | **Step 6.1 — Create shared/domain/LevelDefinition.ts schema** |
+| **Overall Status** | **Phase 5 (Client Character Visuals & Hierarchical Articulated Cube Rig) 100% complete; moving to Phase 6.** |
 | **Last Updated** | **2026-10-04** |
 
 ---
@@ -468,28 +468,31 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 5 — Client Character Visuals & Hierarchical Articulated Cube Rig (Approach B)
 
-**Status:** Not Started `[ ]`  
+**Status:** Completed `[x]`  
 **Goal:** Build a modular 15-cube articulated character hierarchy in Babylon.js (Torso, Head, 3-joint Arms, 3-joint Legs) anchored to the Phase 4 capsule, with procedural joint swing animations (Idle, Walk, Run, Jump, Punch, Kick) and customizable materials.  
 **Dependencies:** Phase 4.  
 
 #### Steps
-- [ ] 5.1 Construct 15-cube articulated transform hierarchy in Babylon.js:
+- [x] 5.1 Construct 15-cube articulated transform hierarchy in Babylon.js:
   - Root: Torso cube anchored to the Havok locomotion capsule.
   - Head: Attached via neck pivot.
   - Left & Right Arms (3 joints each): Shoulder joint → Upper Arm cube → Elbow joint → Forearm cube → Wrist joint → Hand/Fist cube.
   - Left & Right Legs (3 joints each): Hip joint → Thigh cube → Knee joint → Shin cube → Ankle joint → Foot cube.
-- [ ] 5.2 Calibrate anatomical joint pivot offsets to enable natural rotational range of motion without visual clipping.
-- [ ] 5.3 Implement client-side `CharacterProceduralAnimator` driving joint rotations via trigonometric curves based on speed and movement state (`Idle`, `Walk`, `Run`, `Jump`, `Fall`, `Land`).
-- [ ] 5.4 Bind root visual transform to the client-predicted capsule transform, absorbing position/yaw updates seamlessly.
-- [ ] 5.5 Support material styling & player color palettes (Player 1 Red/Amber, Player 2 Cyan/Blue, team shaders).
-- [ ] 5.6 Bind remote player visual instances to their own independent articulated cube rigs driven by interpolated network state.
+- [x] 5.2 Calibrate anatomical joint pivot offsets to enable natural rotational range of motion without visual clipping.
+- [x] 5.3 Implement client-side `CharacterProceduralAnimator` driving joint rotations via trigonometric curves based on speed and movement state (`Idle`, `Walk`, `Run`, `Jump`, `Fall`, `Land`, `Punch`, `Kick`).
+- [x] 5.4 Bind root visual transform to the client-predicted capsule transform, absorbing position/yaw updates seamlessly.
+- [x] 5.5 Support material styling & player color palettes (Hero Cyan/Amber, Opponent Crimson/Obsidian).
+- [x] 5.6 Bind remote player visual instances to their own independent articulated cube rigs driven by interpolated network state.
 
 #### Completion Criteria
 - Local and remote characters render as expressive, 15-cube articulated humanoid fighters with procedural walking, running, and jumping limb swings.
 - Limb swings react dynamically to movement speed with zero desync between visuals and Havok physics capsule.
+- Proportions and animation parameters centralized in `CharacterRigConfig.ts` for instant live tweaking.
+- `ICharacterVisual` adapter contract decoupling gameplay hitboxes and physics from visual meshes (guaranteeing future Blender `.glb` imports maintain exact uniform hitboxes).
 
 #### Verification
-- Visual inspection: Local player walks/runs/jumps with coordinated arm and leg swings; remote players mirror animations accurately over the network.
+- Automated test (`scratch/test_character_rig.ts`): All 8 tests passed (Instantiation, Hierarchy, Idle, Walk, Run, Jump/Fall, Punches/Kicks, Palette switch & disposal).
+- Client build (`npm run lint && npx tsc --noEmit && npm run build`): Clean with zero errors or warnings.
 
 ---
 
@@ -1193,9 +1196,9 @@ Phase 2: User Authentication & Player Identity [x]
    ↓
 Phase 3: Application Shell & UI Navigation [x]
    ↓
-Phase 4: Authoritative Character Controller & Humanoid Movement [~]
+Phase 4: Authoritative Character Controller & Humanoid Movement [x]
    ↓
-Phase 5: Client Character Visuals & GLB Animation System
+Phase 5: Client Character Visuals & Hierarchical Articulated Cube Rig [x]
    ↓
 Phase 6: Generic Level & Arena System
    ↓

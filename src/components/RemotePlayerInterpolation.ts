@@ -2,15 +2,10 @@ import {
   Scene,
   Vector3,
   Quaternion,
-  Mesh,
-  MeshBuilder,
-  StandardMaterial,
-  Color3,
 } from "@babylonjs/core";
 
 import {
   PHYSICS_DT_SECONDS,
-  CHARACTER_CAPSULE,
   REMOTE_INTERPOLATION_TARGET_DELAY_TICKS,
   REMOTE_INTERPOLATION_DELAY_TOLERANCE_TICKS,
   REMOTE_MAX_SNAPSHOTS,
@@ -24,6 +19,9 @@ import {
   interpolateRotation,
 } from "../../shared/networking/InterpolationMath";
 
+import { CharacterVisualRig } from "../visuals/character/CharacterVisualRig";
+import { OPPONENT_PALETTE } from "../visuals/character/CharacterRigConfig";
+
 export interface RemotePlayerSnapshot {
   serverTick: number;
   position: Vector3;
@@ -32,7 +30,7 @@ export interface RemotePlayerSnapshot {
 }
 
 export interface RemotePlayerVisual {
-  mesh: Mesh;
+  rig: CharacterVisualRig;
   snapshots: RemotePlayerSnapshot[];
 }
 
@@ -137,29 +135,16 @@ export class RemotePlayerInterpolation {
         playerState.vz ?? 0,
       );
 
-      // First time remote player appears: spawn visual mesh immediately
+      // First time remote player appears: spawn visual rig immediately
       if (!visual) {
-        const mesh = MeshBuilder.CreateCapsule(
+        const rig = new CharacterVisualRig(
           `remote-player-${playerId}`,
-          {
-            radius: CHARACTER_CAPSULE.radius,
-            height: CHARACTER_CAPSULE.totalHeight,
-            tessellation: 16,
-            subdivisions: 1,
-          },
           scene,
+          OPPONENT_PALETTE,
         );
 
-        const remoteMat = new StandardMaterial(
-          `remote-mat-${playerId}`,
-          scene,
-        );
-        remoteMat.diffuseColor = new Color3(0.9, 0.25, 0.25);
-        remoteMat.specularColor = new Color3(0.2, 0.2, 0.2);
-        mesh.material = remoteMat;
-
-        mesh.position.set(playerState.x, playerState.y, playerState.z);
-        mesh.rotationQuaternion = new Quaternion(
+        rig.rootNode.position.set(playerState.x, playerState.y, playerState.z);
+        rig.rootNode.rotationQuaternion = new Quaternion(
           playerState.rx,
           playerState.ry,
           playerState.rz,
@@ -167,7 +152,7 @@ export class RemotePlayerInterpolation {
         );
 
         visual = {
-          mesh,
+          rig,
           snapshots: [
             {
               serverTick: state.serverTick,
@@ -217,8 +202,7 @@ export class RemotePlayerInterpolation {
     // Dispose remote players no longer present
     for (const [playerId, visual] of this.remotePlayers) {
       if (!activeRemotePlayerIds.has(playerId)) {
-        visual.mesh.material?.dispose();
-        visual.mesh.dispose();
+        visual.rig.dispose();
         this.remotePlayers.delete(playerId);
       }
     }
@@ -257,7 +241,7 @@ export class RemotePlayerInterpolation {
     // pause cleanly at newest snapshot instead of running into the future
     this.remoteRenderTick = Math.min(proposedTick, this.latestServerTick);
 
-    // 4. Update each remote visual mesh
+    // 4. Update each remote visual rig
     for (const visual of this.remotePlayers.values()) {
       const count = visual.snapshots.length;
 
@@ -265,75 +249,95 @@ export class RemotePlayerInterpolation {
         continue;
       }
 
-      visual.mesh.rotationQuaternion ??= Quaternion.Identity();
+      const root = visual.rig.rootNode;
+      root.rotationQuaternion ??= Quaternion.Identity();
+
+      let currentVel = visual.snapshots[0].linearVelocity;
 
       // Exactly 1 snapshot: hold immediately
       if (count === 1) {
-        visual.mesh.position.copyFrom(visual.snapshots[0].position);
-        visual.mesh.rotationQuaternion.copyFrom(visual.snapshots[0].rotation);
-        continue;
-      }
-
-      // Render tick before oldest snapshot: hold oldest
-      if (this.remoteRenderTick <= visual.snapshots[0].serverTick) {
-        visual.mesh.position.copyFrom(visual.snapshots[0].position);
-        visual.mesh.rotationQuaternion.copyFrom(visual.snapshots[0].rotation);
-        continue;
-      }
-
-      // Render tick at or past newest snapshot: hold newest (no extrapolation)
-      if (
+        root.position.copyFrom(visual.snapshots[0].position);
+        root.rotationQuaternion.copyFrom(visual.snapshots[0].rotation);
+        currentVel = visual.snapshots[0].linearVelocity;
+      } else if (this.remoteRenderTick <= visual.snapshots[0].serverTick) {
+        // Render tick before oldest snapshot: hold oldest
+        root.position.copyFrom(visual.snapshots[0].position);
+        root.rotationQuaternion.copyFrom(visual.snapshots[0].rotation);
+        currentVel = visual.snapshots[0].linearVelocity;
+      } else if (
         this.remoteRenderTick >= visual.snapshots[count - 1].serverTick
       ) {
-        visual.mesh.position.copyFrom(visual.snapshots[count - 1].position);
-        visual.mesh.rotationQuaternion.copyFrom(
+        // Render tick at or past newest snapshot: hold newest (no extrapolation)
+        root.position.copyFrom(visual.snapshots[count - 1].position);
+        root.rotationQuaternion.copyFrom(
           visual.snapshots[count - 1].rotation,
         );
-        continue;
-      }
+        currentVel = visual.snapshots[count - 1].linearVelocity;
+      } else {
+        // Locate surrounding bounding snapshots A and B
+        let snapshotA = visual.snapshots[0];
+        let snapshotB = visual.snapshots[count - 1];
 
-      // Locate surrounding bounding snapshots A and B
-      let snapshotA = visual.snapshots[0];
-      let snapshotB = visual.snapshots[count - 1];
-
-      for (let i = 0; i < count - 1; i++) {
-        if (
-          visual.snapshots[i].serverTick <= this.remoteRenderTick &&
-          visual.snapshots[i + 1].serverTick >= this.remoteRenderTick
-        ) {
-          snapshotA = visual.snapshots[i];
-          snapshotB = visual.snapshots[i + 1];
-          break;
+        for (let i = 0; i < count - 1; i++) {
+          if (
+            visual.snapshots[i].serverTick <= this.remoteRenderTick &&
+            visual.snapshots[i + 1].serverTick >= this.remoteRenderTick
+          ) {
+            snapshotA = visual.snapshots[i];
+            snapshotB = visual.snapshots[i + 1];
+            break;
+          }
         }
+
+        // Actual tick span accounts for potential skipped network packets
+        const tickSpan = snapshotB.serverTick - snapshotA.serverTick;
+        const snapshotDeltaTimeSeconds = tickSpan * PHYSICS_DT_SECONDS;
+
+        const alpha = calculateInterpolationAlpha(
+          this.remoteRenderTick,
+          snapshotA.serverTick,
+          snapshotB.serverTick,
+        );
+
+        // Cubic Hermite position interpolation with interval-scaled velocity tangents
+        interpolateHermitePosition(
+          snapshotA.position,
+          snapshotB.position,
+          snapshotA.linearVelocity,
+          snapshotB.linearVelocity,
+          alpha,
+          snapshotDeltaTimeSeconds,
+          root.position,
+        );
+
+        // Spherical linear rotation interpolation
+        interpolateRotation(
+          snapshotA.rotation,
+          snapshotB.rotation,
+          alpha,
+          root.rotationQuaternion,
+        );
+
+        currentVel = Vector3.Lerp(
+          snapshotA.linearVelocity,
+          snapshotB.linearVelocity,
+          alpha,
+        );
       }
 
-      // Actual tick span accounts for potential skipped network packets
-      const tickSpan = snapshotB.serverTick - snapshotA.serverTick;
-      const snapshotDeltaTimeSeconds = tickSpan * PHYSICS_DT_SECONDS;
-
-      const alpha = calculateInterpolationAlpha(
-        this.remoteRenderTick,
-        snapshotA.serverTick,
-        snapshotB.serverTick,
+      // Drive remote procedural biped animation
+      const isGrounded = root.position.y <= -0.80;
+      const speed = Math.sqrt(
+        currentVel.x * currentVel.x + currentVel.z * currentVel.z,
       );
+      const isSprinting = speed > 5.0;
 
-      // Cubic Hermite position interpolation with interval-scaled velocity tangents
-      interpolateHermitePosition(
-        snapshotA.position,
-        snapshotB.position,
-        snapshotA.linearVelocity,
-        snapshotB.linearVelocity,
-        alpha,
-        snapshotDeltaTimeSeconds,
-        visual.mesh.position,
-      );
-
-      // Spherical linear rotation interpolation
-      interpolateRotation(
-        snapshotA.rotation,
-        snapshotB.rotation,
-        alpha,
-        visual.mesh.rotationQuaternion,
+      visual.rig.update(
+        deltaSeconds,
+        currentVel,
+        isGrounded,
+        isSprinting,
+        "NONE",
       );
     }
   }
@@ -344,8 +348,7 @@ export class RemotePlayerInterpolation {
 
   dispose() {
     for (const visual of this.remotePlayers.values()) {
-      visual.mesh.material?.dispose();
-      visual.mesh.dispose();
+      visual.rig.dispose();
     }
     this.remotePlayers.clear();
   }

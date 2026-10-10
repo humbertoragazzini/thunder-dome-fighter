@@ -10,7 +10,6 @@ import {
   Vector3,
   Quaternion,
   HavokPlugin,
-  Mesh,
 } from "@babylonjs/core";
 
 import {
@@ -487,7 +486,7 @@ export class LocalPlayerPrediction {
   handleAuthoritativeState(
     playerState: AuthoritativePlayerState,
     serverTick: number,
-    localVisualMesh: Mesh,
+    localVisualNode: TransformNode,
   ) {
     // --------------------------------------------------
     // First packet: initialize baseline timeline & visual mesh
@@ -513,13 +512,13 @@ export class LocalPlayerPrediction {
         new Vector3(playerState.avx, playerState.avy, playerState.avz),
       );
 
-      localVisualMesh.position.set(
+      localVisualNode.position.set(
         playerState.x,
         playerState.y,
         playerState.z,
       );
-      localVisualMesh.rotationQuaternion ??= Quaternion.Identity();
-      localVisualMesh.rotationQuaternion.set(
+      localVisualNode.rotationQuaternion ??= Quaternion.Identity();
+      localVisualNode.rotationQuaternion.set(
         playerState.rx,
         playerState.ry,
         playerState.rz,
@@ -605,9 +604,9 @@ export class LocalPlayerPrediction {
     // --------------------------------------------------
 
     // 1. Capture current visible transform before correction
-    const oldVisualPos = localVisualMesh.position.clone();
+    const oldVisualPos = localVisualNode.position.clone();
     const oldVisualRot = (
-      localVisualMesh.rotationQuaternion ?? Quaternion.Identity()
+      localVisualNode.rotationQuaternion ?? Quaternion.Identity()
     ).clone();
 
     // 2. Reset prediction body to authoritative past state
@@ -659,7 +658,7 @@ export class LocalPlayerPrediction {
   // and decays exponentially toward 0 over VISUAL_CORRECTION_TIME_CONSTANT_MS.
   // ==================================================
 
-  updateVisualSmoothing(localVisualMesh: Mesh, deltaSeconds: number) {
+  updateVisualSmoothing(localVisualNode: TransformNode, deltaSeconds: number) {
     if (!this.hasReceivedInitialAuthoritativeState) {
       return;
     }
@@ -684,15 +683,29 @@ export class LocalPlayerPrediction {
     // Visual position = predicted position + decaying error offset
     this.predictionNode.position.addToRef(
       this.visualPositionError,
-      localVisualMesh.position,
+      localVisualNode.position,
     );
 
     // Visual rotation = decaying rotation offset * predicted rotation
-    localVisualMesh.rotationQuaternion ??= Quaternion.Identity();
+    localVisualNode.rotationQuaternion ??= Quaternion.Identity();
     this.visualRotationError.multiplyToRef(
       this.predictionNode.rotationQuaternion ?? Quaternion.Identity(),
-      localVisualMesh.rotationQuaternion,
+      localVisualNode.rotationQuaternion,
     );
+  }
+
+  /**
+   * Returns instantaneous linear velocity of the predicted Havok body
+   */
+  getLinearVelocity(): Vector3 {
+    return this.predictionBody.getLinearVelocity();
+  }
+
+  /**
+   * Returns whether the local character is grounded according to the 3-point probe
+   */
+  getIsGrounded(): boolean {
+    return this.isGrounded;
   }
 
   // ==================================================

@@ -43,8 +43,9 @@ import { RemotePlayerInterpolation } from "./RemotePlayerInterpolation";
 import { CharacterInputController } from "../input/CharacterInputController";
 import type { TouchVirtualGamepadProvider } from "../input/providers/TouchVirtualGamepadProvider";
 import { TouchGamepadOverlay } from "./ui/organisms/TouchGamepadOverlay";
+import { CharacterVisualRig } from "../visuals/character/CharacterVisualRig";
+import { HERO_PALETTE } from "../visuals/character/CharacterRigConfig";
 import {
-  CHARACTER_CAPSULE,
   FLOOR_SIZE,
   FLOOR_POSITION,
   GRAVITY,
@@ -65,6 +66,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
   const localPredictionRef = useRef<LocalPlayerPrediction | null>(null);
   const remoteInterpolationRef = useRef<RemotePlayerInterpolation | null>(null);
   const inputControllerRef = useRef<CharacterInputController | null>(null);
+  const localPlayerRigRef = useRef<CharacterVisualRig | null>(null);
   const stateChangeHandlerRef = useRef<((state: any) => void) | null>(null);
 
   const [touchProvider, setTouchProvider] = useState<TouchVirtualGamepadProvider | null>(null);
@@ -125,25 +127,15 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
       // VISUAL MESHES
       // ==================================================
 
-      // Visible local player humanoid capsule (smoothly follows predicted present state)
-      const localPlayerMesh = MeshBuilder.CreateCapsule(
+      // Articulated 15-cube humanoid character rig (Approach B)
+      const localPlayerRig = new CharacterVisualRig(
         "local-player",
-        {
-          radius: CHARACTER_CAPSULE.radius,
-          height: CHARACTER_CAPSULE.totalHeight,
-          tessellation: 16,
-          subdivisions: 1,
-        },
         scene,
+        HERO_PALETTE,
       );
-
-      localPlayerMesh.position.set(0, 1, 0);
-      localPlayerMesh.rotationQuaternion = Quaternion.Identity();
-
-      const localMat = new StandardMaterial("local-player-mat", scene);
-      localMat.diffuseColor = new Color3(0.2, 0.6, 1.0); // Vibrant blue/cyan
-      localMat.specularColor = new Color3(0.3, 0.3, 0.3);
-      localPlayerMesh.material = localMat;
+      localPlayerRig.rootNode.position.set(0, 1, 0);
+      localPlayerRig.rootNode.rotationQuaternion = Quaternion.Identity();
+      localPlayerRigRef.current = localPlayerRig;
 
       // Static floor visual mesh
       const floor = MeshBuilder.CreateBox(
@@ -226,7 +218,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
           localPrediction.handleAuthoritativeState(
             localState,
             state.serverTick ?? 0,
-            localPlayerMesh,
+            localPlayerRig.rootNode,
           );
         }
 
@@ -248,6 +240,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
       }
 
       if (disposed) {
+        localPlayerRig.dispose();
         scene.dispose();
         engine.dispose();
         return;
@@ -261,9 +254,10 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
       //
       // Runs at native display refresh rate (60 / 120 / 144+ FPS):
       // 1. Advance fixed 30 Hz local prediction physics
-      // 2. Smooth visible local player mesh toward corrected prediction
-      // 3. Smooth remote players via continuous fractional interpolation
-      // 4. Render Babylon scene
+      // 2. Smooth visible local player rig toward corrected prediction
+      // 3. Drive procedural limb swings & combat strikes
+      // 4. Smooth remote players via continuous fractional interpolation
+      // 5. Render Babylon scene
       // ==================================================
 
       engine.runRenderLoop(() => {
@@ -275,14 +269,23 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
 
         // 2. Frame-rate-independent visual smoothing
         localPrediction.updateVisualSmoothing(
-          localPlayerMesh,
+          localPlayerRig.rootNode,
           deltaSeconds,
         );
 
-        // 3. Monotonic remote interpolation with time dilation
+        // 3. Procedural biped locomotion and combat gestures
+        localPlayerRig.update(
+          deltaSeconds,
+          localPrediction.getLinearVelocity(),
+          localPrediction.getIsGrounded(),
+          currentInput.sprint,
+          currentInput.attackAction,
+        );
+
+        // 4. Monotonic remote interpolation with time dilation
         remoteInterpolation.updateRender(deltaSeconds);
 
-        // 4. Render scene
+        // 5. Render scene
         scene.render();
       });
     }
@@ -324,6 +327,9 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
         room.onStateChange.remove(stateChangeHandlerRef.current);
         stateChangeHandlerRef.current = null;
       }
+
+      localPlayerRigRef.current?.dispose();
+      localPlayerRigRef.current = null;
 
       localPredictionRef.current?.dispose();
       localPredictionRef.current = null;
