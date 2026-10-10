@@ -21,10 +21,11 @@
 import { type Client, Room, ServerError } from "colyseus";
 import { GameState, PlayerState } from "./GameState";
 import { SimulatorWorld } from "./SimulationWorld";
-import type {
-  PlayerInputCommand,
-  CharacterInputCommand,
-  AttackActionType,
+import {
+  type PlayerInputCommand,
+  type CharacterInputCommand,
+  type AttackActionType,
+  PHYSICS_DT_MS,
 } from "../shared/player/PlayerConfig";
 import { verifySessionToken, type AuthenticatedUser } from "./auth/TokenVerifier.ts";
 
@@ -186,7 +187,7 @@ export class GameRoom extends Room {
 
     this.autoDispose = false;
 
-    this.patchRate = 1000 / 30;
+    this.patchRate = PHYSICS_DT_MS;
 
     this.metadata = {
       serverName: options.serverName,

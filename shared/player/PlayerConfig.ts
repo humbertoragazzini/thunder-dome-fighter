@@ -16,10 +16,10 @@
 // ==================================================
 
 // ==================================================
-// PHYSICS SIMULATION CONSTANTS
+// PHYSICS SIMULATION CONSTANTS (60 Hz)
 // ==================================================
 
-export const PHYSICS_HZ = 30;
+export const PHYSICS_HZ = 60;
 export const PHYSICS_DT_MS = 1000 / PHYSICS_HZ;
 export const PHYSICS_DT_SECONDS = 1 / PHYSICS_HZ;
 
@@ -107,17 +107,17 @@ export const GRAVITY = {
 // ==================================================
 
 // Maximum input commands stored per entity before rejecting new arrivals
-export const MAX_SERVER_INPUT_QUEUE = 16;
+export const MAX_SERVER_INPUT_QUEUE = 32;
 
-// Jitter buffer target: commands accumulated before FIFO consumption starts
+// Jitter buffer target: commands accumulated before FIFO consumption starts (2 ticks = 33ms at 60 Hz)
 export const SERVER_INPUT_BUFFER_TARGET = 2;
 
 // ==================================================
 // LOCAL PREDICTION & RECONCILIATION
 // ==================================================
 
-export const MAX_PREDICTION_STEPS_PER_UPDATE = 5;
-export const PREDICTION_HISTORY_MAX_FRAMES = 128;
+export const MAX_PREDICTION_STEPS_PER_UPDATE = 8;
+export const PREDICTION_HISTORY_MAX_FRAMES = 256;
 
 // Tolerances beyond which reconciliation re-simulates physics
 export const POSITION_RECONCILIATION_EPSILON = 0.02; // 2 cm
@@ -135,11 +135,12 @@ export const RESIDUAL_ROTATION_EPSILON = 0.001;
 // REMOTE INTERPOLATION
 // ==================================================
 
-export const REMOTE_INTERPOLATION_TARGET_DELAY_TICKS = 3.0;
-export const REMOTE_INTERPOLATION_DELAY_TOLERANCE_TICKS = 0.5;
+// Target render delay: 6 ticks = 100ms behind server baseline at 60 Hz
+export const REMOTE_INTERPOLATION_TARGET_DELAY_TICKS = 6.0;
+export const REMOTE_INTERPOLATION_DELAY_TOLERANCE_TICKS = 1.0;
 export const REMOTE_TIME_SCALE_ACCELERATION = 1.03;
 export const REMOTE_TIME_SCALE_DECELERATION = 0.97;
-export const REMOTE_MAX_SNAPSHOTS = 32;
+export const REMOTE_MAX_SNAPSHOTS = 64;
 
 // ==================================================
 // HUMANOID CHARACTER INPUT CONTRACTS (MODERN TARGET)
