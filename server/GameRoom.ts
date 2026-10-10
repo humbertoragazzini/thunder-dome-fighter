@@ -7,11 +7,12 @@
 //
 // HOW IT WORKS:
 // - onAuth: Verifies JWT token, active PostgreSQL session, and prevents duplicate player connections.
-// - onJoin: Enforces single-session invariant, spawns Havok capsule, and initializes network state.
-// - handlePlayerInput: Validates sequence numbers, sanitizes inputs, and
-//   enqueues commands into the Havok simulation accumulator at 60 Hz.
+// - onJoin: Enforces single-session invariant, spawns Havok capsule, balances teams, and triggers COUNTDOWN.
+// - handlePlayerInput: Validates sequence numbers, sanitizes inputs, and gates commands to PLAYING state.
 // - syncSimulationState: Broadcasts physics body transforms to all clients at 60 Hz.
-// - onLeave: Despawns entities and tears down session tracking.
+// - Match State Machine: Authoritatively manages WAITING -> COUNTDOWN -> PLAYING -> MATCH_END.
+// - onLeave: Despawns entities, aborts countdown or awards forfeit win if players drop.
+// - onDispose: Disposes headless Havok physics world, clears timers, and frees memory.
 //
 // WHY IT EXISTS:
 // Serves as the authoritative master simulation node. The server dictates
@@ -137,6 +138,12 @@ export class GameRoom extends Room {
   // Track monotonic input sequence per connected client session
   private lastAcceptedSequenceBySessionId = new Map<string, number>();
 
+  // Match state machine timers
+  private countdownTimer: ReturnType<typeof setInterval> | null = null;
+  private matchDurationTimer: ReturnType<typeof setInterval> | null = null;
+  public static readonly COUNTDOWN_DURATION_SEC = 3;
+  public static readonly MATCH_DURATION_SEC = 180;
+
   // ==================================================
   // SERVER PHYSICS WORLD & GAME RULES
   // ==================================================
@@ -213,6 +220,11 @@ export class GameRoom extends Room {
 
     this.state.modeId = this.gameMode.id;
     this.state.levelId = this.level.id;
+    this.state.matchStatus = "WAITING_FOR_PLAYERS";
+    this.state.countdownSeconds = 0;
+    this.state.remainingTimeSeconds = GameRoom.MATCH_DURATION_SEC;
+    this.state.winningTeamIndex = -1;
+    this.state.winningPlayerId = "";
 
     if ((this as any)._listing) {
       this.metadata = {
@@ -278,6 +290,11 @@ export class GameRoom extends Room {
   // ==================================================
 
   private handlePlayerInput(client: Client, message: unknown) {
+    // Authoritative Invariant: Physical inputs are strictly rejected unless in PLAYING state
+    if (this.state.matchStatus !== "PLAYING") {
+      return;
+    }
+
     const lastAcceptedSeq = this.lastAcceptedSequenceBySessionId.get(client.sessionId) ?? 0;
     const sanitizedInput = validateAndClampPlayerInputCommand(message, lastAcceptedSeq);
 
@@ -363,6 +380,13 @@ export class GameRoom extends Room {
       client.sessionId,
       playerState,
     );
+
+    // Match State Machine: Evaluate if minimum required players are present to start countdown
+    if (this.state.matchStatus === "WAITING_FOR_PLAYERS") {
+      if (this.state.players.size >= this.gameMode.minPlayers) {
+        this.startCountdown();
+      }
+    }
   }
 
   // ==================================================
@@ -389,5 +413,121 @@ export class GameRoom extends Room {
 
     // Remove sequence tracking so no stale state survives
     this.lastAcceptedSequenceBySessionId.delete(client.sessionId);
+
+    // Match State Machine: Check if leaving player aborts countdown or triggers forfeit
+    if (this.state.matchStatus === "COUNTDOWN") {
+      if (this.state.players.size < this.gameMode.minPlayers) {
+        this.abortCountdown();
+      }
+    } else if (this.state.matchStatus === "PLAYING") {
+      if (this.state.players.size === 1) {
+        const [remainingSession, remainingPlayer] = Array.from(this.state.players.entries())[0];
+        this.endMatch("FORFEIT", remainingSession, remainingPlayer?.teamIndex);
+      } else if (this.state.players.size === 0) {
+        this.endMatch("ALL_DISCONNECTED");
+      }
+    }
+  }
+
+  // ==================================================
+  // MATCH STATE MACHINE METHODS
+  // ==================================================
+
+  public startCountdown() {
+    if (this.countdownTimer) {
+      clearInterval(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+
+    this.state.matchStatus = "COUNTDOWN";
+    this.state.countdownSeconds = GameRoom.COUNTDOWN_DURATION_SEC;
+    console.log(`⏱️ Starting match countdown: ${this.state.countdownSeconds}s...`);
+
+    this.countdownTimer = setInterval(() => {
+      this.state.countdownSeconds--;
+
+      if (this.state.countdownSeconds <= 0) {
+        if (this.countdownTimer) {
+          clearInterval(this.countdownTimer);
+          this.countdownTimer = null;
+        }
+        this.startMatch();
+      }
+    }, 1000);
+  }
+
+  public abortCountdown() {
+    console.log("⚠️ Player disconnected during countdown. Reverting to WAITING_FOR_PLAYERS.");
+    if (this.countdownTimer) {
+      clearInterval(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+    this.state.matchStatus = "WAITING_FOR_PLAYERS";
+    this.state.countdownSeconds = 0;
+  }
+
+  public startMatch() {
+    console.log("⚔️ MATCH STARTED: Physical gameplay simulation active!");
+    this.state.matchStatus = "PLAYING";
+    this.state.countdownSeconds = 0;
+    this.state.remainingTimeSeconds = GameRoom.MATCH_DURATION_SEC;
+    this.simulationWorld.setGameplayActive(true);
+
+    if (this.matchDurationTimer) {
+      clearInterval(this.matchDurationTimer);
+      this.matchDurationTimer = null;
+    }
+
+    this.matchDurationTimer = setInterval(() => {
+      this.state.remainingTimeSeconds--;
+
+      if (this.state.remainingTimeSeconds <= 0) {
+        if (this.matchDurationTimer) {
+          clearInterval(this.matchDurationTimer);
+          this.matchDurationTimer = null;
+        }
+        this.endMatch("TIMEOUT");
+      }
+    }, 1000);
+  }
+
+  public endMatch(reason: string, winnerPlayerId?: string, winnerTeamIndex?: number) {
+    console.log(`🏁 MATCH ENDED [Reason: ${reason}]. Winner: ${winnerPlayerId ?? "Draw"}`);
+    this.state.matchStatus = "MATCH_END";
+    this.simulationWorld.setGameplayActive(false);
+
+    if (this.countdownTimer) {
+      clearInterval(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+    if (this.matchDurationTimer) {
+      clearInterval(this.matchDurationTimer);
+      this.matchDurationTimer = null;
+    }
+
+    if (winnerPlayerId !== undefined) {
+      this.state.winningPlayerId = winnerPlayerId;
+    }
+    if (winnerTeamIndex !== undefined) {
+      this.state.winningTeamIndex = winnerTeamIndex;
+    }
+  }
+
+  // ==================================================
+  // ROOM DISPOSAL
+  // ==================================================
+
+  onDispose() {
+    console.log("🧹 Disposing GameRoom resources...");
+    if (this.countdownTimer) {
+      clearInterval(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+    if (this.matchDurationTimer) {
+      clearInterval(this.matchDurationTimer);
+      this.matchDurationTimer = null;
+    }
+    this.simulationWorld?.dispose();
+    this.lastAcceptedSequenceBySessionId.clear();
   }
 }
