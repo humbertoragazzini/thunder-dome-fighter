@@ -10,12 +10,12 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 6 — Generic Level & Arena System** |
-| **Current Step** | **Step 6.1 — Create shared/domain/LevelDefinition.ts schema** |
-| **Last Completed Step** | **Step 5.6 — Bind remote player visual instances to independent articulated cube rigs** |
-| **Next Step** | **Step 6.1 — Create shared/domain/LevelDefinition.ts schema** |
-| **Overall Status** | **Phase 5 (Client Character Visuals & Hierarchical Articulated Cube Rig) 100% complete; moving to Phase 6.** |
-| **Last Updated** | **2026-10-04** |
+| **Current Phase** | **Phase 7 — Generic Match & GameMode Architecture** |
+| **Current Step** | **Step 7.1 — Implement shared/domain/GameMode.ts definition schema** |
+| **Last Completed Step** | **Step 6.6 — Implement level cleanup and asset unloading routines upon room teardown** |
+| **Next Step** | **Step 7.1 — Implement shared/domain/GameMode.ts definition schema** |
+| **Overall Status** | **Phase 6 (Generic Level & Arena System) 100% complete; moving to Phase 7.** |
+| **Last Updated** | **2026-10-10** |
 
 ---
 
@@ -498,25 +498,26 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 6 — Generic Level & Arena System
 
-**Status:** Not Started `[ ]`  
+**Status:** Complete `[x]`  
 **Goal:** Support multiple arenas through a generic `LevelDefinition` system separating collision hulls from visual meshes.  
 **Dependencies:** Phase 5.  
 
 #### Steps
-- [ ] 6.1 Create `shared/domain/LevelDefinition.ts` schema (level ID, name, bounding extents, spawn points, weapon spawns).
-- [ ] 6.2 Build Level 1 definition: `"thunder-dome-alpha"` (circular domed arena with perimeter walls, hazard ring, elevated platforms).
-- [ ] 6.3 Implement server-side level loader: loads low-poly simplified collision hulls into Havok physics world.
-- [ ] 6.4 Implement client-side level loader: loads high-detail visual environment, PBR materials, skybox, and arena lighting.
-- [ ] 6.5 Implement level spawn point resolution (distributing players across designated spawn transforms).
-- [ ] 6.6 Implement level cleanup and asset unloading routines upon room teardown.
+- [x] 6.1 Create `shared/domain/Level.ts` schema (level ID, name, bounding extents, spawn points, item spawns, collision hulls, visualTheme).
+- [x] 6.2 Build Level 1 definition: `"thunder-dome-alpha"` (circular arena with 16m radius, perimeter walls, elevated platforms, forcefield).
+- [x] 6.3 Implement server-side level loader: `LevelCollisionLoader` loads modular static collision hulls into Havok physics world.
+- [x] 6.4 Implement client-side level loader: `LevelVisualLoader` renders circular arena, elevated platforms with neon trim, glowing forcefield cylinder, sky dome, and spotlights.
+- [x] 6.5 Implement level spawn point resolution (`SpawnPointResolver` distributing players across designated spawn transforms).
+- [x] 6.6 Implement level cleanup and asset unloading routines (`dispose()`) upon room teardown.
 
 #### Completion Criteria
-- Server simulates against optimized collision geometry; client renders visually rich arena.
+- Server simulates against optimized collision geometry; client renders visually rich arena with prediction parity.
 - Players spawn at designated team/individual spawn coordinates inside the arena boundaries.
 
 #### Verification
-- Run headless server: Load arena collision hull, spawn test entity, verify gravity and boundary containment.
-- Client inspection: Arena visuals, lighting, and arena boundaries render correctly.
+- Headless automated test suite (`scratch/test_level_collision.ts`): All 6 test suites passed (Hulls, Spawn points, Floor settle, Platform settle, Boundary containment, Disposal).
+- Headless humanoid physics test (`scratch/test_humanoid_physics.ts`): Passed at 60 Hz simulation rate.
+- Build and linter (`npm run lint && npx tsc --noEmit && npm run build`): Passed cleanly with zero errors.
 
 ---
 
@@ -1200,7 +1201,7 @@ Phase 4: Authoritative Character Controller & Humanoid Movement [x]
    ↓
 Phase 5: Client Character Visuals & Hierarchical Articulated Cube Rig [x]
    ↓
-Phase 6: Generic Level & Arena System
+Phase 6: Generic Level & Arena System [x]
    ↓
 Phase 7: Generic Match & GameMode Architecture
    ↓
