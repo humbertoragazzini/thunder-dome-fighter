@@ -6,11 +6,11 @@
 // handshake, input ingestion, and synchronized authoritative game state.
 //
 // HOW IT WORKS:
-// - onAuth: Verifies JWT token and active PostgreSQL session before connection.
-// - onJoin: Spawns Havok character capsule and initializes network state.
+// - onAuth: Verifies JWT token, active PostgreSQL session, and prevents duplicate player connections.
+// - onJoin: Enforces single-session invariant, spawns Havok capsule, and initializes network state.
 // - handlePlayerInput: Validates sequence numbers, sanitizes inputs, and
-//   enqueues commands into the Havok simulation accumulator at 30 Hz.
-// - syncSimulationState: Broadcasts physics body transforms to all clients at 30 Hz.
+//   enqueues commands into the Havok simulation accumulator at 60 Hz.
+// - syncSimulationState: Broadcasts physics body transforms to all clients at 60 Hz.
 // - onLeave: Despawns entities and tears down session tracking.
 //
 // WHY IT EXISTS:
@@ -239,7 +239,7 @@ export class GameRoom extends Room {
   // WEBSOCKET AUTHENTICATION HOOK
   // ==================================================
 
-  async onAuth(_client: Client, options: unknown): Promise<AuthenticatedUser> {
+  async onAuth(client: Client, options: unknown): Promise<AuthenticatedUser> {
     const token =
       typeof options === "object" && options !== null && "token" in options
         ? (options as { token: unknown }).token
@@ -249,12 +249,28 @@ export class GameRoom extends Room {
       throw new ServerError(401, "Authentication token required to enter arena.");
     }
 
+    let user: AuthenticatedUser;
     try {
-      return await verifySessionToken(token);
+      user = await verifySessionToken(token);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Invalid session token.";
       throw new ServerError(401, message);
     }
+
+    // Prevent duplicate active connections for the same player identity in this room
+    if (this.clients && Array.isArray(this.clients)) {
+      const isAlreadyConnected = this.clients.some(
+        (existingClient) =>
+          existingClient !== client &&
+          (existingClient.auth as AuthenticatedUser | undefined)?.playerId === user.playerId,
+      );
+
+      if (isAlreadyConnected) {
+        throw new ServerError(409, `Player ${user.playerName} is already active in this match.`);
+      }
+    }
+
+    return user;
   }
 
   // ==================================================
@@ -284,6 +300,24 @@ export class GameRoom extends Room {
   onJoin(client: Client, options?: unknown) {
     const auth = client.auth as AuthenticatedUser;
     console.log(`🎮 Player joined: ${auth.playerName} (${auth.playerId}) [Session: ${client.sessionId}]`);
+
+    // Defensive redundancy: Prevent duplicate active connections for the same player identity
+    if (auth?.playerId && this.clients && Array.isArray(this.clients)) {
+      const isDuplicate = this.clients.some(
+        (existingClient) =>
+          existingClient !== client &&
+          (existingClient.auth as AuthenticatedUser | undefined)?.playerId === auth.playerId,
+      );
+
+      if (isDuplicate) {
+        throw new ServerError(409, `Player ${auth.playerName} is already active in this match.`);
+      }
+    }
+
+    // Ensure client is tracked in this.clients (for headless test environments)
+    if (this.clients && !this.clients.includes(client)) {
+      this.clients.push(client);
+    }
 
     // Optional requested team index from client join options
     const requestedTeam =
@@ -339,6 +373,14 @@ export class GameRoom extends Room {
     const auth = client.auth as AuthenticatedUser | undefined;
     const playerName = auth?.playerName ?? client.sessionId;
     console.log(`👋 Player leaving: ${playerName} [Session: ${client.sessionId}]`);
+
+    // Clean up tracking in this.clients (for headless test environments)
+    if (this.clients) {
+      const clientIndex = this.clients.indexOf(client);
+      if (clientIndex !== -1) {
+        this.clients.splice(clientIndex, 1);
+      }
+    }
 
     this.simulationWorld.removeEntity(client.sessionId);
 
