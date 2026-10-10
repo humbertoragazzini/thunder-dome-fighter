@@ -4,7 +4,8 @@
 // WHAT IT DOES:
 // Defines the binary-serialized Colyseus schemas for synchronized match state:
 // - PlayerState: Real-time physics transforms, velocity, sequence ack, and team affinity.
-// - GameState: Server simulation tick, active game mode ID, level ID, and player map.
+// - GameState: Server simulation tick, game mode, level ID, match lifecycle state,
+//   countdown/round timers, outcome attribution, and synchronized player map.
 //
 // HOW IT WORKS:
 // Uses @colyseus/schema delta-compression. Fields are packed into compact binary
@@ -65,6 +66,18 @@ export const GameState = schema(
     serverTick: t.number().default(0),
     modeId: t.string().default("1v1"),
     levelId: t.string().default("thunder-dome-alpha"),
+
+    // Match lifecycle state machine (CREATED, WAITING_FOR_PLAYERS, COUNTDOWN, PLAYING, MATCH_END)
+    matchStatus: t.string().default("WAITING_FOR_PLAYERS"),
+
+    // Synchronized match timers (in seconds)
+    countdownSeconds: t.number().default(0),
+    remainingTimeSeconds: t.number().default(180),
+
+    // Match outcome data (assigned upon MATCH_END)
+    winningTeamIndex: t.number().default(-1),
+    winningPlayerId: t.string().default(""),
+
     players: t.map(PlayerState),
   },
   "GameState",
