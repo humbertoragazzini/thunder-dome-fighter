@@ -28,6 +28,7 @@ import {
   PHYSICS_DT_MS,
 } from "../shared/player/PlayerConfig";
 import { verifySessionToken, type AuthenticatedUser } from "./auth/TokenVerifier.ts";
+import { resolveSpawnPoint } from "../shared/levels/SpawnPointResolver";
 
 // ==================================================
 // INPUT VALIDATION & CLAMPING
@@ -256,11 +257,27 @@ export class GameRoom extends Room {
     const auth = client.auth as AuthenticatedUser;
     console.log(`🎮 Player joined: ${auth.playerName} (${auth.playerId}) [Session: ${client.sessionId}]`);
 
-    this.simulationWorld.spawnEntity(client.sessionId);
+    // Deterministically resolve starting spawn location based on player slot
+    const playerIndex = this.state.players.size;
+    const spawnPoint = resolveSpawnPoint(
+      this.simulationWorld.getLevel(),
+      playerIndex,
+    );
+
+    this.simulationWorld.spawnEntity(client.sessionId, spawnPoint);
 
     // Create the network state for this player.
     const playerState = new PlayerState();
     playerState.playerId = client.sessionId;
+    playerState.x = spawnPoint.position.x;
+    playerState.y = spawnPoint.position.y;
+    playerState.z = spawnPoint.position.z;
+
+    const halfYaw = spawnPoint.rotationYaw / 2;
+    playerState.rx = 0;
+    playerState.ry = Math.sin(halfYaw);
+    playerState.rz = 0;
+    playerState.rw = Math.cos(halfYaw);
 
     // Add it to the synchronized players map.
     this.state.players.set(

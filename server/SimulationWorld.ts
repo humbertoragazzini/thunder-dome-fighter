@@ -2,12 +2,13 @@
 // AUTHORITATIVE SERVER PHYSICS SIMULATION WORLD
 //
 // WHAT IT DOES:
-// Runs a headless Havok physics scene (30 Hz fixed step) managing player
-// capsule colliders, static arena geometry, and FIFO input queues.
+// Runs a headless Havok physics scene (60 Hz fixed step) managing player
+// capsule colliders, modular arena collision hulls, and FIFO input queues.
 //
 // HOW IT WORKS:
 // Consumes client input packets from a jitter buffer, applies movement forces
 // and yaw steering, steps physics via createPhysicsAccumulator, and exports state.
+// Static collision hulls are instantiated from LevelDefinition via LevelCollisionLoader.
 //
 // WHY IT EXISTS:
 // Enforces server authority (ADR-010). Ensures client inputs cannot cheat physics,
@@ -23,7 +24,6 @@ import {
   HavokPlugin,
   PhysicsBody,
   PhysicsMotionType,
-  PhysicsShapeBox,
   PhysicsShapeCapsule,
   PhysicsRaycastResult,
 } from "@babylonjs/core";
@@ -42,8 +42,6 @@ import {
   PLAYER_MASS,
   LINEAR_DAMPING,
   ANGULAR_DAMPING,
-  FLOOR_SIZE,
-  FLOOR_POSITION,
   GRAVITY,
   MAX_SERVER_INPUT_QUEUE,
   SERVER_INPUT_BUFFER_TARGET,
@@ -60,6 +58,13 @@ import {
   calculateHumanoidMovementForce,
   calculateJumpImpulse,
 } from "../shared/player/PlayerPhysicsMath";
+
+import { LevelCollisionLoader } from "../shared/levels/LevelCollisionLoader";
+import {
+  LEVEL_THUNDER_DOME_ALPHA,
+  type LevelDefinition,
+  type SpawnPoint,
+} from "../shared/domain/Level";
 
 // ==================================================
 // ENTITIES CONFIGURATION
@@ -131,6 +136,8 @@ export class SimulatorWorld {
   private scheduler: ReturnType<typeof setInterval> | null = null;
   private entities = new Map<string, SimulationEntity>();
   private serverTick = 0;
+  private level: LevelDefinition;
+  private levelCollisionLoader: LevelCollisionLoader | null = null;
 
   // Zero-allocation scratch buffers for 3-point downward ground probe
   private raycastResultCenter = new PhysicsRaycastResult();
@@ -145,7 +152,9 @@ export class SimulatorWorld {
   // Synchronous Babylon setup.
   // ==================================================
 
-  constructor() {
+  constructor(level: LevelDefinition = LEVEL_THUNDER_DOME_ALPHA) {
+    this.level = level;
+
     // Headless Babylon engine.
     this.engine = new NullEngine();
 
@@ -155,6 +164,10 @@ export class SimulatorWorld {
 
   getServerTick(): number {
     return this.serverTick;
+  }
+
+  getLevel(): LevelDefinition {
+    return this.level;
   }
 
   // ==================================================
@@ -204,7 +217,7 @@ export class SimulatorWorld {
     }
   }
 
-  spawnEntity(playerId: string) {
+  spawnEntity(playerId: string, spawnPoint?: SpawnPoint) {
     if (this.entities.has(playerId)) {
       return;
     }
@@ -215,13 +228,11 @@ export class SimulatorWorld {
 
     const playerNode = new TransformNode(`player-${playerId}`, this.scene);
 
-    playerNode.position.set(
-      PLAYER_SPAWN_POSITION.x,
-      PLAYER_SPAWN_POSITION.y,
-      PLAYER_SPAWN_POSITION.z,
-    );
+    const spawnPos = spawnPoint?.position ?? PLAYER_SPAWN_POSITION;
+    const spawnYaw = spawnPoint?.rotationYaw ?? 0;
 
-    playerNode.rotationQuaternion = Quaternion.Identity();
+    playerNode.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
+    playerNode.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnYaw, 0);
 
     // HOW does physics treat it?
     const playerBody = new PhysicsBody(
@@ -269,7 +280,7 @@ export class SimulatorWorld {
       currentInput: {
         moveX: 0,
         moveZ: 0,
-        lookYaw: 0,
+        lookYaw: spawnYaw,
         jump: false,
         sprint: false,
         attackAction: "NONE",
@@ -594,38 +605,13 @@ export class SimulatorWorld {
     );
 
     // ==================================================
-    // FLOOR
+    // LEVEL STATIC COLLISION HULLS
     // ==================================================
 
-    // WHERE is it?
-    const floorNode = new TransformNode("floor", this.scene);
-
-    floorNode.position.set(
-      FLOOR_POSITION.x,
-      FLOOR_POSITION.y,
-      FLOOR_POSITION.z,
-    );
-
-    floorNode.rotationQuaternion = Quaternion.Identity();
-
-    // HOW does physics treat it?
-    const floorBody = new PhysicsBody(
-      floorNode,
-      PhysicsMotionType.STATIC,
-      true,
+    this.levelCollisionLoader = new LevelCollisionLoader(
+      this.level,
       this.scene,
     );
-
-    // WHAT collision shape does it have?
-    const floorShape = new PhysicsShapeBox(
-      Vector3.Zero(),
-      Quaternion.Identity(),
-      new Vector3(FLOOR_SIZE.width, FLOOR_SIZE.height, FLOOR_SIZE.depth),
-      this.scene,
-    );
-
-    // Connect shape to body.
-    floorBody.shape = floorShape;
 
     // ==================================================
     // MANUAL PHYSICS CONTROL
@@ -663,6 +649,8 @@ export class SimulatorWorld {
       clearInterval(this.scheduler);
       this.scheduler = null;
     }
+    this.levelCollisionLoader?.dispose();
+    this.levelCollisionLoader = null;
     this.scene?.dispose();
     this.engine?.dispose();
   }
