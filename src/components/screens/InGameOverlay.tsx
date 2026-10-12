@@ -33,6 +33,46 @@ function formatTimer(seconds: number): string {
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
+interface FighterHUDData {
+  id: string;
+  name: string;
+  health: number;
+  maxHealth: number;
+  score: number;
+  isDead: boolean;
+  isInvulnerable: boolean;
+}
+
+function ScorePips({
+  score,
+  max = 3,
+  color = "amber",
+}: {
+  score: number;
+  max?: number;
+  color?: "amber" | "rose" | "cyan";
+}) {
+  const pips = [];
+  for (let i = 0; i < max; i++) {
+    const isFilled = i < score;
+    pips.push(
+      <span
+        key={i}
+        className={`w-3 h-3 rounded-full border border-slate-700 transition-all ${
+          isFilled
+            ? color === "cyan"
+              ? "bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"
+              : color === "rose"
+                ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]"
+                : "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
+            : "bg-slate-800/80"
+        }`}
+      />,
+    );
+  }
+  return <div className="flex items-center gap-1.5">{pips}</div>;
+}
+
 export function InGameOverlay() {
   const [isPauseOpen, setIsPauseOpen] = useState(false);
   const [matchStatus, setMatchStatus] = useState<string>("WAITING_FOR_PLAYERS");
@@ -40,6 +80,17 @@ export function InGameOverlay() {
   const [remainingTimeSeconds, setRemainingTimeSeconds] = useState<number>(180);
   const [playerCount, setPlayerCount] = useState<number>(1);
   const [winningPlayerId, setWinningPlayerId] = useState<string>("");
+
+  const [localFighter, setLocalFighter] = useState<FighterHUDData>({
+    id: "",
+    name: "Fighter",
+    health: 100,
+    maxHealth: 100,
+    score: 0,
+    isDead: false,
+    isInvulnerable: false,
+  });
+  const [opponentFighter, setOpponentFighter] = useState<FighterHUDData | null>(null);
 
   const room = useAppStore((state) => state.room);
   const setRoom = useAppStore((state) => state.setRoom);
@@ -60,6 +111,37 @@ export function InGameOverlay() {
       if (state.players) {
         const count = typeof state.players.size === "number" ? state.players.size : Object.keys(state.players).length;
         setPlayerCount(count);
+
+        const mySessionId = room.sessionId;
+        let foundLocal: FighterHUDData | null = null;
+        let foundOpponent: FighterHUDData | null = null;
+
+        const entries: [string, any][] =
+          typeof state.players.entries === "function"
+            ? Array.from(state.players.entries())
+            : Object.entries(state.players);
+
+        for (const [sessionId, pState] of entries) {
+          const p = pState as any;
+          const fighterData: FighterHUDData = {
+            id: sessionId,
+            name: sessionId === mySessionId ? (player?.playerName ?? "You") : "Opponent",
+            health: typeof p.health === "number" ? p.health : 100,
+            maxHealth: typeof p.maxHealth === "number" ? p.maxHealth : 100,
+            score: typeof p.score === "number" ? p.score : 0,
+            isDead: Boolean(p.isDead),
+            isInvulnerable: Boolean(p.isInvulnerable),
+          };
+
+          if (sessionId === mySessionId) {
+            foundLocal = fighterData;
+          } else {
+            foundOpponent = fighterData;
+          }
+        }
+
+        if (foundLocal) setLocalFighter(foundLocal);
+        if (foundOpponent) setOpponentFighter(foundOpponent);
       }
     };
 
@@ -181,8 +263,110 @@ export function InGameOverlay() {
           </div>
         </div>
 
+        {/* Top Dual Fighter Health Bars (Fighting Game HUD) */}
+        <div className="w-full max-w-4xl mx-auto flex items-center justify-between gap-4 px-2 py-1">
+          {/* Left Fighter: Local Player */}
+          <div className="flex-1 flex flex-col gap-1 items-start">
+            <div className="flex items-center gap-2 w-full justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className="text-sm font-black uppercase tracking-wider text-cyan-300 drop-shadow"
+                  style={{ fontFamily: "var(--font-game)" }}
+                >
+                  {localFighter.name}
+                </span>
+                {localFighter.isInvulnerable && (
+                  <Badge variant="cyan" pulse>
+                    <GiLightningShield className="mr-1 inline" /> SHIELD 2s
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-400 font-mono font-bold uppercase">KOs</span>
+                <ScorePips score={localFighter.score} color="cyan" />
+              </div>
+            </div>
+            {/* Health Bar Outer */}
+            <div className="w-full h-5 bg-slate-900/90 border border-cyan-500/40 rounded-lg overflow-hidden relative shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+              <div
+                className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-200 ease-out"
+                style={{ width: `${Math.max(0, Math.min(100, localFighter.health))}%` }}
+              />
+              <span className="absolute inset-0 flex items-center justify-start pl-2 text-[11px] font-mono font-black text-white drop-shadow">
+                {localFighter.health} / {localFighter.maxHealth} HP
+              </span>
+            </div>
+          </div>
+
+          {/* Center VS Pip */}
+          <div className="flex flex-col items-center justify-center px-1">
+            <span
+              className="text-xs font-black tracking-widest text-amber-400 bg-slate-900/90 border border-slate-700 px-2.5 py-1 rounded-md shadow-md"
+              style={{ fontFamily: "var(--font-game)" }}
+            >
+              VS
+            </span>
+          </div>
+
+          {/* Right Fighter: Opponent */}
+          <div className="flex-1 flex flex-col gap-1 items-end">
+            <div className="flex items-center gap-2 w-full justify-between">
+              <div className="flex items-center gap-2">
+                <ScorePips score={opponentFighter?.score ?? 0} color="rose" />
+                <span className="text-[10px] text-slate-400 font-mono font-bold uppercase">KOs</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {opponentFighter?.isInvulnerable && (
+                  <Badge variant="cyan" pulse>
+                    <GiLightningShield className="mr-1 inline" /> SHIELD 2s
+                  </Badge>
+                )}
+                <span
+                  className="text-sm font-black uppercase tracking-wider text-rose-400 drop-shadow"
+                  style={{ fontFamily: "var(--font-game)" }}
+                >
+                  {opponentFighter ? opponentFighter.name : "Waiting for Opponent..."}
+                </span>
+              </div>
+            </div>
+            {/* Health Bar Outer */}
+            <div className="w-full h-5 bg-slate-900/90 border border-rose-500/40 rounded-lg overflow-hidden relative shadow-[0_0_15px_rgba(244,63,94,0.2)]">
+              <div
+                className="h-full bg-gradient-to-l from-rose-600 to-rose-400 transition-all duration-200 ease-out ml-auto"
+                style={{ width: `${Math.max(0, Math.min(100, opponentFighter?.health ?? 100))}%` }}
+              />
+              <span className="absolute inset-0 flex items-center justify-end pr-2 text-[11px] font-mono font-black text-white drop-shadow">
+                {opponentFighter ? opponentFighter.health : 0} / {opponentFighter?.maxHealth ?? 100} HP
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Center Screen: State Machine Callouts */}
-        <div className="flex flex-col items-center justify-center my-auto">
+        <div className="flex flex-col items-center justify-center my-auto gap-4">
+          {/* Floating Combat KO Callouts */}
+          {localFighter.isDead && matchStatus === "PLAYING" && (
+            <div className="pointer-events-auto bg-red-950/90 border-2 border-red-500 text-red-200 px-6 py-3 rounded-2xl shadow-[0_0_30px_rgba(239,68,68,0.6)] animate-pulse flex flex-col items-center">
+              <span className="text-xl font-black uppercase tracking-wider" style={{ fontFamily: "var(--font-game)" }}>
+                KNOCKED OUT!
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-red-300">
+                Respawning in 3 seconds with shield...
+              </span>
+            </div>
+          )}
+
+          {opponentFighter?.isDead && matchStatus === "PLAYING" && !localFighter.isDead && (
+            <div className="pointer-events-auto bg-emerald-950/90 border-2 border-emerald-500 text-emerald-200 px-6 py-3 rounded-2xl shadow-[0_0_30px_rgba(16,185,129,0.6)] animate-bounce flex flex-col items-center">
+              <span className="text-xl font-black uppercase tracking-wider" style={{ fontFamily: "var(--font-game)" }}>
+                TARGET ELIMINATED!
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+                +1 KO Awarded • First to 3 Wins
+              </span>
+            </div>
+          )}
+
           {/* 1. WAITING FOR PLAYERS BANNER */}
           {matchStatus === "WAITING_FOR_PLAYERS" && (
             <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md border-2 border-amber-500/40 px-6 py-3.5 rounded-2xl flex items-center gap-3.5 shadow-[0_0_30px_rgba(245,158,11,0.2)] animate-pulse">
@@ -241,7 +425,7 @@ export function InGameOverlay() {
                   style={{ fontFamily: "var(--font-tech)" }}
                 >
                   {isWinner
-                    ? "Outstanding fight! You claimed victory in the Thunder Dome."
+                    ? "Outstanding fight! You reached 3 KOs and claimed victory in the Thunder Dome."
                     : winningPlayerId
                       ? "Good sparring session. Return to menu and prepare for the next bout."
                       : "The match has reached completion."}
@@ -263,10 +447,10 @@ export function InGameOverlay() {
         {/* Bottom Bar: Controls Guide */}
         <div className="flex items-end justify-between w-full">
           {/* Controls Hints */}
-          <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800/80 px-3.5 py-2 rounded-xl text-xs text-slate-300 shadow-lg">
-            <GiGamepad className="text-amber-400 text-lg" />
+          <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/85 backdrop-blur-md border border-slate-800/80 px-4 py-2.5 rounded-xl text-xs text-slate-300 shadow-lg">
+            <GiGamepad className="text-amber-400 text-lg flex-shrink-0" />
             <span style={{ fontFamily: "var(--font-tech)" }}>
-              Move: <strong className="text-amber-400">W/S</strong> • Turn: <strong className="text-amber-400">A/D</strong> • Strafe: <strong className="text-amber-400">Q/E</strong> • Jump: <strong className="text-amber-400">SPACE</strong> • Sprint: <strong className="text-amber-400">SHIFT</strong> • Fight: <strong className="text-amber-400">J/K/L</strong>
+              Move: <strong className="text-amber-400">W/S</strong> • Turn: <strong className="text-amber-400">A/D</strong> • Strafe: <strong className="text-amber-400">Q/E</strong> • Jump: <strong className="text-amber-400">SPACE</strong> • Punch (7): <strong className="text-amber-400">J/I</strong> (Click Combo) • Kick (12): <strong className="text-amber-400">K</strong> (Right Click) • Push: <strong className="text-amber-400">L</strong> (Shove to Void)
             </span>
           </div>
         </div>
