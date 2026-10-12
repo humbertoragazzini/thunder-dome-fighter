@@ -10,12 +10,12 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 8 — Match State Machine & Room Lifecycle Management** |
-| **Current Step** | **Step 8.1 — Define Match States (CREATED, WAITING_FOR_PLAYERS, COUNTDOWN, PLAYING, etc.)** |
-| **Last Completed Step** | **Step 7.4 — Implement generic team assignment logic and spawn slot distribution** |
-| **Next Step** | **Step 8.1 — Define Match States (CREATED, WAITING_FOR_PLAYERS, COUNTDOWN, PLAYING, etc.)** |
-| **Overall Status** | **Phase 7 (Generic Match & GameMode Architecture) 100% complete; moving to Phase 8.** |
-| **Last Updated** | **2026-10-10** |
+| **Current Phase** | **Phase 9 — 1v1 End-to-End Playable Vertical Slice** |
+| **Current Step** | **Step 9.1 — Connect UI Quick Play 1v1 button to Colyseus matchmaker** |
+| **Last Completed Step** | **Step 8.4 — Implement complete room disposal and resource lifecycle cleanup** |
+| **Next Step** | **Step 9.1 — Connect UI Quick Play 1v1 button to Colyseus matchmaker** |
+| **Overall Status** | **Phase 8 (Match State Machine & Room Lifecycle Management) 100% complete; moving to Phase 9.** |
+| **Last Updated** | **2026-10-12** |
 
 ---
 
@@ -545,18 +545,18 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 8 — Match State Machine & Room Lifecycle Management
 
-**Status:** Not Started `[ ]`  
+**Status:** Completed `[x]`  
 **Goal:** Robust match state machine preventing gameplay until ready and ensuring clean room resource disposal.  
 **Dependencies:** Phase 7.  
 
 #### Steps
-- [ ] 8.1 Define Match States: `CREATED`, `WAITING_FOR_PLAYERS`, `READY`, `COUNTDOWN`, `PLAYING`, `ROUND_END`, `MATCH_END`, `FINALIZING`, `CLOSED`.
-- [ ] 8.2 Implement authoritative state machine transitions in `GameRoom`:
+- [x] 8.1 Define Match States: `CREATED`, `WAITING_FOR_PLAYERS`, `READY`, `COUNTDOWN`, `PLAYING`, `ROUND_END`, `MATCH_END`, `FINALIZING`, `CLOSED`.
+- [x] 8.2 Implement authoritative state machine transitions in `GameRoom`:
   - Inputs ignored during `WAITING_FOR_PLAYERS` and `COUNTDOWN`.
   - Simulation activates on transition to `PLAYING`.
-  - Match terminates when score limit or time limit is reached, transitioning to `MATCH_END`.
-- [ ] 8.3 Implement synchronized countdown timer broadcast to clients.
-- [ ] 8.4 Implement complete room disposal: clear physics scheduler intervals, dispose Havok world, dispose Babylon scene, clear client maps, and trigger database persistence hooks.
+  - Match terminates when score limit, forfeit, or time limit is reached, transitioning to `MATCH_END`.
+- [x] 8.3 Implement synchronized countdown timer and match duration clock broadcast to clients.
+- [x] 8.4 Implement complete room disposal: clear physics scheduler intervals, dispose Havok world, dispose Babylon scene, clear client maps, and trigger database persistence hooks.
 
 #### Completion Criteria
 - Room strictly enforces state rules; physics simulation cannot advance gameplay before `PLAYING`.
