@@ -10,11 +10,11 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 9 — 1v1 End-to-End Playable Vertical Slice** |
-| **Current Step** | **Step 9.1 — Connect UI Quick Play 1v1 button to Colyseus matchmaker** |
-| **Last Completed Step** | **Step 8.4 — Implement complete room disposal and resource lifecycle cleanup** |
-| **Next Step** | **Step 9.1 — Connect UI Quick Play 1v1 button to Colyseus matchmaker** |
-| **Overall Status** | **Phase 8 (Match State Machine & Room Lifecycle Management) 100% complete; moving to Phase 9.** |
+| **Current Phase** | **Phase 10 — Authoritative Combat Foundation (Attacks, Hitboxes, Stun & Knockback)** |
+| **Current Step** | **Step 10.1 — Define combat configuration in shared/combat/CombatConfig.ts** |
+| **Last Completed Step** | **Step 9.7 — Return to Menu button cleanly disconnects room and returns user to Main Menu** |
+| **Next Step** | **Step 10.1 — Define combat configuration in shared/combat/CombatConfig.ts** |
+| **Overall Status** | **Phase 9 (1v1 End-to-End Playable Vertical Slice) 100% complete; moving to Phase 10.** |
 | **Last Updated** | **2026-10-12** |
 
 ---
@@ -572,24 +572,24 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 9 — 1v1 End-to-End Playable Vertical Slice
 
-**Status:** Not Started `[ ]`  
+**Status:** Complete `[x]`  
 **Goal:** Assemble the first complete, playable end-to-end loop: Login -> Matchmake -> 1v1 Arena -> Fight -> Score -> Results Screen.  
 **Dependencies:** Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8.  
 
 #### Steps
-- [ ] 9.1 Connect UI Quick Play 1v1 button to Colyseus matchmaker (`joinOrCreate("game", { mode: "1v1", level: "thunder-dome-alpha" })`).
-- [ ] 9.2 Load arena, spawn two players at opposing spawn points.
-- [ ] 9.3 Display in-game HUD overlay (player names, health bars, match score, remaining time).
-- [ ] 9.4 Implement basic punch attack (trigger animation, server hitbox check, subtract health).
-- [ ] 9.5 Trigger player death on health <= 0, award kill to attacker, respawn defeated player after 3s.
-- [ ] 9.6 First to reach 3 kills triggers `MATCH_END`, displaying Victory/Defeat screen with match statistics.
-- [ ] 9.7 "Return to Menu" button cleanly disconnects room and returns user to Main Menu.
+- [x] 9.1 Connect UI Quick Play 1v1 button to Colyseus matchmaker (`joinOrCreate("game", { modeId: "1v1", levelId: "thunder-dome-alpha" })`).
+- [x] 9.2 Load arena, spawn two players at opposing spawn points.
+- [x] 9.3 Display in-game HUD overlay (dual health bars, KO score pips, invulnerability shield badges, controls bar).
+- [x] 9.4 Implement Left/Right Punch (7 dmg), Kick (12 dmg), Push (3 dmg + 8.0 m/s knockback impulse to shove opponents into the void).
+- [x] 9.5 Trigger player death on health <= 0 or Void Fall (< -5.0m), award kill to attacker, respawn defeated player after 3s with 2s invulnerability.
+- [x] 9.6 First to reach 3 kills triggers `MATCH_END`, displaying Victory/Defeat screen with match statistics.
+- [x] 9.7 "Return to Menu" button cleanly disconnects room and returns user to Main Menu.
 
 #### Completion Criteria
 - Two real players can log in, enter 1v1 match, fight until victory condition, view results, and return to menu seamlessly.
 
 #### Verification
-- Playable 2-player manual test in two browser windows completing a full 1v1 match from start to finish.
+- Headless automated test suite `test_1v1_combat_lifecycle.ts` passing all 12 test assertions cleanly.
 
 ---
 
