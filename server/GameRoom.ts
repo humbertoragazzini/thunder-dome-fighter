@@ -701,6 +701,12 @@ export class GameRoom extends Room {
   }
 
   public respawnPlayer(sessionId: string): void {
+    const pendingTimer = this.respawnTimers.get(sessionId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      this.respawnTimers.delete(sessionId);
+    }
+
     const playerState = this.state.players.get(sessionId);
     if (!playerState) return;
 
