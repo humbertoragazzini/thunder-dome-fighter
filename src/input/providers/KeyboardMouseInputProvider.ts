@@ -26,6 +26,7 @@ export class KeyboardMouseInputProvider implements IInputProvider {
   private currentYaw = 0;
   private jumpPressed = false;
   private currentAttack: AttackActionType = "NONE";
+  private lastPunchHand: "LEFT" | "RIGHT" = "RIGHT";
 
   private handleKeyDown = (e: KeyboardEvent) => {
     // Avoid capturing inputs if the user is typing in an input field / textarea
@@ -42,12 +43,14 @@ export class KeyboardMouseInputProvider implements IInputProvider {
     }
 
     if (e.code === "KeyJ") {
-      this.currentAttack = "LIGHT_PUNCH";
+      this.currentAttack = "LEFT_PUNCH";
+    } else if (e.code === "KeyI" || e.code === "KeyU") {
+      this.currentAttack = "RIGHT_PUNCH";
     } else if (e.code === "KeyK") {
-      this.currentAttack = "HEAVY_PUNCH";
-    } else if (e.code === "KeyL") {
       this.currentAttack = "KICK";
-    } else if (e.code === "KeyI") {
+    } else if (e.code === "KeyL" || e.code === "KeyF") {
+      this.currentAttack = "PUSH";
+    } else if (e.code === "KeyB") {
       this.currentAttack = "BLOCK";
     }
   };
@@ -57,9 +60,45 @@ export class KeyboardMouseInputProvider implements IInputProvider {
     if (e.code === "Space") {
       this.jumpPressed = false;
     }
-    if (["KeyJ", "KeyK", "KeyL", "KeyI"].includes(e.code)) {
+    if (["KeyJ", "KeyI", "KeyU", "KeyK", "KeyL", "KeyF", "KeyB"].includes(e.code)) {
       this.currentAttack = "NONE";
     }
+  };
+
+  private handleMouseDown = (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "BUTTON")) {
+      return;
+    }
+
+    this.active = true;
+
+    if (e.button === 0) {
+      // Left Click: Alternating 1-2 punch combo (Left Punch -> Right Punch)
+      if (this.lastPunchHand === "LEFT") {
+        this.currentAttack = "RIGHT_PUNCH";
+        this.lastPunchHand = "RIGHT";
+      } else {
+        this.currentAttack = "LEFT_PUNCH";
+        this.lastPunchHand = "LEFT";
+      }
+    } else if (e.button === 1) {
+      // Middle Click: Tactical Push / Shove
+      this.currentAttack = "PUSH";
+    } else if (e.button === 2) {
+      // Right Click: Kick
+      this.currentAttack = "KICK";
+    }
+  };
+
+  private handleMouseUp = (e: MouseEvent) => {
+    if (e.button === 0 || e.button === 1 || e.button === 2) {
+      this.currentAttack = "NONE";
+    }
+  };
+
+  private handleContextMenu = (e: MouseEvent) => {
+    e.preventDefault();
   };
 
   private handleBlur = () => {
@@ -73,6 +112,9 @@ export class KeyboardMouseInputProvider implements IInputProvider {
     if (typeof window === "undefined") return;
     window.addEventListener("keydown", this.handleKeyDown);
     window.addEventListener("keyup", this.handleKeyUp);
+    window.addEventListener("mousedown", this.handleMouseDown);
+    window.addEventListener("mouseup", this.handleMouseUp);
+    window.addEventListener("contextmenu", this.handleContextMenu);
     window.addEventListener("blur", this.handleBlur);
   }
 
@@ -80,6 +122,9 @@ export class KeyboardMouseInputProvider implements IInputProvider {
     if (typeof window === "undefined") return;
     window.removeEventListener("keydown", this.handleKeyDown);
     window.removeEventListener("keyup", this.handleKeyUp);
+    window.removeEventListener("mousedown", this.handleMouseDown);
+    window.removeEventListener("mouseup", this.handleMouseUp);
+    window.removeEventListener("contextmenu", this.handleContextMenu);
     window.removeEventListener("blur", this.handleBlur);
     this.activeKeys.clear();
   }
