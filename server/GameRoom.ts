@@ -27,6 +27,7 @@ import {
   type CharacterInputCommand,
   type AttackActionType,
   PHYSICS_DT_MS,
+  COMBAT_CONFIG,
 } from "../shared/player/PlayerConfig";
 import { verifySessionToken, type AuthenticatedUser } from "./auth/TokenVerifier.ts";
 import { resolveSpawnPoint } from "../shared/levels/SpawnPointResolver";
@@ -84,9 +85,16 @@ export function validateAndClampPlayerInputCommand(
     const sprint = typeof data.sprint === "boolean" ? data.sprint : false;
     const attackAction =
       typeof data.attackAction === "string" &&
-      ["NONE", "LIGHT_PUNCH", "HEAVY_PUNCH", "KICK", "BLOCK"].includes(
-        data.attackAction,
-      )
+      [
+        "NONE",
+        "LEFT_PUNCH",
+        "RIGHT_PUNCH",
+        "LIGHT_PUNCH",
+        "HEAVY_PUNCH",
+        "KICK",
+        "PUSH",
+        "BLOCK",
+      ].includes(data.attackAction)
         ? (data.attackAction as AttackActionType)
         : "NONE";
 
@@ -138,9 +146,10 @@ export class GameRoom extends Room {
   // Track monotonic input sequence per connected client session
   private lastAcceptedSequenceBySessionId = new Map<string, number>();
 
-  // Match state machine timers
+  // Match state machine & respawn timers
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
   private matchDurationTimer: ReturnType<typeof setInterval> | null = null;
+  private respawnTimers = new Map<string, ReturnType<typeof setTimeout>>();
   public static readonly COUNTDOWN_DURATION_SEC = 3;
   public static readonly MATCH_DURATION_SEC = 180;
 
@@ -158,6 +167,10 @@ export class GameRoom extends Room {
 
   getLevel(): LevelDefinition {
     return this.level;
+  }
+
+  getSimulationWorld(): SimulatorWorld {
+    return this.simulationWorld;
   }
 
   private syncSimulationState() {
@@ -199,6 +212,7 @@ export class GameRoom extends Room {
         currentPlayer.avy = avy;
         currentPlayer.avz = avz;
         currentPlayer.lastProcessedInputSequence = lastProcessedInputSequence;
+        currentPlayer.isInvulnerable = this.simulationWorld.isEntityInvulnerable(playerId);
       },
     );
   }
@@ -239,6 +253,9 @@ export class GameRoom extends Room {
 
     await this.simulationWorld.initialize(() => {
       this.syncSimulationState();
+      if (this.state.matchStatus === "PLAYING") {
+        this.checkVoidFalls();
+      }
     });
 
     // Register input network message
@@ -295,6 +312,11 @@ export class GameRoom extends Room {
       return;
     }
 
+    const playerState = this.state.players.get(client.sessionId);
+    if (!playerState || playerState.isDead) {
+      return;
+    }
+
     const lastAcceptedSeq = this.lastAcceptedSequenceBySessionId.get(client.sessionId) ?? 0;
     const sanitizedInput = validateAndClampPlayerInputCommand(message, lastAcceptedSeq);
 
@@ -304,6 +326,11 @@ export class GameRoom extends Room {
 
     // Update monotonic accepted sequence for this session
     this.lastAcceptedSequenceBySessionId.set(client.sessionId, sanitizedInput.sequence);
+
+    // Authoritative combat action resolution
+    if ("attackAction" in sanitizedInput && sanitizedInput.attackAction !== "NONE") {
+      this.resolveCombatAction(client.sessionId, sanitizedInput.attackAction);
+    }
 
     // Sender identity comes strictly from client.sessionId.
     // Never accept or trust a client-supplied playerId.
@@ -365,6 +392,12 @@ export class GameRoom extends Room {
     const playerState = new PlayerState();
     playerState.playerId = client.sessionId;
     playerState.teamIndex = teamAssignment.teamIndex;
+    playerState.health = 100;
+    playerState.maxHealth = 100;
+    playerState.score = 0;
+    playerState.lastAttackAction = "NONE";
+    playerState.isDead = false;
+    playerState.isInvulnerable = false;
     playerState.x = spawnPoint.position.x;
     playerState.y = spawnPoint.position.y;
     playerState.z = spawnPoint.position.z;
@@ -404,6 +437,13 @@ export class GameRoom extends Room {
       if (clientIndex !== -1) {
         this.clients.splice(clientIndex, 1);
       }
+    }
+
+    // Cancel pending respawn timer if any
+    const pendingTimer = this.respawnTimers.get(client.sessionId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      this.respawnTimers.delete(client.sessionId);
     }
 
     this.simulationWorld.removeEntity(client.sessionId);
@@ -514,6 +554,184 @@ export class GameRoom extends Room {
   }
 
   // ==================================================
+  // AUTHORITATIVE COMBAT RESOLUTION & LIFECYCLE (PHASE 9)
+  // ==================================================
+
+  public resolveCombatAction(attackerSessionId: string, action: AttackActionType): void {
+    if (action === "NONE" || action === "BLOCK") {
+      return;
+    }
+
+    // Check attack cooldown
+    if (this.simulationWorld.isAttackOnCooldown(attackerSessionId)) {
+      return;
+    }
+
+    // Lookup combat move definition
+    const moveDef =
+      action === "LEFT_PUNCH"
+        ? COMBAT_CONFIG.LEFT_PUNCH
+        : action === "RIGHT_PUNCH"
+          ? COMBAT_CONFIG.RIGHT_PUNCH
+          : action === "KICK"
+            ? COMBAT_CONFIG.KICK
+            : action === "PUSH"
+              ? COMBAT_CONFIG.PUSH
+              : action === "LIGHT_PUNCH"
+                ? COMBAT_CONFIG.LIGHT_PUNCH
+                : action === "HEAVY_PUNCH"
+                  ? COMBAT_CONFIG.HEAVY_PUNCH
+                  : null;
+
+    if (!moveDef) return;
+
+    // Apply cooldown to attacker
+    this.simulationWorld.setAttackCooldown(attackerSessionId, moveDef.cooldownSeconds);
+
+    const attackerState = this.state.players.get(attackerSessionId);
+    if (attackerState) {
+      attackerState.lastAttackAction = action;
+    }
+
+    // Perform spatial query cone check
+    const hit = this.simulationWorld.checkMeleeHit(
+      attackerSessionId,
+      moveDef.range,
+      moveDef.coneAngleRad,
+    );
+
+    if (!hit) {
+      return;
+    }
+
+    const victimSessionId = hit.targetSessionId;
+    const victimState = this.state.players.get(victimSessionId);
+    if (!victimState || victimState.isDead) {
+      return;
+    }
+
+    // Check if victim is currently in invulnerability window (e.g. post-respawn)
+    if (this.simulationWorld.isEntityInvulnerable(victimSessionId)) {
+      console.log(`🛡️ Hit ignored: Player ${victimSessionId} is invulnerable.`);
+      return;
+    }
+
+    // Record damage attribution for kill credit (including future void falls)
+    this.simulationWorld.setEntityDamageAttribution(victimSessionId, attackerSessionId);
+
+    // Impart physical knockback impulse in Havok
+    this.simulationWorld.applyKnockbackImpulse(
+      attackerSessionId,
+      victimSessionId,
+      moveDef.knockbackImpulse,
+    );
+
+    // Apply damage authoritatively
+    victimState.health = Math.max(0, victimState.health - moveDef.damage);
+    console.log(
+      `💥 Hit landed! Attacker ${attackerSessionId} used ${action} on ${victimSessionId}. Damage: ${moveDef.damage}, Target HP: ${victimState.health}`,
+    );
+
+    // Check knockout
+    if (victimState.health <= 0) {
+      this.eliminatePlayer(victimSessionId, "COMBAT_DAMAGE", attackerSessionId);
+    }
+  }
+
+  public checkVoidFalls(): void {
+    const fallenPlayerIds = this.simulationWorld.checkVoidFalls();
+    for (const victimSessionId of fallenPlayerIds) {
+      const victimState = this.state.players.get(victimSessionId);
+      if (victimState && !victimState.isDead) {
+        console.log(`💀 Player ${victimSessionId} fell below arena boundaries into the void!`);
+        this.eliminatePlayer(victimSessionId, "VOID_FALL");
+      }
+    }
+  }
+
+  public eliminatePlayer(
+    victimSessionId: string,
+    cause: "COMBAT_DAMAGE" | "VOID_FALL",
+    directAttackerId?: string,
+  ): void {
+    const victimState = this.state.players.get(victimSessionId);
+    if (!victimState || victimState.isDead) return;
+
+    victimState.isDead = true;
+    victimState.health = 0;
+
+    // Determine killer
+    let killerSessionId = directAttackerId;
+    if (!killerSessionId) {
+      const attribution = this.simulationWorld.getEntityLastAttacker(victimSessionId);
+      if (
+        attribution.attackerSessionId &&
+        attribution.timestamp &&
+        performance.now() - attribution.timestamp <=
+          COMBAT_CONFIG.VOID_FALL_ATTRIBUTION_WINDOW_SECONDS * 1000
+      ) {
+        killerSessionId = attribution.attackerSessionId;
+      }
+    }
+
+    if (killerSessionId && killerSessionId !== victimSessionId) {
+      const killerState = this.state.players.get(killerSessionId);
+      if (killerState) {
+        killerState.score++;
+        console.log(
+          `🏆 Kill awarded to ${killerSessionId} (cause: ${cause})! Score: ${killerState.score}/${COMBAT_CONFIG.MATCH_WIN_KILLS}`,
+        );
+
+        // Check match victory condition (first to 3 kills)
+        if (killerState.score >= COMBAT_CONFIG.MATCH_WIN_KILLS) {
+          this.endMatch("SCORE_LIMIT", killerSessionId, killerState.teamIndex);
+          return;
+        }
+      }
+    }
+
+    // Schedule respawn after 3 seconds
+    const timer = setTimeout(() => {
+      this.respawnTimers.delete(victimSessionId);
+      if (this.state.matchStatus !== "PLAYING") return;
+      this.respawnPlayer(victimSessionId);
+    }, COMBAT_CONFIG.RESPAWN_DELAY_SECONDS * 1000);
+
+    this.respawnTimers.set(victimSessionId, timer);
+  }
+
+  public respawnPlayer(sessionId: string): void {
+    const playerState = this.state.players.get(sessionId);
+    if (!playerState) return;
+
+    const spawnPoint = resolveSpawnPoint(
+      this.level,
+      0,
+      playerState.teamIndex >= 0 ? playerState.teamIndex : undefined,
+    );
+
+    this.simulationWorld.respawnEntity(sessionId, spawnPoint);
+
+    playerState.health = 100;
+    playerState.isDead = false;
+    playerState.isInvulnerable = true;
+    playerState.x = spawnPoint.position.x;
+    playerState.y = spawnPoint.position.y;
+    playerState.z = spawnPoint.position.z;
+
+    const halfYaw = spawnPoint.rotationYaw / 2;
+    playerState.rx = 0;
+    playerState.ry = Math.sin(halfYaw);
+    playerState.rz = 0;
+    playerState.rw = Math.cos(halfYaw);
+    playerState.vx = 0;
+    playerState.vy = 0;
+    playerState.vz = 0;
+
+    console.log(`✨ Player ${sessionId} respawned with 2-second invulnerability.`);
+  }
+
+  // ==================================================
   // ROOM DISPOSAL
   // ==================================================
 
@@ -527,6 +745,10 @@ export class GameRoom extends Room {
       clearInterval(this.matchDurationTimer);
       this.matchDurationTimer = null;
     }
+    for (const timer of this.respawnTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.respawnTimers.clear();
     this.simulationWorld?.dispose();
     this.lastAcceptedSequenceBySessionId.clear();
   }
