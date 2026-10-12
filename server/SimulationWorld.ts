@@ -655,9 +655,8 @@ export class SimulatorWorld {
       updatePhysics();
     }, SCHEDULER_INTERVAL_MS);
 
-    // ==================================================
-    // CURRENT STATE
-    // ==================================================
+    console.log("world initialized");
+  }
 
   // ==================================================
   // COMBAT & SPATIAL QUERIES (PHASE 9)
