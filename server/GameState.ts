@@ -34,6 +34,14 @@ export const PlayerState = schema(
     // Team affinity: -1 for FFA, 0 for Team Alpha, 1 for Team Beta
     teamIndex: t.number().default(-1),
 
+    // Synchronized Authoritative Combat State
+    health: t.number().default(100),
+    maxHealth: t.number().default(100),
+    score: t.number().default(0),
+    lastAttackAction: t.string().default("NONE"),
+    isDead: t.boolean().default(false),
+    isInvulnerable: t.boolean().default(false),
+
     x: t.number().default(0),
     y: t.number().default(0),
     z: t.number().default(0),
