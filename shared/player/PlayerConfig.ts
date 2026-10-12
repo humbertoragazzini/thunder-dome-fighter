@@ -148,10 +148,90 @@ export const REMOTE_MAX_SNAPSHOTS = 64;
 
 export type AttackActionType =
   | "NONE"
+  | "LEFT_PUNCH"
+  | "RIGHT_PUNCH"
   | "LIGHT_PUNCH"
   | "HEAVY_PUNCH"
   | "KICK"
+  | "PUSH"
   | "BLOCK";
+
+// ==================================================
+// COMBAT & DAMAGE SPECIFICATION (PHASE 9 VERTICAL SLICE)
+// ==================================================
+
+export interface CombatMoveDefinition {
+  damage: number;
+  range: number;
+  coneAngleRad: number;
+  knockbackImpulse: number;
+  cooldownSeconds: number;
+}
+
+export const COMBAT_CONFIG = {
+  LEFT_PUNCH: {
+    damage: 7,
+    range: 2.0,
+    coneAngleRad: (60 * Math.PI) / 180, // ±60 degrees forward cone
+    knockbackImpulse: 1.5,
+    cooldownSeconds: 0.25,
+  },
+  RIGHT_PUNCH: {
+    damage: 7,
+    range: 2.0,
+    coneAngleRad: (60 * Math.PI) / 180, // ±60 degrees forward cone
+    knockbackImpulse: 2.0,
+    cooldownSeconds: 0.3,
+  },
+  // Aliases for backwards compatibility with tests / legacy inputs
+  LIGHT_PUNCH: {
+    damage: 7,
+    range: 2.0,
+    coneAngleRad: (60 * Math.PI) / 180,
+    knockbackImpulse: 1.5,
+    cooldownSeconds: 0.25,
+  },
+  HEAVY_PUNCH: {
+    damage: 7,
+    range: 2.0,
+    coneAngleRad: (60 * Math.PI) / 180,
+    knockbackImpulse: 2.0,
+    cooldownSeconds: 0.3,
+  },
+  KICK: {
+    damage: 12,
+    range: 2.5,
+    coneAngleRad: (50 * Math.PI) / 180, // ±50 degrees forward cone
+    knockbackImpulse: 3.5,
+    cooldownSeconds: 0.55,
+  },
+  PUSH: {
+    damage: 3,
+    range: 1.8,
+    coneAngleRad: (45 * Math.PI) / 180, // ±45 degrees forward cone
+    knockbackImpulse: 8.0, // High horizontal knockback impulse to shove opponents into the void
+    cooldownSeconds: 0.9,
+  },
+  BLOCK: {
+    damage: 0,
+    range: 0,
+    coneAngleRad: 0,
+    knockbackImpulse: 0,
+    cooldownSeconds: 0.1,
+  },
+
+  /** Duration a defeated player waits before respawning at team base */
+  RESPAWN_DELAY_SECONDS: 3.0,
+
+  /** Duration of invulnerability granted upon respawn */
+  RESPAWN_INVULNERABILITY_SECONDS: 2.0,
+
+  /** Total kills required to immediately trigger match victory */
+  MATCH_WIN_KILLS: 3,
+
+  /** Time window in seconds where void falls are credited to the last attacker */
+  VOID_FALL_ATTRIBUTION_WINDOW_SECONDS: 10.0,
+} as const;
 
 /**
  * High-level intention of a player controlling a humanoid character.
