@@ -63,14 +63,18 @@ export function InGameOverlay() {
       }
     };
 
+    let isMounted = true;
+    const handleStateChange = () => {
+      if (isMounted) syncState();
+    };
+
     syncState();
-    const unsubscribe = room.onStateChange(() => {
-      syncState();
-    });
+    room.onStateChange(handleStateChange);
 
     return () => {
-      if (typeof unsubscribe === "function") {
-        unsubscribe();
+      isMounted = false;
+      if (typeof (room.onStateChange as any)?.remove === "function") {
+        (room.onStateChange as any).remove(handleStateChange);
       }
     };
   }, [room]);
