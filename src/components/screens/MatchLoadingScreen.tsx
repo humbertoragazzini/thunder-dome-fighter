@@ -77,7 +77,12 @@ export function MatchLoadingScreen() {
 
       try {
         const client = new Client(colyseusUrl);
-        const joinedRoom = await client.join("game", { token });
+        const selectedModeId = useNavigationStore.getState().selectedMatchMode ?? "1v1";
+        const joinedRoom = await client.joinOrCreate("game", {
+          token,
+          modeId: selectedModeId,
+          levelId: "thunder-dome-alpha",
+        });
 
         if (isCancelled) {
           await joinedRoom.leave();
