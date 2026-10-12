@@ -49,6 +49,7 @@ import {
   type PlayerInputCommand,
   type CharacterActionInput,
   type CharacterInputCommand,
+  COMBAT_CONFIG,
 } from "../shared/player/PlayerConfig";
 
 import {
@@ -81,6 +82,12 @@ export interface SimulationEntity {
   leftLegGrounded: boolean;
   rightLegGrounded: boolean;
   jumpConsumed: boolean;
+
+  // Combat runtime state
+  lastAttackerSessionId?: string;
+  lastDamageTimestamp?: number;
+  attackCooldownUntil?: number;
+  invulnerableUntil?: number;
 }
 
 // ==================================================
@@ -652,7 +659,209 @@ export class SimulatorWorld {
     // CURRENT STATE
     // ==================================================
 
-    console.log("world initialized");
+  // ==================================================
+  // COMBAT & SPATIAL QUERIES (PHASE 9)
+  // ==================================================
+
+  /**
+   * Performs forward cone spatial hit check against other humanoid fighters.
+   * Returns the closest valid target within range and horizontal cone angle.
+   */
+  public checkMeleeHit(
+    attackerSessionId: string,
+    range: number,
+    coneAngleRad: number,
+  ): { targetSessionId: string; distance: number } | null {
+    const attacker = this.entities.get(attackerSessionId);
+    if (!attacker) return null;
+
+    const atkPos = attacker.node.position;
+    let atkYaw = 0;
+    if (
+      "lookYaw" in attacker.currentInput &&
+      typeof attacker.currentInput.lookYaw === "number"
+    ) {
+      atkYaw = attacker.currentInput.lookYaw;
+    } else if (attacker.node.rotationQuaternion) {
+      atkYaw = attacker.node.rotationQuaternion.toEulerAngles().y;
+    }
+
+    const cosCone = Math.cos(coneAngleRad);
+    let bestTarget: { targetSessionId: string; distance: number } | null = null;
+    let minDistance = Infinity;
+
+    for (const [targetId, target] of this.entities.entries()) {
+      if (targetId === attackerSessionId) continue;
+
+      const tgtPos = target.node.position;
+      const dx = tgtPos.x - atkPos.x;
+      const dy = tgtPos.y - atkPos.y;
+      const dz = tgtPos.z - atkPos.z;
+
+      // Vertical tolerance check (within capsule height)
+      if (Math.abs(dy) > CHARACTER_CAPSULE.totalHeight * 1.5) {
+        continue;
+      }
+
+      const horizontalDist = Math.sqrt(dx * dx + dz * dz);
+      if (horizontalDist > range) {
+        continue;
+      }
+
+      // If practically touching, consider it a direct hit
+      if (horizontalDist < 0.25) {
+        if (horizontalDist < minDistance) {
+          minDistance = horizontalDist;
+          bestTarget = { targetSessionId: targetId, distance: horizontalDist };
+        }
+        continue;
+      }
+
+      // Check forward cone angle
+      // Forward direction for yaw: (sin(yaw), cos(yaw))
+      const dirX = dx / horizontalDist;
+      const dirZ = dz / horizontalDist;
+      const forwardX = Math.sin(atkYaw);
+      const forwardZ = Math.cos(atkYaw);
+      const dot = forwardX * dirX + forwardZ * dirZ;
+
+      if (dot >= cosCone) {
+        if (horizontalDist < minDistance) {
+          minDistance = horizontalDist;
+          bestTarget = { targetSessionId: targetId, distance: horizontalDist };
+        }
+      }
+    }
+
+    return bestTarget;
+  }
+
+  /**
+   * Applies horizontal knockback impulse from attacker towards target body.
+   */
+  public applyKnockbackImpulse(
+    attackerSessionId: string,
+    targetSessionId: string,
+    impulseMagnitude: number,
+  ): void {
+    const attacker = this.entities.get(attackerSessionId);
+    const target = this.entities.get(targetSessionId);
+    if (!target) return;
+
+    let dirX = 0;
+    let dirZ = 1;
+
+    if (attacker) {
+      const dx = target.node.position.x - attacker.node.position.x;
+      const dz = target.node.position.z - attacker.node.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist > 0.05) {
+        dirX = dx / dist;
+        dirZ = dz / dist;
+      } else {
+        // Fallback to attacker's forward look yaw
+        let yaw = 0;
+        if ("lookYaw" in attacker.currentInput && typeof attacker.currentInput.lookYaw === "number") {
+          yaw = attacker.currentInput.lookYaw;
+        }
+        dirX = Math.sin(yaw);
+        dirZ = Math.cos(yaw);
+      }
+    }
+
+    // Apply linear impulse with a slight upward lift (0.5 m/s) to break static friction
+    const impulseVec = new Vector3(
+      dirX * impulseMagnitude * PLAYER_MASS,
+      0.5 * PLAYER_MASS,
+      dirZ * impulseMagnitude * PLAYER_MASS,
+    );
+    target.body.applyImpulse(impulseVec, target.node.position);
+  }
+
+  /**
+   * Identifies any entities whose vertical position fell below the arena boundaries.
+   * Returns list of session IDs that experienced a void fall.
+   */
+  public checkVoidFalls(): string[] {
+    const fallenPlayerIds: string[] = [];
+    const voidY = this.level.boundaries.min.y;
+
+    for (const [playerId, entity] of this.entities.entries()) {
+      if (entity.node.position.y < voidY) {
+        fallenPlayerIds.push(playerId);
+      }
+    }
+
+    return fallenPlayerIds;
+  }
+
+  /**
+   * Authoritatively relocates an entity to designated spawn position,
+   * zeroes linear and angular velocities, and resets pending inputs.
+   */
+  public respawnEntity(playerId: string, spawnPoint?: SpawnPoint): void {
+    const entity = this.entities.get(playerId);
+    if (!entity) return;
+
+    const spawnPos = spawnPoint?.position ?? PLAYER_SPAWN_POSITION;
+    const spawnYaw = spawnPoint?.rotationYaw ?? 0;
+
+    entity.node.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
+    entity.node.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnYaw, 0);
+
+    // Reset physics linear and angular velocity in Havok
+    entity.body.setLinearVelocity(Vector3.Zero());
+    entity.body.setAngularVelocity(Vector3.Zero());
+
+    // Clear jump state and reset current input
+    entity.jumpConsumed = false;
+    entity.pendingInputCommands = [];
+    entity.inputBufferPrimed = false;
+
+    // Set 2-second invulnerability
+    entity.invulnerableUntil = performance.now() + COMBAT_CONFIG.RESPAWN_INVULNERABILITY_SECONDS * 1000;
+  }
+
+  public isEntityInvulnerable(playerId: string): boolean {
+    const entity = this.entities.get(playerId);
+    if (!entity || !entity.invulnerableUntil) return false;
+    return performance.now() < entity.invulnerableUntil;
+  }
+
+  public setEntityInvulnerable(playerId: string, durationMs: number): void {
+    const entity = this.entities.get(playerId);
+    if (entity) {
+      entity.invulnerableUntil = performance.now() + durationMs;
+    }
+  }
+
+  public setEntityDamageAttribution(playerId: string, attackerSessionId: string): void {
+    const entity = this.entities.get(playerId);
+    if (entity) {
+      entity.lastAttackerSessionId = attackerSessionId;
+      entity.lastDamageTimestamp = performance.now();
+    }
+  }
+
+  public getEntityLastAttacker(playerId: string): { attackerSessionId?: string; timestamp?: number } {
+    const entity = this.entities.get(playerId);
+    return {
+      attackerSessionId: entity?.lastAttackerSessionId,
+      timestamp: entity?.lastDamageTimestamp,
+    };
+  }
+
+  public setAttackCooldown(playerId: string, cooldownDurationSec: number): void {
+    const entity = this.entities.get(playerId);
+    if (entity) {
+      entity.attackCooldownUntil = performance.now() + cooldownDurationSec * 1000;
+    }
+  }
+
+  public isAttackOnCooldown(playerId: string): boolean {
+    const entity = this.entities.get(playerId);
+    if (!entity || !entity.attackCooldownUntil) return false;
+    return performance.now() < entity.attackCooldownUntil;
   }
 
   public setGameplayActive(active: boolean): void {
