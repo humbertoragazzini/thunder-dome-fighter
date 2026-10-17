@@ -19,6 +19,8 @@
 
 import type { EntityId } from "../../domain/Identity.ts";
 import type { Vector3D } from "../../domain/Level.ts";
+import type { HurtboxZone } from "../../combat/CombatConfig.ts";
+import type { AttackActionType } from "../../player/PlayerConfig.ts";
 
 /**
  * Enumeration of all discrete gameplay occurrences.
@@ -83,6 +85,9 @@ export interface DamageAppliedEvent {
   attackerPlayerId: EntityId;
   victimPlayerId: EntityId;
   weaponId: string;
+  attackAction?: AttackActionType;
+  hitZone?: HurtboxZone;
+  comboCount?: number;
   damage: number;
   remainingHealth: number;
   hitPoint: Vector3D;
