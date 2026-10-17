@@ -49,8 +49,25 @@ import {
   type PlayerInputCommand,
   type CharacterActionInput,
   type CharacterInputCommand,
+  type AttackActionType,
   COMBAT_CONFIG,
 } from "../shared/player/PlayerConfig";
+
+import {
+  ATTACK_FRAME_DATA,
+  HURTBOX_ZONE_CONFIG,
+  COMBO_RULES,
+  type HurtboxZone,
+  type AttackFrameData,
+} from "../shared/combat/CombatConfig";
+
+import {
+  computeAttackingLimbHitbox,
+  computeTargetHurtboxProfile,
+  resolveHitboxVsHurtboxes,
+  type HitResolutionResult,
+  type Vector3D,
+} from "../shared/combat/HitboxMath";
 
 import {
   calculateThrottleForce,
@@ -88,6 +105,14 @@ export interface SimulationEntity {
   lastDamageTimestamp?: number;
   attackCooldownUntil?: number;
   invulnerableUntil?: number;
+
+  // Phase 10: Authoritative Combat Timeline & Stun State
+  attackAction: AttackActionType;
+  attackTimelineState: "IDLE" | "STARTUP" | "ACTIVE" | "RECOVERY";
+  attackStartedAt: number;
+  hasHitConnectedInActiveWindow: boolean;
+  comboCount: number;
+  stunnedUntil?: number;
 }
 
 // ==================================================
@@ -303,6 +328,11 @@ export class SimulatorWorld {
       leftLegGrounded: false,
       rightLegGrounded: false,
       jumpConsumed: false,
+      attackAction: "NONE",
+      attackTimelineState: "IDLE",
+      attackStartedAt: 0,
+      hasHitConnectedInActiveWindow: false,
+      comboCount: 0,
     };
 
     this.entities.set(playerId, newPlayer);
@@ -501,6 +531,44 @@ export class SimulatorWorld {
       // Perform 3-point downward ground detection
       this.checkGrounded(entity);
 
+      // ==================================================
+      // COMBAT TIMELINE & HIT STUN STATE MACHINE (PHASE 10)
+      // ==================================================
+      const now = performance.now();
+      const isStunned = Boolean(entity.stunnedUntil && now < entity.stunnedUntil);
+
+      if (isStunned) {
+        // Authoritative Action Interruption: Cancel active attack immediately if struck
+        if (entity.attackTimelineState !== "IDLE") {
+          entity.attackTimelineState = "IDLE";
+          entity.attackAction = "NONE";
+          entity.hasHitConnectedInActiveWindow = false;
+        }
+      } else {
+        // Advance attack timeline through frame data windows
+        if (entity.attackTimelineState !== "IDLE" && entity.attackAction !== "NONE") {
+          const actionKey = entity.attackAction as keyof typeof ATTACK_FRAME_DATA;
+          const frameData = ATTACK_FRAME_DATA[actionKey];
+          if (frameData) {
+            const elapsed = now - entity.attackStartedAt;
+            if (elapsed < frameData.startupMs) {
+              entity.attackTimelineState = "STARTUP";
+            } else if (elapsed < frameData.startupMs + frameData.activeMs) {
+              entity.attackTimelineState = "ACTIVE";
+            } else if (elapsed < frameData.totalDurationMs) {
+              entity.attackTimelineState = "RECOVERY";
+            } else {
+              entity.attackTimelineState = "IDLE";
+              entity.attackAction = "NONE";
+              entity.hasHitConnectedInActiveWindow = false;
+            }
+          } else {
+            entity.attackTimelineState = "IDLE";
+            entity.attackAction = "NONE";
+          }
+        }
+      }
+
       const currentInput = entity.currentInput;
 
       // Handle Modern Humanoid Input (CharacterActionInput)
@@ -508,10 +576,14 @@ export class SimulatorWorld {
         const charInput = currentInput as CharacterActionInput;
         const currentLinearVelocity = entity.body.getLinearVelocity();
 
-        // 1. 8-Way Directional Locomotion Force
+        // 1. Locomotion Force (locked to 0 when stunned)
+        const moveX = isStunned ? 0 : charInput.moveX;
+        const moveZ = isStunned ? 0 : charInput.moveZ;
+        const canJump = !isStunned && charInput.jump;
+
         const movementForce = calculateHumanoidMovementForce(
-          charInput.moveX,
-          charInput.moveZ,
+          moveX,
+          moveZ,
           charInput.lookYaw,
           charInput.sprint,
           currentLinearVelocity,
@@ -530,7 +602,7 @@ export class SimulatorWorld {
         entity.body.setAngularVelocity(new Vector3(0, targetAngularVelY, 0));
 
         // 3. Discrete Jump Impulse when Grounded
-        if (charInput.jump) {
+        if (canJump) {
           if (!entity.jumpConsumed && entity.isGrounded) {
             const jumpImpulse = calculateJumpImpulse(true, true);
             entity.body.applyImpulse(jumpImpulse, entity.node.position);
@@ -659,20 +731,201 @@ export class SimulatorWorld {
   }
 
   // ==================================================
-  // COMBAT & SPATIAL QUERIES (PHASE 9)
+  // COMBAT & SPATIAL QUERIES (PHASE 9 & PHASE 10)
   // ==================================================
 
   /**
-   * Performs forward cone spatial hit check against other humanoid fighters.
-   * Returns the closest valid target within range and horizontal cone angle.
+   * Phase 10: Authoritative 3D Articulated Hit Resolution.
+   * Tests the attacking character's active limb hitbox against all other fighters'
+   * discrete hurtbox zones (Head: 1.5x crit, Torso: 1.0x, Limbs: 0.75x).
+   */
+  public checkArticulatedHit(
+    attackerSessionId: string,
+    action: Extract<AttackActionType, "LEFT_PUNCH" | "RIGHT_PUNCH" | "KICK" | "PUSH">,
+    extensionProgress: number = 1.0,
+  ): HitResolutionResult | null {
+    const attacker = this.entities.get(attackerSessionId);
+    if (!attacker) return null;
+
+    // Attacker cannot strike while stunned
+    if (this.isEntityStunned(attackerSessionId)) {
+      return null;
+    }
+
+    const atkPos = attacker.node.position;
+    let atkYaw = 0;
+    if (
+      "lookYaw" in attacker.currentInput &&
+      typeof attacker.currentInput.lookYaw === "number"
+    ) {
+      atkYaw = attacker.currentInput.lookYaw;
+    } else if (attacker.node.rotationQuaternion) {
+      atkYaw = attacker.node.rotationQuaternion.toEulerAngles().y;
+    }
+
+    // Compute attacking limb volume in 3D world space
+    const hitbox = computeAttackingLimbHitbox(atkPos, atkYaw, action, extensionProgress);
+
+    let bestHit: HitResolutionResult | null = null;
+    let minDistance = Infinity;
+
+    for (const [targetId, target] of this.entities.entries()) {
+      if (targetId === attackerSessionId) continue;
+
+      // Skip invulnerable targets
+      if (this.isEntityInvulnerable(targetId)) continue;
+
+      const tgtPos = target.node.position;
+      let tgtYaw = 0;
+      if (
+        "lookYaw" in target.currentInput &&
+        typeof target.currentInput.lookYaw === "number"
+      ) {
+        tgtYaw = target.currentInput.lookYaw;
+      } else if (target.node.rotationQuaternion) {
+        tgtYaw = target.node.rotationQuaternion.toEulerAngles().y;
+      }
+
+      // Compute target multi-zone hurtbox profile
+      const targetProfile = computeTargetHurtboxProfile(targetId, tgtPos, tgtYaw);
+
+      // Check combo bonus if attacker executed a combo
+      const comboBonus = attacker.comboCount > 0 ? COMBO_RULES.LEFT_TO_RIGHT_COMBO.bonusDamage : 0;
+
+      // Resolve volumetric intersection
+      const hitResult = resolveHitboxVsHurtboxes(
+        atkPos,
+        hitbox,
+        action,
+        targetProfile,
+        comboBonus,
+      );
+
+      if (hitResult) {
+        // Prioritize closer target or higher priority zone
+        if (hitResult.distance < minDistance) {
+          minDistance = hitResult.distance;
+          bestHit = hitResult;
+        }
+      }
+    }
+
+    return bestHit;
+  }
+
+  /**
+   * Starts an authoritative attack timeline for the entity, evaluating combo cancel windows.
+   */
+  public startEntityAttack(
+    playerId: string,
+    action: AttackActionType,
+  ): boolean {
+    const entity = this.entities.get(playerId);
+    if (!entity) return false;
+
+    // Cannot attack while stunned
+    if (this.isEntityStunned(playerId)) return false;
+
+    const now = performance.now();
+
+    // Check combo: Left Punch -> Right Punch
+    if (
+      action === "RIGHT_PUNCH" &&
+      entity.attackAction === "LEFT_PUNCH" &&
+      now - entity.attackStartedAt >= COMBO_RULES.LEFT_TO_RIGHT_COMBO.windowStartMs &&
+      now - entity.attackStartedAt <= COMBO_RULES.LEFT_TO_RIGHT_COMBO.windowEndMs
+    ) {
+      entity.comboCount++;
+      entity.attackAction = action;
+      entity.attackTimelineState = "STARTUP";
+      const reducedStartup =
+        ATTACK_FRAME_DATA.RIGHT_PUNCH.startupMs *
+        (1 - COMBO_RULES.LEFT_TO_RIGHT_COMBO.startupReductionFactor);
+      entity.attackStartedAt =
+        now - (ATTACK_FRAME_DATA.RIGHT_PUNCH.startupMs - reducedStartup);
+      entity.hasHitConnectedInActiveWindow = false;
+      return true;
+    }
+
+    entity.comboCount = 0;
+    entity.attackAction = action;
+    entity.attackTimelineState = "STARTUP";
+    entity.attackStartedAt = now;
+    entity.hasHitConnectedInActiveWindow = false;
+    return true;
+  }
+
+  public getEntityAttackState(playerId: string) {
+    const entity = this.entities.get(playerId);
+    if (!entity) return null;
+    return {
+      action: entity.attackAction,
+      timelineState: entity.attackTimelineState,
+      comboCount: entity.comboCount,
+      isStunned: this.isEntityStunned(playerId),
+    };
+  }
+
+  public applyHitStun(playerId: string, durationMs: number): void {
+    const entity = this.entities.get(playerId);
+    if (!entity) return;
+    entity.stunnedUntil = performance.now() + durationMs;
+    // Interruption: cancel active attack immediately
+    entity.attackTimelineState = "IDLE";
+    entity.attackAction = "NONE";
+    entity.hasHitConnectedInActiveWindow = false;
+  }
+
+  public isEntityStunned(playerId: string): boolean {
+    const entity = this.entities.get(playerId);
+    if (!entity || !entity.stunnedUntil) return false;
+    return performance.now() < entity.stunnedUntil;
+  }
+
+  /**
+   * Performs spatial hit check against other humanoid fighters.
+   * Checks articulated hitboxes first, falling back to proximity cone for backwards compatibility.
    */
   public checkMeleeHit(
     attackerSessionId: string,
     range: number,
     coneAngleRad: number,
-  ): { targetSessionId: string; distance: number } | null {
+  ): {
+    targetSessionId: string;
+    distance: number;
+    hitZone?: HurtboxZone;
+    isCritical?: boolean;
+    finalDamage?: number;
+    contactPoint?: Vector3D;
+    knockbackDirection?: Vector3D;
+  } | null {
     const attacker = this.entities.get(attackerSessionId);
     if (!attacker) return null;
+
+    // Check articulated hit first if action is valid
+    if (
+      attacker.attackAction === "LEFT_PUNCH" ||
+      attacker.attackAction === "RIGHT_PUNCH" ||
+      attacker.attackAction === "KICK" ||
+      attacker.attackAction === "PUSH"
+    ) {
+      const artHit = this.checkArticulatedHit(
+        attackerSessionId,
+        attacker.attackAction,
+        1.0,
+      );
+      if (artHit) {
+        return {
+          targetSessionId: artHit.targetSessionId,
+          distance: artHit.distance,
+          hitZone: artHit.hitZone,
+          isCritical: artHit.isCritical,
+          finalDamage: artHit.finalDamage,
+          contactPoint: artHit.contactPoint,
+          knockbackDirection: artHit.knockbackDirection,
+        };
+      }
+    }
 
     const atkPos = attacker.node.position;
     let atkYaw = 0;
@@ -717,7 +970,6 @@ export class SimulatorWorld {
       }
 
       // Check forward cone angle
-      // Forward direction for yaw: (sin(yaw), cos(yaw))
       const dirX = dx / horizontalDist;
       const dirZ = dz / horizontalDist;
       const forwardX = Math.sin(atkYaw);
@@ -736,21 +988,27 @@ export class SimulatorWorld {
   }
 
   /**
-   * Applies horizontal knockback impulse from attacker towards target body.
+   * Applies horizontal/3D knockback impulse from attacker towards target body.
    */
   public applyKnockbackImpulse(
     attackerSessionId: string,
     targetSessionId: string,
     impulseMagnitude: number,
+    knockbackDir?: Vector3D,
   ): void {
     const attacker = this.entities.get(attackerSessionId);
     const target = this.entities.get(targetSessionId);
     if (!target) return;
 
     let dirX = 0;
+    let dirY = 0.5;
     let dirZ = 1;
 
-    if (attacker) {
+    if (knockbackDir) {
+      dirX = knockbackDir.x;
+      dirY = knockbackDir.y ?? 0.25;
+      dirZ = knockbackDir.z;
+    } else if (attacker) {
       const dx = target.node.position.x - attacker.node.position.x;
       const dz = target.node.position.z - attacker.node.position.z;
       const dist = Math.sqrt(dx * dx + dz * dz);
@@ -768,10 +1026,10 @@ export class SimulatorWorld {
       }
     }
 
-    // Apply linear impulse with a slight upward lift (0.5 m/s) to break static friction
+    // Apply linear impulse to Havok body
     const impulseVec = new Vector3(
       dirX * impulseMagnitude * PLAYER_MASS,
-      0.5 * PLAYER_MASS,
+      dirY * PLAYER_MASS,
       dirZ * impulseMagnitude * PLAYER_MASS,
     );
     target.body.applyImpulse(impulseVec, target.node.position);
