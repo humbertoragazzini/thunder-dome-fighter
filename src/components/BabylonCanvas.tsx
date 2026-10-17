@@ -43,6 +43,7 @@ import { TouchGamepadOverlay } from "./ui/organisms/TouchGamepadOverlay";
 import { CharacterVisualRig } from "../visuals/character/CharacterVisualRig";
 import { HERO_PALETTE } from "../visuals/character/CharacterRigConfig";
 import { LevelVisualLoader } from "../visuals/level/LevelVisualLoader";
+import { CombatEffectsManager } from "../visuals/combat/CombatEffectsManager";
 import {
   GRAVITY,
   type CharacterInputCommand,
@@ -64,6 +65,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
   const inputControllerRef = useRef<CharacterInputController | null>(null);
   const localPlayerRigRef = useRef<CharacterVisualRig | null>(null);
   const levelVisualLoaderRef = useRef<LevelVisualLoader | null>(null);
+  const combatEffectsRef = useRef<CombatEffectsManager | null>(null);
   const stateChangeHandlerRef = useRef<((state: any) => void) | null>(null);
 
   const [touchProvider, setTouchProvider] = useState<TouchVirtualGamepadProvider | null>(null);
@@ -180,6 +182,9 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
       const remoteInterpolation = new RemotePlayerInterpolation();
       remoteInterpolationRef.current = remoteInterpolation;
 
+      const combatEffects = new CombatEffectsManager(scene);
+      combatEffectsRef.current = combatEffects;
+
       // ==================================================
       // COLYSEUS STATE SYNCHRONIZATION
       // ==================================================
@@ -200,6 +205,13 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
             state.serverTick ?? 0,
             localPlayerRig.rootNode,
           );
+
+          // Local ragdoll handling on knockout / respawn
+          if (localState.isDead && !localPlayerRig.getIsRagdoll()) {
+            localPlayerRig.triggerRagdoll();
+          } else if (!localState.isDead && localPlayerRig.getIsRagdoll()) {
+            localPlayerRig.resetFromRagdoll();
+          }
         }
 
         remoteInterpolation.onNetworkStateUpdate(
@@ -214,6 +226,34 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
         room.onStateChange(handleStateChange);
         stateChangeHandlerRef.current = handleStateChange;
 
+        // Authoritative combat event listener
+        room.onMessage("combat:damage-applied", (event: any) => {
+          if (!event?.hitPoint) return;
+          const hitVec = new Vector3(event.hitPoint.x, event.hitPoint.y, event.hitPoint.z);
+          combatEffects.spawnHitSparks(hitVec, event.hitZone, event.isCritical);
+          combatEffects.playHitSound(event.attackAction, event.hitZone, event.isCritical);
+
+          const isLocalVictim = event.victimPlayerId === room.sessionId;
+          const victimRig = isLocalVictim
+            ? localPlayerRig
+            : remoteInterpolation.getRemoteRig(event.victimPlayerId);
+
+          if (victimRig) {
+            victimRig.triggerFlinch(event.hitZone);
+            if (event.remainingHealth <= 0) {
+              const knockbackVec = event.knockbackForce
+                ? new Vector3(event.knockbackForce.x, event.knockbackForce.y, event.knockbackForce.z)
+                : undefined;
+              victimRig.triggerRagdoll(knockbackVec);
+            }
+          }
+
+          if (isLocalVictim) {
+            const camera = scene.activeCamera as ArcRotateCamera;
+            combatEffects.applyCameraImpact(camera, event.isCritical);
+          }
+        });
+
         // Process already-synchronized state immediately if available upon mount
         if (room.state) {
           handleStateChange(room.state);
@@ -222,6 +262,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
 
       if (disposed) {
         localPlayerRig.dispose();
+        combatEffects.dispose();
         scene.dispose();
         engine.dispose();
         return;
@@ -254,6 +295,12 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
           deltaSeconds,
         );
 
+        const localState = room?.state?.players
+          ? typeof room.state.players.get === "function"
+            ? room.state.players.get(room.sessionId)
+            : room.state.players[room.sessionId]
+          : null;
+
         // 3. Procedural biped locomotion and combat gestures
         localPlayerRig.update(
           deltaSeconds,
@@ -261,6 +308,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
           localPrediction.getIsGrounded(),
           currentInput.sprint,
           currentInput.attackAction,
+          Boolean(localState?.isStunned),
         );
 
         // 4. Monotonic remote interpolation with time dilation
@@ -320,6 +368,9 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
 
       remoteInterpolationRef.current?.dispose();
       remoteInterpolationRef.current = null;
+
+      combatEffectsRef.current?.dispose();
+      combatEffectsRef.current = null;
 
       sceneRef.current?.dispose();
       engineRef.current?.dispose();

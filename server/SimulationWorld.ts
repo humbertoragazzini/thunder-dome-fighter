@@ -55,10 +55,8 @@ import {
 
 import {
   ATTACK_FRAME_DATA,
-  HURTBOX_ZONE_CONFIG,
   COMBO_RULES,
   type HurtboxZone,
-  type AttackFrameData,
 } from "../shared/combat/CombatConfig";
 
 import {

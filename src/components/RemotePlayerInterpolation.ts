@@ -21,12 +21,16 @@ import {
 
 import { CharacterVisualRig } from "../visuals/character/CharacterVisualRig";
 import { HERO_PALETTE, OPPONENT_PALETTE } from "../visuals/character/CharacterRigConfig";
+import type { AttackActionType } from "../../shared/player/PlayerConfig";
 
 export interface RemotePlayerSnapshot {
   serverTick: number;
   position: Vector3;
   rotation: Quaternion;
   linearVelocity: Vector3;
+  attackAction?: AttackActionType;
+  isStunned?: boolean;
+  isDead?: boolean;
 }
 
 export interface RemotePlayerVisual {
@@ -179,6 +183,9 @@ export class RemotePlayerInterpolation {
                 playerState.rw,
               ),
               linearVelocity,
+              attackAction: (playerState.lastAttackAction as AttackActionType) ?? "NONE",
+              isStunned: Boolean(playerState.isStunned),
+              isDead: Boolean(playerState.isDead),
             },
           ],
         };
@@ -203,6 +210,9 @@ export class RemotePlayerInterpolation {
           playerState.rw,
         ),
         linearVelocity,
+        attackAction: (playerState.lastAttackAction as AttackActionType) ?? "NONE",
+        isStunned: Boolean(playerState.isStunned),
+        isDead: Boolean(playerState.isDead),
       });
 
       if (visual.snapshots.length > REMOTE_MAX_SNAPSHOTS) {
@@ -336,21 +346,43 @@ export class RemotePlayerInterpolation {
         );
       }
 
-      // Drive remote procedural biped animation
+      // Drive remote procedural biped animation and combat gestures
       const isGrounded = root.position.y <= -0.80;
       const speed = Math.sqrt(
         currentVel.x * currentVel.x + currentVel.z * currentVel.z,
       );
       const isSprinting = speed > 5.0;
 
+      const latestSnapshot = visual.snapshots[count - 1];
+      const attackAction = latestSnapshot?.attackAction ?? "NONE";
+      const isStunned = Boolean(latestSnapshot?.isStunned);
+      const isDead = Boolean(latestSnapshot?.isDead);
+
+      // Handle remote ragdoll collapse on knockout
+      if (isDead) {
+        if (!visual.rig.getIsRagdoll()) {
+          visual.rig.triggerRagdoll();
+        }
+      } else if (visual.rig.getIsRagdoll()) {
+        visual.rig.resetFromRagdoll();
+      }
+
       visual.rig.update(
         deltaSeconds,
         currentVel,
         isGrounded,
         isSprinting,
-        "NONE",
+        attackAction,
+        isStunned,
       );
     }
+  }
+
+  /**
+   * Retrieves visual rig for a connected remote fighter
+   */
+  getRemoteRig(playerId: string): CharacterVisualRig | undefined {
+    return this.remotePlayers.get(playerId)?.rig;
   }
 
   // ==================================================
