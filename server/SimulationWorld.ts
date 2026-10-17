@@ -807,6 +807,7 @@ export class SimulatorWorld {
 
     entity.node.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
     entity.node.rotationQuaternion = Quaternion.FromEulerAngles(0, spawnYaw, 0);
+    entity.body.disablePreStep = false;
 
     // Reset physics linear and angular velocity in Havok
     entity.body.setLinearVelocity(Vector3.Zero());
@@ -819,6 +820,20 @@ export class SimulatorWorld {
 
     // Set 2-second invulnerability
     entity.invulnerableUntil = performance.now() + COMBAT_CONFIG.RESPAWN_INVULNERABILITY_SECONDS * 1000;
+  }
+
+  /**
+   * Authoritatively teleports an entity to specific coordinates and syncs to Havok body.
+   */
+  public teleportEntity(playerId: string, x: number, y: number, z: number, yaw = 0): void {
+    const entity = this.entities.get(playerId);
+    if (!entity) return;
+
+    entity.node.position.set(x, y, z);
+    entity.node.rotationQuaternion = Quaternion.FromEulerAngles(0, yaw, 0);
+    entity.body.disablePreStep = false;
+    entity.body.setLinearVelocity(Vector3.Zero());
+    entity.body.setAngularVelocity(Vector3.Zero());
   }
 
   public isEntityInvulnerable(playerId: string): boolean {
