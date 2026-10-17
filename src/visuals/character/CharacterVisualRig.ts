@@ -28,6 +28,7 @@ import {
   MeshBuilder,
   StandardMaterial,
   Vector3,
+  Quaternion,
   Color3,
 } from "@babylonjs/core";
 import type { AttackActionType } from "../../../shared/player/PlayerConfig";
@@ -75,6 +76,11 @@ export class CharacterVisualRig implements ICharacterVisual {
   // Character identity and animator
   readonly name: string;
   private animator: CharacterProceduralAnimator;
+
+  // Physical ragdoll collapse state on knockout
+  private isRagdoll: boolean = false;
+  private ragdollVelocity: Vector3 = Vector3.Zero();
+  private ragdollAngularVelocity: Vector3 = Vector3.Zero();
 
   constructor(
     name: string,
@@ -368,6 +374,11 @@ export class CharacterVisualRig implements ICharacterVisual {
     attackAction: AttackActionType = "NONE",
     isStunned: boolean = false,
   ): void {
+    if (this.isRagdoll) {
+      this.updateRagdollPhysics(deltaSeconds);
+      return;
+    }
+
     const pose = this.animator.update(
       deltaSeconds,
       linearVelocity,
@@ -412,6 +423,105 @@ export class CharacterVisualRig implements ICharacterVisual {
    */
   triggerFlinch(zone: "HEAD" | "TORSO" | "LIMBS" = "TORSO"): void {
     this.animator.triggerFlinch(zone);
+  }
+
+  /**
+   * Triggers physical ragdoll collapse when player HP drops to 0
+   */
+  triggerRagdoll(knockbackImpulse?: Vector3): void {
+    this.isRagdoll = true;
+    if (knockbackImpulse) {
+      this.ragdollVelocity.set(
+        knockbackImpulse.x,
+        Math.max(3.5, knockbackImpulse.y + 2.0),
+        knockbackImpulse.z,
+      );
+    } else {
+      this.ragdollVelocity.set(0, 3.5, -2.0);
+    }
+    // Violent random tumbling spin
+    this.ragdollAngularVelocity.set(
+      (Math.random() - 0.5) * 12.0,
+      (Math.random() - 0.5) * 8.0,
+      (Math.random() - 0.5) * 10.0,
+    );
+  }
+
+  /**
+   * Restores character from ragdoll upon respawn
+   */
+  resetFromRagdoll(): void {
+    this.isRagdoll = false;
+    this.ragdollVelocity.set(0, 0, 0);
+    this.ragdollAngularVelocity.set(0, 0, 0);
+    if (this.rootNode.rotationQuaternion) {
+      this.rootNode.rotationQuaternion = Quaternion.Identity();
+    }
+    this.torsoNode.rotation.set(0, 0, 0);
+    this.headJoint.rotation.set(0, 0, 0);
+    this.shoulderLeftJoint.rotation.set(0, 0, 0);
+    this.elbowLeftJoint.rotation.set(0, 0, 0);
+    this.wristLeftJoint.rotation.set(0, 0, 0);
+    this.shoulderRightJoint.rotation.set(0, 0, 0);
+    this.elbowRightJoint.rotation.set(0, 0, 0);
+    this.wristRightJoint.rotation.set(0, 0, 0);
+    this.hipLeftJoint.rotation.set(0, 0, 0);
+    this.kneeLeftJoint.rotation.set(0, 0, 0);
+    this.ankleLeftJoint.rotation.set(0, 0, 0);
+    this.hipRightJoint.rotation.set(0, 0, 0);
+    this.kneeRightJoint.rotation.set(0, 0, 0);
+    this.ankleRightJoint.rotation.set(0, 0, 0);
+  }
+
+  getIsRagdoll(): boolean {
+    return this.isRagdoll;
+  }
+
+  private updateRagdollPhysics(deltaSeconds: number): void {
+    // 1. Gravity acceleration
+    this.ragdollVelocity.y -= 19.6 * deltaSeconds;
+
+    // 2. Linear displacement
+    this.rootNode.position.addInPlace(this.ragdollVelocity.scale(deltaSeconds));
+
+    // 3. Angular tumble
+    if (!this.rootNode.rotationQuaternion) {
+      this.rootNode.rotationQuaternion = Quaternion.Identity();
+    }
+    const deltaRot = Quaternion.FromEulerAngles(
+      this.ragdollAngularVelocity.x * deltaSeconds,
+      this.ragdollAngularVelocity.y * deltaSeconds,
+      this.ragdollAngularVelocity.z * deltaSeconds,
+    );
+    this.rootNode.rotationQuaternion = deltaRot.multiply(this.rootNode.rotationQuaternion);
+
+    // 4. Floor bounce / friction
+    const floorY = -0.80;
+    const planarDistSq =
+      this.rootNode.position.x * this.rootNode.position.x +
+      this.rootNode.position.z * this.rootNode.position.z;
+    const isOverFloor = planarDistSq <= 12.0 * 12.0;
+
+    if (isOverFloor && this.rootNode.position.y <= floorY) {
+      this.rootNode.position.y = floorY;
+      if (this.ragdollVelocity.y < 0) {
+        this.ragdollVelocity.y = -this.ragdollVelocity.y * 0.25; // Restitution
+      }
+      this.ragdollVelocity.x *= 0.85; // Ground friction
+      this.ragdollVelocity.z *= 0.85;
+      this.ragdollAngularVelocity.scaleInPlace(0.80);
+    }
+
+    // 5. Limp articulated joints (flop downward with gravity)
+    this.headJoint.rotation.x = Math.PI * 0.35; // Head sags back
+    this.shoulderLeftJoint.rotation.z = -Math.PI * 0.45; // Arms splay outward
+    this.shoulderRightJoint.rotation.z = Math.PI * 0.45;
+    this.elbowLeftJoint.rotation.x = -Math.PI * 0.3;
+    this.elbowRightJoint.rotation.x = -Math.PI * 0.3;
+    this.hipLeftJoint.rotation.x = Math.PI * 0.35; // Legs bend limp
+    this.hipRightJoint.rotation.x = Math.PI * 0.25;
+    this.kneeLeftJoint.rotation.x = Math.PI * 0.4;
+    this.kneeRightJoint.rotation.x = Math.PI * 0.4;
   }
 
   /**
