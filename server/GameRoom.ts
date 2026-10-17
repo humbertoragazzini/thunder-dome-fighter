@@ -213,6 +213,7 @@ export class GameRoom extends Room {
         currentPlayer.avz = avz;
         currentPlayer.lastProcessedInputSequence = lastProcessedInputSequence;
         currentPlayer.isInvulnerable = this.simulationWorld.isEntityInvulnerable(playerId);
+        currentPlayer.isStunned = this.simulationWorld.isEntityStunned(playerId);
       },
     );
   }
@@ -585,15 +586,21 @@ export class GameRoom extends Room {
 
     if (!moveDef) return;
 
+    // Start attack timeline in SimulationWorld (validates stun and combos)
+    const attackStarted = this.simulationWorld.startEntityAttack(attackerSessionId, action);
+    if (!attackStarted) return;
+
     // Apply cooldown to attacker
     this.simulationWorld.setAttackCooldown(attackerSessionId, moveDef.cooldownSeconds);
 
     const attackerState = this.state.players.get(attackerSessionId);
+    const attackState = this.simulationWorld.getEntityAttackState(attackerSessionId);
     if (attackerState) {
       attackerState.lastAttackAction = action;
+      attackerState.comboCount = attackState?.comboCount ?? 0;
     }
 
-    // Perform spatial query cone check
+    // Perform spatial query check
     const hit = this.simulationWorld.checkMeleeHit(
       attackerSessionId,
       moveDef.range,
@@ -619,18 +626,55 @@ export class GameRoom extends Room {
     // Record damage attribution for kill credit (including future void falls)
     this.simulationWorld.setEntityDamageAttribution(victimSessionId, attackerSessionId);
 
+    // Hit Zone Details
+    const hitZone = hit.hitZone ?? "TORSO";
+    const finalDamage = hit.finalDamage ?? moveDef.damage;
+    const isCritical = hit.isCritical ?? (hitZone === "HEAD");
+
     // Impart physical knockback impulse in Havok
     this.simulationWorld.applyKnockbackImpulse(
       attackerSessionId,
       victimSessionId,
       moveDef.knockbackImpulse,
+      hit.knockbackDirection,
     );
 
+    // Apply hit stun to victim
+    const stunDurationMs =
+      hitZone === "HEAD" ? 300 : hitZone === "TORSO" ? 220 : 150;
+    this.simulationWorld.applyHitStun(victimSessionId, stunDurationMs);
+    victimState.isStunned = true;
+
     // Apply damage authoritatively
-    victimState.health = Math.max(0, victimState.health - moveDef.damage);
+    victimState.health = Math.max(0, victimState.health - finalDamage);
     console.log(
-      `💥 Hit landed! Attacker ${attackerSessionId} used ${action} on ${victimSessionId}. Damage: ${moveDef.damage}, Target HP: ${victimState.health}`,
+      `💥 Hit landed! Attacker ${attackerSessionId} used ${action} on ${victimSessionId} [Zone: ${hitZone}, Crit: ${isCritical}]. Damage: ${finalDamage}, Target HP: ${victimState.health}`,
     );
+
+    // Broadcast discrete combat hit event
+    this.broadcast("combat:damage-applied", {
+      attackerPlayerId: attackerSessionId,
+      victimPlayerId: victimSessionId,
+      weaponId: action,
+      attackAction: action,
+      hitZone,
+      comboCount: attackState?.comboCount ?? 0,
+      damage: finalDamage,
+      remainingHealth: victimState.health,
+      hitPoint: hit.contactPoint ?? {
+        x: victimState.x,
+        y: victimState.y + 0.1,
+        z: victimState.z,
+      },
+      knockbackForce: hit.knockbackDirection
+        ? {
+            x: hit.knockbackDirection.x * moveDef.knockbackImpulse,
+            y: hit.knockbackDirection.y * moveDef.knockbackImpulse,
+            z: hit.knockbackDirection.z * moveDef.knockbackImpulse,
+          }
+        : { x: 0, y: 0.5, z: 0 },
+      isCritical,
+    });
 
     // Check knockout
     if (victimState.health <= 0) {
