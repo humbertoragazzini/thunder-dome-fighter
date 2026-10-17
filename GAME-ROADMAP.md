@@ -10,12 +10,12 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 10 — Authoritative Combat Foundation (Attacks, Hitboxes, Stun & Knockback)** |
-| **Current Step** | **Step 10.1 — Define combat configuration in shared/combat/CombatConfig.ts** |
-| **Last Completed Step** | **Step 9.7 — Return to Menu button cleanly disconnects room and returns user to Main Menu** |
-| **Next Step** | **Step 10.1 — Define combat configuration in shared/combat/CombatConfig.ts** |
-| **Overall Status** | **Phase 9 (1v1 End-to-End Playable Vertical Slice) 100% complete; moving to Phase 10.** |
-| **Last Updated** | **2026-10-12** |
+| **Current Phase** | **Phase 11 — Temporary Per-Match Progression & Kill Modifiers** |
+| **Current Step** | **Step 11.1 — Create shared/domain/MatchPlayerState.ts containing temporary match attributes** |
+| **Last Completed Step** | **Step 10.7 — Implement Knockout Ragdoll Collapse** |
+| **Next Step** | **Step 11.1 — Create shared/domain/MatchPlayerState.ts containing temporary match attributes** |
+| **Overall Status** | **Phase 10 (Authoritative Combat Foundation) 100% complete; moving to Phase 11.** |
+| **Last Updated** | **2026-10-17** |
 
 ---
 
@@ -595,18 +595,18 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 10 — Authoritative Combat Foundation (Attacks, Hitboxes, Stun & Knockback)
 
-**Status:** Not Started `[ ]`  
+**Status:** Completed `[x]`  
 **Goal:** Deepen the combat mechanics with server-side hitbox/hurtbox calculations, attack combos, hit stun, and knockback.  
 **Dependencies:** Phase 9.  
 
 #### Steps
-- [ ] 10.1 Define combat configuration in `shared/combat/CombatConfig.ts` (light attack, heavy attack, damage values, active frame windows, recovery frames).
-- [ ] 10.2 Implement authoritative server hitbox generation attached to attacking character's Fist/Hand cubes (punches) and Foot cubes (kicks) during active attack frames.
-- [ ] 10.3 Implement discrete hurtbox registration across body cubes: Head cube (critical damage), Torso cube (standard body), and Limbs (glancing damage).
-- [ ] 10.4 Implement server hit resolution: check spatial overlap, verify attacker is not in stun, apply damage, compute horizontal and vertical knockback impulses.
-- [ ] 10.5 Implement temporary hit stun state (briefly locks movement and attack intentions for victim).
-- [ ] 10.6 Dispatch authoritative combat events to client: play hit reaction animation, spawn visual impact particles, play sound effects.
-- [ ] 10.7 Implement Knockout Ragdoll Collapse: When fighter HP reaches 0, activate physical Havok 6DOF constraints between the 15 articulated cubes for a satisfying physical ragdoll defeat.
+- [x] 10.1 Define combat configuration in `shared/combat/CombatConfig.ts` (light attack, heavy attack, damage values, active frame windows, recovery frames).
+- [x] 10.2 Implement authoritative server hitbox generation attached to attacking character's Fist/Hand cubes (punches) and Foot cubes (kicks) during active attack frames.
+- [x] 10.3 Implement discrete hurtbox registration across body cubes: Head cube (critical damage), Torso cube (standard body), and Limbs (glancing damage).
+- [x] 10.4 Implement server hit resolution: check spatial overlap, verify attacker is not in stun, apply damage, compute horizontal and vertical knockback impulses.
+- [x] 10.5 Implement temporary hit stun state (briefly locks movement and attack intentions for victim).
+- [x] 10.6 Dispatch authoritative combat events to client: play hit reaction animation, spawn visual impact particles, play sound effects.
+- [x] 10.7 Implement Knockout Ragdoll Collapse: When fighter HP reaches 0, activate physical Havok 6DOF constraints between the 15 articulated cubes for a satisfying physical ragdoll defeat.
 
 #### Completion Criteria
 - Hits register reliably on server regardless of client frame rate.
