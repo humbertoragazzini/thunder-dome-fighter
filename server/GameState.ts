@@ -41,6 +41,8 @@ export const PlayerState = schema(
     lastAttackAction: t.string().default("NONE"),
     isDead: t.boolean().default(false),
     isInvulnerable: t.boolean().default(false),
+    isStunned: t.boolean().default(false),
+    comboCount: t.number().default(0),
 
     x: t.number().default(0),
     y: t.number().default(0),
