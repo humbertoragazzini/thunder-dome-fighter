@@ -538,7 +538,13 @@ export class GameRoom extends Room {
     this.simulationWorld.setGameplayActive(false);
 
     // Authoritatively lock room so matchmaker immediately excludes it from new player queries
-    this.lock();
+    if ((this as any)._listing) {
+      try {
+        this.lock().catch(() => {});
+      } catch {
+        // Driver not initialized in headless unit tests
+      }
+    }
 
     if (this.countdownTimer) {
       clearInterval(this.countdownTimer);

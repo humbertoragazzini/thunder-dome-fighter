@@ -1,4 +1,4 @@
-import { defineServer, defineRoom, matchMaker } from "colyseus";
+import { defineServer, defineRoom } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./GameRoom";
 
