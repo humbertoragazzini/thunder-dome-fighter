@@ -56,6 +56,11 @@ export class CharacterProceduralAnimator {
   private attackElapsedSec = 0;
   private attackDurationSec = 0.25;
 
+  // Hit flinch / recoil tracking
+  private hitFlinchZone: "HEAD" | "TORSO" | "LIMBS" | null = null;
+  private hitFlinchTimerSec = 0;
+  private hitFlinchDurationSec = 0.25;
+
   // Jump / airborne transition tracking
   private wasGrounded = true;
   private landingTimerSec = 0;
@@ -80,6 +85,18 @@ export class CharacterProceduralAnimator {
   };
 
   /**
+   * Triggers a momentary physical flinch reaction based on struck body zone
+   */
+  triggerFlinch(zone: "HEAD" | "TORSO" | "LIMBS" = "TORSO"): void {
+    this.hitFlinchZone = zone;
+    this.hitFlinchDurationSec = zone === "HEAD" ? 0.30 : zone === "TORSO" ? 0.22 : 0.15;
+    this.hitFlinchTimerSec = this.hitFlinchDurationSec;
+    // Interruption cancels ongoing attack animation
+    this.activeAttack = "NONE";
+    this.attackElapsedSec = 0;
+  }
+
+  /**
    * Evaluates procedural animation curves for the current frame
    */
   update(
@@ -88,8 +105,23 @@ export class CharacterProceduralAnimator {
     isGrounded: boolean,
     isSprinting: boolean,
     attackAction: AttackActionType = "NONE",
+    isStunned: boolean = false,
   ): RigJointPose {
     const config = CHARACTER_PROPORTIONS.animation;
+
+    // Handle hit flinch timer
+    if (this.hitFlinchTimerSec > 0) {
+      this.hitFlinchTimerSec = Math.max(0, this.hitFlinchTimerSec - deltaSeconds);
+      if (this.hitFlinchTimerSec === 0) {
+        this.hitFlinchZone = null;
+      }
+    }
+
+    // Cancel attack if stunned
+    if (isStunned) {
+      this.activeAttack = "NONE";
+      this.attackElapsedSec = 0;
+    }
 
     // 1. Detect landing event
     if (!this.wasGrounded && isGrounded) {
@@ -101,16 +133,18 @@ export class CharacterProceduralAnimator {
       this.landingTimerSec = Math.max(0, this.landingTimerSec - deltaSeconds);
     }
 
-    // 2. Trigger new attack if requested and none currently active
-    if (attackAction !== "NONE" && this.activeAttack === "NONE") {
+    // 2. Trigger new attack if requested, not stunned, and none currently active
+    if (!isStunned && attackAction !== "NONE" && this.activeAttack === "NONE") {
       this.activeAttack = attackAction;
       this.attackElapsedSec = 0;
-      if (attackAction === "LIGHT_PUNCH") {
-        this.attackDurationSec = config.lightPunchDurationSec;
-      } else if (attackAction === "HEAVY_PUNCH") {
-        this.attackDurationSec = config.heavyPunchDurationSec;
+      if (attackAction === "LEFT_PUNCH" || attackAction === "LIGHT_PUNCH") {
+        this.attackDurationSec = 0.26;
+      } else if (attackAction === "RIGHT_PUNCH" || attackAction === "HEAVY_PUNCH") {
+        this.attackDurationSec = 0.40;
       } else if (attackAction === "KICK") {
-        this.attackDurationSec = config.kickDurationSec;
+        this.attackDurationSec = 0.55;
+      } else if (attackAction === "PUSH") {
+        this.attackDurationSec = 0.60;
       } else {
         this.attackDurationSec = 0.25;
       }
@@ -164,6 +198,11 @@ export class CharacterProceduralAnimator {
     // 7. Layer combat attack animations over the base pose
     if (this.activeAttack !== "NONE") {
       this.applyCombatOverlay(target, this.activeAttack, this.attackElapsedSec / this.attackDurationSec);
+    }
+
+    // 7.1 Layer hit flinch kinematics over pose if recovering from a strike
+    if (this.hitFlinchTimerSec > 0 && this.hitFlinchZone) {
+      this.applyFlinchOverlay(target, this.hitFlinchZone, this.hitFlinchTimerSec / this.hitFlinchDurationSec);
     }
 
     // 8. Smooth outputs towards targets (eliminates pops)
@@ -339,30 +378,32 @@ export class CharacterProceduralAnimator {
     // Bell curve punch curve: 0 -> peak at 0.4 -> 0
     const attackEnvelope = Math.sin(Math.min(1.0, progress) * Math.PI);
 
-    if (action === "LIGHT_PUNCH") {
-      // Rapid Right Jab / Lead Straight Punch
-      pose.torsoRotation.y -= attackEnvelope * 18 * DEG_TO_RAD; // Right shoulder rotates forward
-      pose.shoulderR_Rot.x = -attackEnvelope * 85 * DEG_TO_RAD; // Forward shoulder extension
-      pose.shoulderR_Rot.y = -attackEnvelope * 15 * DEG_TO_RAD;
-      pose.elbowR_Rot.x = -(1.0 - attackEnvelope) * 20 * DEG_TO_RAD; // Snaps straight forward
-      pose.wristR_Rot.x = attackEnvelope * 10 * DEG_TO_RAD;
+    if (action === "LEFT_PUNCH" || action === "LIGHT_PUNCH") {
+      // Rapid Left Jab: Left shoulder rotates forward, left arm punches, right arm guards
+      pose.torsoRotation.y += attackEnvelope * 20 * DEG_TO_RAD; // Left shoulder rotates forward
+      pose.shoulderL_Rot.x = -attackEnvelope * 88 * DEG_TO_RAD; // Forward shoulder extension
+      pose.shoulderL_Rot.y = attackEnvelope * 12 * DEG_TO_RAD;
+      pose.elbowL_Rot.x = -(1.0 - attackEnvelope) * 15 * DEG_TO_RAD; // Snaps straight
+      pose.wristL_Rot.x = attackEnvelope * 10 * DEG_TO_RAD;
 
-      // Left arm guards chest and face
-      pose.shoulderL_Rot.x = -20 * DEG_TO_RAD;
-      pose.shoulderL_Rot.z = -12 * DEG_TO_RAD;
-      pose.elbowL_Rot.x = -70 * DEG_TO_RAD; // Forearm flexed forward in front of face
-    } else if (action === "HEAVY_PUNCH") {
-      // Deep lunging cross punch
-      pose.torsoRotation.x += attackEnvelope * 15 * DEG_TO_RAD;
-      pose.torsoRotation.y -= attackEnvelope * 30 * DEG_TO_RAD; // Right shoulder rotates forward
+      // Right arm guards face
+      pose.shoulderR_Rot.x = -20 * DEG_TO_RAD;
+      pose.shoulderR_Rot.z = 12 * DEG_TO_RAD;
+      pose.elbowR_Rot.x = -70 * DEG_TO_RAD;
+    } else if (action === "RIGHT_PUNCH" || action === "HEAVY_PUNCH") {
+      // Deep lunging right cross: Torso rotates forward, right arm punches, left arm guards
+      pose.torsoRotation.x += attackEnvelope * 12 * DEG_TO_RAD;
+      pose.torsoRotation.y -= attackEnvelope * 28 * DEG_TO_RAD; // Right shoulder rotates forward
 
       pose.shoulderR_Rot.x = -attackEnvelope * 95 * DEG_TO_RAD;
       pose.shoulderR_Rot.z = attackEnvelope * 10 * DEG_TO_RAD;
       pose.elbowR_Rot.x = -(1.0 - attackEnvelope) * 15 * DEG_TO_RAD;
-      pose.wristR_Rot.z = attackEnvelope * 25 * DEG_TO_RAD;
+      pose.wristR_Rot.z = attackEnvelope * 20 * DEG_TO_RAD;
 
-      // Left arm drops back for counterbalance
-      pose.shoulderL_Rot.x = attackEnvelope * 35 * DEG_TO_RAD;
+      // Left arm guards chest
+      pose.shoulderL_Rot.x = -20 * DEG_TO_RAD;
+      pose.shoulderL_Rot.z = -12 * DEG_TO_RAD;
+      pose.elbowL_Rot.x = -65 * DEG_TO_RAD;
     } else if (action === "KICK") {
       // High front snap kick with right leg
       const kickEnvelope = Math.sin(Math.min(1.0, progress) * Math.PI);
@@ -377,6 +418,46 @@ export class CharacterProceduralAnimator {
       pose.shoulderR_Rot.z = 35 * DEG_TO_RAD;
       pose.elbowL_Rot.x = -20 * DEG_TO_RAD;
       pose.elbowR_Rot.x = -20 * DEG_TO_RAD;
+    } else if (action === "PUSH") {
+      // Two-handed explosive shove
+      pose.torsoRotation.x += attackEnvelope * 15 * DEG_TO_RAD;
+      pose.shoulderL_Rot.x = -attackEnvelope * 80 * DEG_TO_RAD;
+      pose.shoulderR_Rot.x = -attackEnvelope * 80 * DEG_TO_RAD;
+      pose.shoulderL_Rot.z = -15 * DEG_TO_RAD;
+      pose.shoulderR_Rot.z = 15 * DEG_TO_RAD;
+      pose.elbowL_Rot.x = -(1.0 - attackEnvelope) * 15 * DEG_TO_RAD;
+      pose.elbowR_Rot.x = -(1.0 - attackEnvelope) * 15 * DEG_TO_RAD;
+    }
+  }
+
+  /**
+   * Layers hit flinch / recoil kinematics over target pose based on struck body zone
+   */
+  private applyFlinchOverlay(
+    pose: RigJointPose,
+    zone: "HEAD" | "TORSO" | "LIMBS",
+    remainingProgress: number, // 1.0 -> 0.0
+  ): void {
+    const envelope = Math.sin(Math.min(1.0, Math.max(0, remainingProgress)) * Math.PI);
+
+    if (zone === "HEAD") {
+      // Violent head snap backwards and slight neck twist
+      pose.headRotation.x -= envelope * 38 * DEG_TO_RAD;
+      pose.headRotation.y += envelope * 12 * DEG_TO_RAD;
+      pose.torsoRotation.x -= envelope * 12 * DEG_TO_RAD;
+      pose.shoulderL_Rot.z -= envelope * 20 * DEG_TO_RAD;
+      pose.shoulderR_Rot.z += envelope * 20 * DEG_TO_RAD;
+    } else if (zone === "TORSO") {
+      // Core compression backwards
+      pose.torsoPositionOffset.z -= envelope * 0.08;
+      pose.torsoRotation.x -= envelope * 20 * DEG_TO_RAD;
+      pose.elbowL_Rot.x -= envelope * 30 * DEG_TO_RAD;
+      pose.elbowR_Rot.x -= envelope * 30 * DEG_TO_RAD;
+    } else if (zone === "LIMBS") {
+      // Lateral limb recoil
+      pose.shoulderL_Rot.x += envelope * 25 * DEG_TO_RAD;
+      pose.shoulderR_Rot.x -= envelope * 25 * DEG_TO_RAD;
+      pose.hipL_Rot.x += envelope * 15 * DEG_TO_RAD;
     }
   }
 

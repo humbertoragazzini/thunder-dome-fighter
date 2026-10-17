@@ -366,6 +366,7 @@ export class CharacterVisualRig implements ICharacterVisual {
     isGrounded: boolean,
     isSprinting: boolean,
     attackAction: AttackActionType = "NONE",
+    isStunned: boolean = false,
   ): void {
     const pose = this.animator.update(
       deltaSeconds,
@@ -373,6 +374,7 @@ export class CharacterVisualRig implements ICharacterVisual {
       isGrounded,
       isSprinting,
       attackAction,
+      isStunned,
     );
 
     // Apply Torso offset & rotation
@@ -403,6 +405,13 @@ export class CharacterVisualRig implements ICharacterVisual {
     this.hipRightJoint.rotation.copyFrom(pose.hipR_Rot);
     this.kneeRightJoint.rotation.copyFrom(pose.kneeR_Rot);
     this.ankleRightJoint.rotation.copyFrom(pose.ankleR_Rot);
+  }
+
+  /**
+   * Triggers a momentary flinch animation reaction when taking a hit
+   */
+  triggerFlinch(zone: "HEAD" | "TORSO" | "LIMBS" = "TORSO"): void {
+    this.animator.triggerFlinch(zone);
   }
 
   /**

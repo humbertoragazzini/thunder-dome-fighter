@@ -91,7 +91,13 @@ export interface ICharacterVisual {
     isGrounded: boolean,
     isSprinting: boolean,
     attackAction?: AttackActionType,
+    isStunned?: boolean,
   ): void;
+
+  /**
+   * Trigger hit flinch recoil animation
+   */
+  triggerFlinch?(zone?: "HEAD" | "TORSO" | "LIMBS"): void;
 
   /**
    * Apply a stylized material color palette
