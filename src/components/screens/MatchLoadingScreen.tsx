@@ -18,7 +18,7 @@
 // ==================================================
 
 import { Client } from "@colyseus/sdk";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GiLightningTrio } from "react-icons/gi";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuthStore } from "../../store/useAuthStore";
@@ -57,24 +57,31 @@ export function MatchLoadingScreen() {
     return () => clearInterval(interval);
   }, []);
 
+  const connectionLockRef = useRef(false);
+  const isMountedRef = useRef(true);
+
   // Connect to Colyseus on mount if not already connected
   useEffect(() => {
-    let isCancelled = false;
+    isMountedRef.current = true;
+
+    // Guard against duplicate / concurrent connection attempts (e.g. React StrictMode or rapid double-clicks)
+    if (connectionLockRef.current || useAppStore.getState().room?.roomId) {
+      if (useAppStore.getState().room?.roomId) {
+        setLoadingStep("Synchronizing Havok physics world...");
+      }
+      return;
+    }
+
+    if (!token) {
+      openModal("ERROR", "No active session token found. Please log in again.");
+      return;
+    }
+
+    connectionLockRef.current = true;
+    const colyseusUrl = getColyseusUrl();
+    setLoadingStep(`Connecting to Thunder Dome at ${colyseusUrl}...`);
 
     async function joinArena() {
-      if (room?.roomId) {
-        setLoadingStep("Synchronizing Havok physics world...");
-        return;
-      }
-
-      if (!token) {
-        openModal("ERROR", "No active session token found. Please log in again.");
-        return;
-      }
-
-      const colyseusUrl = getColyseusUrl();
-      setLoadingStep(`Connecting to Thunder Dome at ${colyseusUrl}...`);
-
       try {
         const client = new Client(colyseusUrl);
         const selectedModeId = useNavigationStore.getState().selectedMatchMode ?? "1v1";
@@ -84,7 +91,8 @@ export function MatchLoadingScreen() {
           levelId: "thunder-dome-alpha",
         });
 
-        if (isCancelled) {
+        // If the user navigated away before connection completed, leave cleanly
+        if (!isMountedRef.current) {
           await joinedRoom.leave();
           return;
         }
@@ -92,7 +100,8 @@ export function MatchLoadingScreen() {
         setRoom(joinedRoom);
         setLoadingStep("Authoritative handshake accepted. Launching viewport...");
       } catch (err: unknown) {
-        if (isCancelled) return;
+        connectionLockRef.current = false;
+        if (!isMountedRef.current) return;
         const msg =
           err instanceof Error
             ? err.message
@@ -104,9 +113,9 @@ export function MatchLoadingScreen() {
     joinArena();
 
     return () => {
-      isCancelled = true;
+      isMountedRef.current = false;
     };
-  }, [token, room, setRoom, openModal]);
+  }, [token, setRoom, openModal]);
 
   // Transition to IN_GAME once room exists and 3D scene is ready
   useEffect(() => {
