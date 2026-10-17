@@ -230,7 +230,7 @@ export class GameRoom extends Room {
     this.level = LEVELS[requestedLevelId];
 
     this.maxClients = this.gameMode.maxPlayers;
-    this.autoDispose = false;
+    this.autoDispose = true;
     this.patchRate = PHYSICS_DT_MS;
 
     this.state.modeId = this.gameMode.id;
@@ -242,12 +242,12 @@ export class GameRoom extends Room {
     this.state.winningPlayerId = "";
 
     if ((this as any)._listing) {
-      this.metadata = {
+      this.setMetadata({
         serverName: options.serverName ?? "Thunder Dome Arena",
         serverSlot: options.serverSlot ?? 1,
         modeId: this.gameMode.id,
         levelId: this.level.id,
-      };
+      });
     }
 
     this.simulationWorld = new SimulatorWorld(this.level);
@@ -536,6 +536,9 @@ export class GameRoom extends Room {
     console.log(`🏁 MATCH ENDED [Reason: ${reason}]. Winner: ${winnerPlayerId ?? "Draw"}`);
     this.state.matchStatus = "MATCH_END";
     this.simulationWorld.setGameplayActive(false);
+
+    // Authoritatively lock room so matchmaker immediately excludes it from new player queries
+    this.lock();
 
     if (this.countdownTimer) {
       clearInterval(this.countdownTimer);
