@@ -53,6 +53,9 @@ export interface GameMode {
 
   /** Whether friendly players can damage each other */
   friendlyFire: boolean;
+
+  /** Whether kill streak physical bonuses (+speed, +force, +jump) are active in this mode */
+  enableKillStreakModifiers: boolean;
 }
 
 // ==================================================
@@ -71,6 +74,7 @@ export const GAME_MODE_1V1: GameMode = {
   timeLimitSeconds: 180, // 3 minutes
   respawnDelaySeconds: 3,
   friendlyFire: false,
+  enableKillStreakModifiers: false,
 };
 
 export const GAME_MODE_3V3: GameMode = {
@@ -85,6 +89,7 @@ export const GAME_MODE_3V3: GameMode = {
   timeLimitSeconds: 300, // 5 minutes
   respawnDelaySeconds: 4,
   friendlyFire: false,
+  enableKillStreakModifiers: false,
 };
 
 export const GAME_MODE_4V4: GameMode = {
@@ -99,6 +104,7 @@ export const GAME_MODE_4V4: GameMode = {
   timeLimitSeconds: 360, // 6 minutes
   respawnDelaySeconds: 5,
   friendlyFire: false,
+  enableKillStreakModifiers: false,
 };
 
 export const GAME_MODE_FFA: GameMode = {
@@ -113,6 +119,7 @@ export const GAME_MODE_FFA: GameMode = {
   timeLimitSeconds: 600, // 10 minutes
   respawnDelaySeconds: 3,
   friendlyFire: true,
+  enableKillStreakModifiers: true,
 };
 
 /**
