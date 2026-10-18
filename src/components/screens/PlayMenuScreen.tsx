@@ -16,7 +16,7 @@
 
 import { FaArrowLeft } from "react-icons/fa6";
 import { GiBangingGavel, GiCarnivalMask, GiCrossedPistols, GiFist } from "react-icons/gi";
-import { MatchMode, useNavigationStore } from "../../store/useNavigationStore";
+import { type MatchMode, useNavigationStore } from "../../store/useNavigationStore";
 import { Button } from "../ui/atoms/Button";
 import { Heading } from "../ui/atoms/Heading";
 import { MenuCard } from "../ui/molecules/MenuCard";
