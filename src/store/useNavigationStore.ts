@@ -32,7 +32,7 @@ export type AppScreen =
 
 export type ModalType = "PROFILE" | "SETTINGS" | "ERROR" | null;
 
-export type MatchMode = "1v1" | "3v3" | "4v4" | "ffa20";
+export type MatchMode = "1v1" | "3v3" | "4v4" | "ffa";
 
 interface NavigationState {
   currentScreen: AppScreen;

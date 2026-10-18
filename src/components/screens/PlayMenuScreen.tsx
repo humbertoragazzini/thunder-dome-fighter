@@ -16,7 +16,7 @@
 
 import { FaArrowLeft } from "react-icons/fa6";
 import { GiBangingGavel, GiCarnivalMask, GiCrossedPistols, GiFist } from "react-icons/gi";
-import { useNavigationStore } from "../../store/useNavigationStore";
+import { MatchMode, useNavigationStore } from "../../store/useNavigationStore";
 import { Button } from "../ui/atoms/Button";
 import { Heading } from "../ui/atoms/Heading";
 import { MenuCard } from "../ui/molecules/MenuCard";
@@ -27,7 +27,7 @@ export function PlayMenuScreen() {
   const goBack = useNavigationStore((state) => state.goBack);
   const setSelectedMatchMode = useNavigationStore((state) => state.setSelectedMatchMode);
 
-  const handleSelectMode = (mode: "1v1") => {
+  const handleSelectMode = (mode: MatchMode) => {
     setSelectedMatchMode(mode);
     navigateTo("MATCH_LOADING");
   };
@@ -100,12 +100,13 @@ export function PlayMenuScreen() {
 
           <MenuCard
             title="20-Player Free-For-All"
-            description="Maximum chaos stadium brawl. Up to 20 fighters in an open arena. Last fighter standing wins."
-            icon={<GiCarnivalMask className="text-red-400" />}
-            badgeText="PHASE 18"
-            badgeVariant="red"
+            description="Maximum chaos stadium brawl. Up to 20 fighters in an open arena. Consecutive kills grant temporary physical streak bonuses!"
+            icon={<GiCarnivalMask className="text-amber-400" />}
+            badgeText="ACTIVE"
+            badgeVariant="emerald"
+            badgePulse
             accentColor="fire"
-            disabled
+            onClick={() => handleSelectMode("ffa")}
           />
         </div>
       </div>
