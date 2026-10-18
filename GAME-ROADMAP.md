@@ -10,12 +10,12 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 11 — Temporary Per-Match Progression & Kill Modifiers** |
-| **Current Step** | **Step 11.1 — Create shared/domain/MatchPlayerState.ts containing temporary match attributes** |
-| **Last Completed Step** | **Step 10.7 — Implement Knockout Ragdoll Collapse** |
-| **Next Step** | **Step 11.1 — Create shared/domain/MatchPlayerState.ts containing temporary match attributes** |
-| **Overall Status** | **Phase 10 (Authoritative Combat Foundation) 100% complete; moving to Phase 11.** |
-| **Last Updated** | **2026-10-17** |
+| **Current Phase** | **Phase 12 — Generic GameItem & Weapon System** |
+| **Current Step** | **Step 12.1 — Define generic GameItem schema in shared/domain/GameItem.ts** |
+| **Last Completed Step** | **Step 11.6 — Invariant verification: Ensure modifiers are strictly purged on room teardown and never written to permanent player database profile** |
+| **Next Step** | **Step 12.1 — Define generic GameItem schema in shared/domain/GameItem.ts** |
+| **Overall Status** | **Phase 11 (Temporary Per-Match Progression & Kill Modifiers) 100% complete; moving to Phase 12.** |
+| **Last Updated** | **2026-10-18** |
 
 ---
 
@@ -621,21 +621,21 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 11 — Temporary Per-Match Progression & Kill Modifiers
 
-**Status:** Not Started `[ ]`  
+**Status:** Complete `[x]`  
 **Goal:** Implement match-only kill-streak bonuses (speed, force, jump) that enhance the player during that match and vanish upon completion.  
 **Dependencies:** Phase 10.  
 
 #### Steps
-- [ ] 11.1 Create `shared/domain/MatchPlayerState.ts` containing temporary match attributes (`speedModifier`, `forceModifier`, `jumpModifier`, `currentKillStreak`).
-- [ ] 11.2 Implement server modifier progression logic:
+- [x] 11.1 Create `shared/domain/MatchPlayerState.ts` containing temporary match attributes (`speedModifier`, `forceModifier`, `jumpModifier`, `currentKillStreak`).
+- [x] 11.2 Implement server modifier progression logic:
   - Base: 1.0x speed, 1.0x force, 1.0x jump.
   - Kill 1: +5% speed, +3% force.
   - Kill 2: +10% speed, +6% force, +5% jump.
   - Subsequent kills scale modifiers up to configured ceiling (e.g., max 1.35x).
-- [ ] 11.3 Apply live modifiers directly into `SimulationWorld` physics force calculations for that player entity.
-- [ ] 11.4 Synchronize temporary modifiers in Colyseus `PlayerState` schema.
-- [ ] 11.5 Build `MatchPowerHUD` component displaying active temporary bonuses and kill streak callout (e.g., `+SPEED`, `+FORCE`).
-- [ ] 11.6 Invariant verification: Ensure modifiers are strictly purged on room teardown and never written to permanent player database profile.
+- [x] 11.3 Apply live modifiers directly into `SimulationWorld` physics force calculations for that player entity.
+- [x] 11.4 Synchronize temporary modifiers in Colyseus `PlayerState` schema.
+- [x] 11.5 Build `MatchPowerHUD` component displaying active temporary bonuses and kill streak callout (e.g., `+SPEED`, `+FORCE`).
+- [x] 11.6 Invariant verification: Ensure modifiers are strictly purged on room teardown and never written to permanent player database profile.
 
 #### Completion Criteria
 - Earning kills noticeably enhances character physical attributes during the active match.
