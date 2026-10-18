@@ -44,6 +44,12 @@ export const PlayerState = schema(
     isStunned: t.boolean().default(false),
     comboCount: t.number().default(0),
 
+    // Ephemeral Per-Match Kill Streak & Physical Modifiers (Phase 11)
+    killStreak: t.number().default(0),
+    speedModifier: t.number().default(1.0),
+    forceModifier: t.number().default(1.0),
+    jumpModifier: t.number().default(1.0),
+
     x: t.number().default(0),
     y: t.number().default(0),
     z: t.number().default(0),

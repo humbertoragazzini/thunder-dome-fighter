@@ -117,6 +117,8 @@ export function calculateBrakeForce(
  * @param currentLinearVelocity Current linear velocity of the physics body
  * @param isGrounded Whether the character is currently touching a walkable surface
  * @param result Optional target Vector3 to store the result
+ * @param speedMultiplier Ephemeral match speed multiplier (default 1.0)
+ * @param forceMultiplier Ephemeral match force multiplier (default 1.0)
  */
 export function calculateHumanoidMovementForce(
   moveX: number,
@@ -126,6 +128,8 @@ export function calculateHumanoidMovementForce(
   currentLinearVelocity: Vector3,
   isGrounded: boolean,
   result?: Vector3,
+  speedMultiplier: number = 1.0,
+  forceMultiplier: number = 1.0,
 ): Vector3 {
   const out = result ?? new Vector3();
 
@@ -142,7 +146,8 @@ export function calculateHumanoidMovementForce(
 
   const speed =
     CHARACTER_FORCES.BASE_SPEED *
-    (sprint ? CHARACTER_FORCES.SPRINT_MULTIPLIER : 1.0);
+    (sprint ? CHARACTER_FORCES.SPRINT_MULTIPLIER : 1.0) *
+    speedMultiplier;
 
   // Rotate local input vector into world space based on lookYaw
   const sinYaw = Math.sin(lookYaw);
@@ -152,7 +157,8 @@ export function calculateHumanoidMovementForce(
 
   // Proportional acceleration force toward target velocity: F = (v_target - v_current) * (m / dt)
   const controlFactor = isGrounded ? 1.0 : CHARACTER_FORCES.AIR_CONTROL_FACTOR;
-  const maxForce = CHARACTER_FORCES.MAX_ACCELERATION_FORCE * controlFactor;
+  const maxForce =
+    CHARACTER_FORCES.MAX_ACCELERATION_FORCE * controlFactor * forceMultiplier;
 
   const rawForceX =
     (targetVelX - currentLinearVelocity.x) *
@@ -182,15 +188,17 @@ export function calculateHumanoidMovementForce(
  * @param isGrounded Whether the character is currently in contact with the ground
  * @param jumpRequested Whether the jump action is triggered this frame
  * @param result Optional target Vector3 to store the result
+ * @param jumpMultiplier Ephemeral match jump multiplier (default 1.0)
  */
 export function calculateJumpImpulse(
   isGrounded: boolean,
   jumpRequested: boolean,
   result?: Vector3,
+  jumpMultiplier: number = 1.0,
 ): Vector3 {
   const out = result ?? new Vector3();
   if (isGrounded && jumpRequested) {
-    out.set(0, CHARACTER_FORCES.JUMP_IMPULSE, 0);
+    out.set(0, CHARACTER_FORCES.JUMP_IMPULSE * jumpMultiplier, 0);
   } else {
     out.set(0, 0, 0);
   }
