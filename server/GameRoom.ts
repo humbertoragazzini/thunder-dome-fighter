@@ -34,6 +34,10 @@ import { resolveSpawnPoint } from "../shared/levels/SpawnPointResolver";
 import { GAME_MODES, type GameMode, type GameModeId } from "../shared/domain/GameMode";
 import { LEVELS, type LevelDefinition } from "../shared/domain/Level";
 import { assignPlayerTeam } from "../shared/match/TeamAssignment";
+import {
+  computeKillStreakModifiers,
+  DEFAULT_MATCH_PLAYER_MODIFIERS,
+} from "../shared/domain/MatchPlayerState";
 
 export interface GameRoomOptions {
   serverName?: string;
@@ -396,6 +400,10 @@ export class GameRoom extends Room {
     playerState.health = 100;
     playerState.maxHealth = 100;
     playerState.score = 0;
+    playerState.killStreak = 0;
+    playerState.speedModifier = 1.0;
+    playerState.forceModifier = 1.0;
+    playerState.jumpModifier = 1.0;
     playerState.lastAttackAction = "NONE";
     playerState.isDead = false;
     playerState.isInvulnerable = false;
@@ -717,6 +725,13 @@ export class GameRoom extends Room {
     victimState.isDead = true;
     victimState.health = 0;
 
+    // Reset victim's kill streak and physical modifiers to baseline 1.0x (Phase 11)
+    victimState.killStreak = 0;
+    victimState.speedModifier = 1.0;
+    victimState.forceModifier = 1.0;
+    victimState.jumpModifier = 1.0;
+    this.simulationWorld.setEntityModifiers(victimSessionId, DEFAULT_MATCH_PLAYER_MODIFIERS);
+
     // Determine killer
     let killerSessionId = directAttackerId;
     if (!killerSessionId) {
@@ -735,12 +750,38 @@ export class GameRoom extends Room {
       const killerState = this.state.players.get(killerSessionId);
       if (killerState) {
         killerState.score++;
+        killerState.killStreak++;
+
+        // Mode-Gated Kill Streak Modifiers (Phase 11): Active only in FFA, strictly disabled in 1v1 / team
+        const isModifierEnabled = Boolean(this.gameMode?.enableKillStreakModifiers);
+        const modifiers = computeKillStreakModifiers(killerState.killStreak, isModifierEnabled);
+
+        killerState.speedModifier = modifiers.speedModifier;
+        killerState.forceModifier = modifiers.forceModifier;
+        killerState.jumpModifier = modifiers.jumpModifier;
+        this.simulationWorld.setEntityModifiers(killerSessionId, modifiers);
+
         console.log(
-          `🏆 Kill awarded to ${killerSessionId} (cause: ${cause})! Score: ${killerState.score}/${COMBAT_CONFIG.MATCH_WIN_KILLS}`,
+          `🏆 Kill awarded to ${killerSessionId} (cause: ${cause})! Score: ${killerState.score}/${this.gameMode?.scoreLimit ?? COMBAT_CONFIG.MATCH_WIN_KILLS}, Streak: ${killerState.killStreak} [Speed: ${modifiers.speedModifier}x, Force: ${modifiers.forceModifier}x, Jump: ${modifiers.jumpModifier}x, ModeEnabled: ${isModifierEnabled}]`,
         );
 
-        // Check match victory condition (first to 3 kills)
-        if (killerState.score >= COMBAT_CONFIG.MATCH_WIN_KILLS) {
+        if (isModifierEnabled && killerState.killStreak >= 1) {
+          try {
+            this.broadcast("match:kill-streak", {
+              playerId: killerSessionId,
+              killStreak: killerState.killStreak,
+              speedModifier: modifiers.speedModifier,
+              forceModifier: modifiers.forceModifier,
+              jumpModifier: modifiers.jumpModifier,
+            });
+          } catch {
+            // In headless test environments with mock clients, broadcast transport may not be attached
+          }
+        }
+
+        // Check match victory condition based on gameMode.scoreLimit
+        const scoreLimit = this.gameMode?.scoreLimit ?? COMBAT_CONFIG.MATCH_WIN_KILLS;
+        if (killerState.score >= scoreLimit) {
           this.endMatch("SCORE_LIMIT", killerSessionId, killerState.teamIndex);
           return;
         }
@@ -778,6 +819,10 @@ export class GameRoom extends Room {
     playerState.health = 100;
     playerState.isDead = false;
     playerState.isInvulnerable = true;
+    playerState.killStreak = 0;
+    playerState.speedModifier = 1.0;
+    playerState.forceModifier = 1.0;
+    playerState.jumpModifier = 1.0;
     playerState.x = spawnPoint.position.x;
     playerState.y = spawnPoint.position.y;
     playerState.z = spawnPoint.position.z;

@@ -82,6 +82,11 @@ import {
   type SpawnPoint,
 } from "../shared/domain/Level";
 
+import {
+  type MatchPlayerModifiers,
+  DEFAULT_MATCH_PLAYER_MODIFIERS,
+} from "../shared/domain/MatchPlayerState";
+
 // ==================================================
 // ENTITIES CONFIGURATION
 // ==================================================
@@ -97,6 +102,12 @@ export interface SimulationEntity {
   leftLegGrounded: boolean;
   rightLegGrounded: boolean;
   jumpConsumed: boolean;
+
+  // Ephemeral per-match kill streak & physical modifiers (Phase 11)
+  killStreak: number;
+  speedModifier: number;
+  forceModifier: number;
+  jumpModifier: number;
 
   // Combat runtime state
   lastAttackerSessionId?: string;
@@ -331,6 +342,10 @@ export class SimulatorWorld {
       attackStartedAt: 0,
       hasHitConnectedInActiveWindow: false,
       comboCount: 0,
+      killStreak: 0,
+      speedModifier: 1.0,
+      forceModifier: 1.0,
+      jumpModifier: 1.0,
     };
 
     this.entities.set(playerId, newPlayer);
@@ -586,6 +601,9 @@ export class SimulatorWorld {
           charInput.sprint,
           currentLinearVelocity,
           entity.isGrounded,
+          undefined,
+          entity.speedModifier,
+          entity.forceModifier,
         );
         entity.body.applyForce(movementForce, entity.node.position);
 
@@ -602,7 +620,12 @@ export class SimulatorWorld {
         // 3. Discrete Jump Impulse when Grounded
         if (canJump) {
           if (!entity.jumpConsumed && entity.isGrounded) {
-            const jumpImpulse = calculateJumpImpulse(true, true);
+            const jumpImpulse = calculateJumpImpulse(
+              true,
+              true,
+              undefined,
+              entity.jumpModifier,
+            );
             entity.body.applyImpulse(jumpImpulse, entity.node.position);
             entity.jumpConsumed = true;
           }
@@ -1024,11 +1047,15 @@ export class SimulatorWorld {
       }
     }
 
+    // Scale knockback impulse by attacker's ephemeral force modifier
+    const attackerForceMod = attacker?.forceModifier ?? 1.0;
+    const finalImpulse = impulseMagnitude * attackerForceMod;
+
     // Apply linear impulse to Havok body
     const impulseVec = new Vector3(
-      dirX * impulseMagnitude * PLAYER_MASS,
+      dirX * finalImpulse * PLAYER_MASS,
       dirY * PLAYER_MASS,
-      dirZ * impulseMagnitude * PLAYER_MASS,
+      dirZ * finalImpulse * PLAYER_MASS,
     );
     target.body.applyImpulse(impulseVec, target.node.position);
   }
@@ -1069,6 +1096,12 @@ export class SimulatorWorld {
     entity.body.setLinearVelocity(Vector3.Zero());
     entity.body.setAngularVelocity(Vector3.Zero());
 
+    // Reset ephemeral match modifiers on defeat/respawn
+    entity.killStreak = 0;
+    entity.speedModifier = 1.0;
+    entity.forceModifier = 1.0;
+    entity.jumpModifier = 1.0;
+
     // Clear jump state and reset current input
     entity.jumpConsumed = false;
     entity.pendingInputCommands = [];
@@ -1076,6 +1109,44 @@ export class SimulatorWorld {
 
     // Set 2-second invulnerability
     entity.invulnerableUntil = performance.now() + COMBAT_CONFIG.RESPAWN_INVULNERABILITY_SECONDS * 1000;
+  }
+
+  /**
+   * Sets ephemeral match physical modifiers for an entity (Phase 11).
+   */
+  public setEntityModifiers(
+    playerId: string,
+    modifiers: Partial<MatchPlayerModifiers>,
+  ): void {
+    const entity = this.entities.get(playerId);
+    if (!entity) return;
+
+    if (typeof modifiers.currentKillStreak === "number") {
+      entity.killStreak = modifiers.currentKillStreak;
+    }
+    if (typeof modifiers.speedModifier === "number") {
+      entity.speedModifier = modifiers.speedModifier;
+    }
+    if (typeof modifiers.forceModifier === "number") {
+      entity.forceModifier = modifiers.forceModifier;
+    }
+    if (typeof modifiers.jumpModifier === "number") {
+      entity.jumpModifier = modifiers.jumpModifier;
+    }
+  }
+
+  /**
+   * Gets current ephemeral match physical modifiers for an entity.
+   */
+  public getEntityModifiers(playerId: string): MatchPlayerModifiers {
+    const entity = this.entities.get(playerId);
+    if (!entity) return { ...DEFAULT_MATCH_PLAYER_MODIFIERS };
+    return {
+      currentKillStreak: entity.killStreak,
+      speedModifier: entity.speedModifier,
+      forceModifier: entity.forceModifier,
+      jumpModifier: entity.jumpModifier,
+    };
   }
 
   /**
