@@ -70,6 +70,10 @@ export interface AuthoritativePlayerState {
   avy: number;
   avz: number;
   lastProcessedInputSequence: number;
+  killStreak?: number;
+  speedModifier?: number;
+  forceModifier?: number;
+  jumpModifier?: number;
 }
 
 // ==================================================
@@ -126,6 +130,11 @@ export class LocalPlayerPrediction {
   // Only actual reconciliation discrepancies are offset and decayed over time.
   private visualPositionError = new Vector3(0, 0, 0);
   private visualRotationError = Quaternion.Identity();
+
+  // Ephemeral match physical multipliers (Phase 11)
+  private speedModifier = 1.0;
+  private forceModifier = 1.0;
+  private jumpModifier = 1.0;
 
   constructor(
     scene: Scene,
@@ -309,6 +318,9 @@ export class LocalPlayerPrediction {
         charCmd.sprint,
         currentLinearVelocity,
         this.isGrounded,
+        undefined,
+        this.speedModifier,
+        this.forceModifier,
       );
       this.predictionBody.applyForce(
         movementForce,
@@ -328,7 +340,12 @@ export class LocalPlayerPrediction {
       // 3. Jump Impulse
       if (charCmd.jump) {
         if (!this.jumpConsumed && this.isGrounded) {
-          const jumpImpulse = calculateJumpImpulse(true, true);
+          const jumpImpulse = calculateJumpImpulse(
+            true,
+            true,
+            undefined,
+            this.jumpModifier,
+          );
           this.predictionBody.applyImpulse(
             jumpImpulse,
             this.predictionNode.position,
@@ -520,6 +537,17 @@ export class LocalPlayerPrediction {
       return;
     }
     this.lastReconciledServerTick = serverTick;
+
+    // Synchronize authoritative physical multipliers (Phase 11)
+    if (typeof playerState.speedModifier === "number") {
+      this.speedModifier = playerState.speedModifier;
+    }
+    if (typeof playerState.forceModifier === "number") {
+      this.forceModifier = playerState.forceModifier;
+    }
+    if (typeof playerState.jumpModifier === "number") {
+      this.jumpModifier = playerState.jumpModifier;
+    }
 
     const authoritativeState = {
       position: new Vector3(playerState.x, playerState.y, playerState.z),
