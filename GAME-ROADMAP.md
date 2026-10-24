@@ -10,11 +10,11 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 16 — 3v3 Team Mode Support & Atomic Party Matchmaking** |
-| **Current Step** | **Step 16.1 — Configure GameMode_3v3 (2 teams, 3 players each, team score limit 10 kills)** |
-| **Last Completed Step** | **Phase 15 — Quick Play & Matchmaking Queue System (15.1 - 15.7)** |
-| **Next Step** | **Step 16.1 — Configure GameMode_3v3 (2 teams, 3 players each, team score limit 10 kills)** |
-| **Overall Status** | **Phase 15 (Quick Play & Matchmaking Queue System) 100% complete; moving to Phase 16.** |
+| **Current Phase** | **Phase 17 — 4v4 Team Mode Support** |
+| **Current Step** | **Step 17.1 — Configure GameMode_4v4 (2 teams, 4 players each, team score limit 15 kills)** |
+| **Last Completed Step** | **Phase 16 — 3v3 Team Mode Support & Atomic Party Matchmaking (16.1 - 16.7)** |
+| **Next Step** | **Step 17.1 — Configure GameMode_4v4 (2 teams, 4 players each, team score limit 15 kills)** |
+| **Overall Status** | **Phase 16 (3v3 Team Mode Support & Atomic Party Matchmaking) 100% complete; moving to Phase 17.** |
 | **Last Updated** | **2026-10-24** |
 
 ---
@@ -758,32 +758,35 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 ---
 
 ### Phase 16 — 3v3 Team Mode Support & Atomic Party Matchmaking
-
-**Status:** Not Started `[ ]`  
-**Goal:** Expand matchmaking and room architecture to support 6-player team matches (Team Alpha vs Team Beta) with **strict party cohesion** and solo backfilling.  
-**Dependencies:** Phase 15.  
-
-#### Steps
-- [ ] 16.1 Configure `GameMode_3v3` (2 teams, 3 players each, team score limit 10 kills).
-- [ ] 16.2 Implement **Bin-Packing Team Backfilling Matchmaker**:
-  - **Party Cohesion Invariant**: Members of the same party are *strictly locked* to the same team and **must never be separated**.
-  - Matchmaker fills each 3-player team bin using valid partition combinations:
-    - `[3]` (Full 3-player party)
-    - `[2 + 1]` (2 friends party + 1 backfilled solo player)
-    - `[1 + 1 + 1]` (3 solo random players)
-  - Evaluates both teams simultaneously (e.g., Party of 2 + Solo vs Party of 3, or Party of 2 + Solo vs Party of 2 + Solo).
-- [ ] 16.3 Pass pre-assigned `teamId` (`alpha` or `beta`) in Colyseus seat reservation tokens so players connect directly to their designated team.
-- [ ] 16.4 Allocate team-specific spawn points in `LevelDefinition` so teammates spawn together.
-- [ ] 16.5 Update visual shaders/materials: tint character outline, nameplate, or armor accents with team colors.
-- [ ] 16.6 Update in-game HUD to display Team Scoreboard (Alpha Score vs Beta Score) and friendly vs enemy health bars.
-- [ ] 16.7 Prevent friendly fire in server combat collision checks.
-
-#### Completion Criteria
-- 6 players connect, respect party groupings (friends stay on the same team), backfill missing team slots with solos, spawn at opposing sides, fight without friendly fire, and win as a team.
-
-#### Verification
-- Automated matchmaker test: Queue a party of 2 friends and 4 solo players for 3v3; assert friends are placed on the exact same team with 1 solo teammate, opposing team has 3 solos.
-- Headless test with 6 mock clients verifying team assignment, score accumulation, and team victory condition.
+ 
+-**Status:** Completed `[x]`  
++**Goal:** Expand matchmaking and room architecture to support 6-player team matches (Team Alpha vs Team Beta) with **strict party cohesion** and solo backfilling.  
++**Dependencies:** Phase 15.  
+ 
+ #### Steps
+ - [x] 16.1 Configure `GameMode_3v3` (2 teams, 3 players each, team score limit 10 kills).
+ - [x] 16.2 Implement **Bin-Packing Team Backfilling Matchmaker**:
+   - **Party Cohesion Invariant**: Members of the same party are *strictly locked* to the same team and **must never be separated**.
+   - Matchmaker fills each 3-player team bin using valid partition combinations:
+     - `[3]` (Full 3-player party)
+     - `[2 + 1]` (2 friends party + 1 backfilled solo player)
+     - `[1 + 1 + 1]` (3 solo random players)
+   - Evaluates both teams simultaneously (e.g., Party of 2 + Solo vs Party of 3, or Party of 2 + Solo vs Party of 2 + Solo).
+ - [x] 16.3 Pass pre-assigned `teamId` (`alpha` or `beta`) in Colyseus seat reservation tokens so players connect directly to their designated team.
+ - [x] 16.4 Allocate team-specific spawn points in `LevelDefinition` so teammates spawn together.
+ - [x] 16.5 Update visual shaders/materials: tint character outline, nameplate, or armor accents with team colors.
+ - [x] 16.6 Update in-game HUD to display Team Scoreboard (Alpha Score vs Beta Score) and friendly vs enemy health bars.
+ - [x] 16.7 Prevent friendly fire in server combat collision checks.
+ 
+ #### Completion Criteria
+ - 6 players connect, respect party groupings (friends stay on the same team), backfill missing team slots with solos, spawn at opposing sides, fight without friendly fire, and win as a team.
+ 
+ #### Verification
+ - Automated matchmaker test: Queue a party of 2 friends and 4 solo players for 3v3; assert friends are placed on the exact same team with 1 solo teammate, opposing team has 3 solos.
+ - Headless test with 6 mock clients verifying team assignment, score accumulation, and team victory condition.
+ - Phase 16 verification suite (`scratch/test_phase16_3v3_team_combat.ts`): All 6 tests passed (bin-packing solver, cohesion protection, multi-client reservation routing, opposing spawns, friendly fire immunity, and 10-kill score limit victory).
+ - Regression test suites (Phase 15, Phase 14, Phase 13, Phase 12): All 29 tests passed cleanly with zero regressions.
+ - TypeScript build (`tsc -b`), linter (`npm run lint`), and production bundle (`npm run build`): 100% clean with zero errors.
 
 ---
 
