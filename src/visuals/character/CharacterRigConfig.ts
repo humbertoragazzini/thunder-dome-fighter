@@ -165,3 +165,14 @@ export const OPPONENT_PALETTE: CharacterPalette = {
   visor: new Color3(1.0, 0.8, 0.1),            // Glowing Amber Eyes
   visorGlow: new Color3(0.8, 0.5, 0.0),
 };
+
+/**
+ * Team Alpha Palette: Electric Cyan & Slate (Standard Team 0 Palette)
+ */
+export const TEAM_ALPHA_PALETTE: CharacterPalette = HERO_PALETTE;
+
+/**
+ * Team Beta Palette: Fiery Crimson & Obsidian (Standard Team 1 Palette)
+ */
+export const TEAM_BETA_PALETTE: CharacterPalette = OPPONENT_PALETTE;
+
