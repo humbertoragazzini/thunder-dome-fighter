@@ -190,11 +190,13 @@ export class RemotePlayerInterpolation {
           ],
         };
 
+        rig.attachWeapon(playerState.heldItemId ?? "FISTS");
         this.remotePlayers.set(playerId, visual);
         continue;
       }
 
-      // Existing player: skip duplicate ticks
+      // Existing player: synchronize equipped weapon and skip duplicate ticks
+      visual.rig.attachWeapon(playerState.heldItemId ?? "FISTS");
       const latest = visual.snapshots[visual.snapshots.length - 1];
       if (latest && latest.serverTick === state.serverTick) {
         continue;
