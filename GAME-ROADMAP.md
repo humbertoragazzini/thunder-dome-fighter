@@ -10,11 +10,11 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 14 — Persistent Player Profiles & Lifetime Statistics** |
-| **Current Step** | **Step 14.1 — Implement Fastify API endpoint `/api/player/profile` querying Prisma** |
-| **Last Completed Step** | **Step 13.5 — Handle unexpected server crashes: unfinalized matches marked as CANCELLED** |
-| **Next Step** | **Step 14.1 — Implement Fastify API endpoint `/api/player/profile` querying Prisma** |
-| **Overall Status** | **Phase 13 (Live Match Statistics & Idempotent Persistence) 100% complete; moving to Phase 14.** |
+| **Current Phase** | **Phase 15 — Quick Play & Matchmaking Queue System** |
+| **Current Step** | **Step 15.1 — Implement MatchmakingQueueManager supporting queues for 1v1, 3v3, 4v4, and FFA** |
+| **Last Completed Step** | **Phase 14 — Persistent Player Profiles & Lifetime Statistics (14.1 - 14.4)** |
+| **Next Step** | **Step 15.1 — Implement MatchmakingQueueManager supporting queues for 1v1, 3v3, 4v4, and FFA** |
+| **Overall Status** | **Phase 14 (Persistent Player Profiles & Lifetime Statistics) 100% complete; moving to Phase 15.** |
 | **Last Updated** | **2026-10-24** |
 
 ---
@@ -700,30 +700,31 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 14 — Persistent Player Profiles & Lifetime Statistics
 
-**Status:** Not Started `[ ]`  
+**Status:** Completed `[x]`  
 **Goal:** Dedicated Profile screen displaying player lifetime statistics, derived ratios (K/D, Win rate), and match history.  
 **Dependencies:** Phase 13.  
 
 #### Steps
-- [ ] 14.1 Implement Fastify API endpoint `/api/player/profile` querying Prisma with selective field projections and relation joins.
-- [ ] 14.2 Calculate derived ratios safely on read:
+- [x] 14.1 Implement Fastify API endpoint `/api/player/profile` querying Prisma with selective field projections and relation joins.
+- [x] 14.2 Calculate derived ratios safely on read:
   - `K/D = deaths > 0 ? (kills / deaths) : kills`
   - `WinRate = matches > 0 ? (wins / matches) * 100 : 0`
-- [ ] 14.3 Implement `ProfileScreen` in React displaying:
+- [x] 14.3 Implement `ProfileScreen` in React displaying:
   - Player avatar and display name.
   - Lifetime record: Total Matches, Wins, Losses, Win Rate.
   - Combat record: Total Kills, Total Deaths, K/D Ratio, Total Damage Dealt.
   - Most used weapons and weapon kill efficiency.
   - Recent match history list.
-- [ ] 14.4 Cache profile responses with short TTL to minimize database load.
+- [x] 14.4 Cache profile responses with short TTL to minimize database load.
 
 #### Completion Criteria
 - Profile renders accurate lifetime statistics updated immediately after match finalization.
 - Division-by-zero handled gracefully for fresh accounts.
 
 #### Verification
-- Automated test: Query profile of account with 0 games, verify clean 0.0 ratios.
-- Play a match, check profile, verify stats incremented accurately.
+- Automated test suite (`scratch/test_phase14_player_profiles.ts`): All 6 tests passed (401 auth guard, zero-division safety for fresh player, derived lifetime ratio accuracy, weapon mastery multi-match aggregation, chronological recent match history projection, and public fighter profile card).
+- Regression test suites (`scratch/test_phase13_match_stats_and_persistence.ts`, `scratch/test_phase12_weapon_and_item_system.ts`): All 17 tests passed with zero regressions.
+- TypeScript build (`tsc -b`), linter (`npm run lint`), and production bundle (`vite build`): 100% clean with zero errors.
 
 ---
 
