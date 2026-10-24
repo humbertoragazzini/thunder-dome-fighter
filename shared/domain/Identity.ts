@@ -90,3 +90,57 @@ export interface PlayerProfileView {
     winRatePercentage: number;
   };
 }
+
+/**
+ * Aggregated weapon mastery metrics (Phase 14).
+ * Combines total uses, hits, kills, and damage dealt per weapon.
+ */
+export interface PlayerWeaponMastery {
+  itemId: string;
+  name: string;
+  category: string;
+  accentColor: string;
+  matchesUsed: number;
+  hits: number;
+  kills: number;
+  damageDealt: number;
+  damagePerHit: number;
+}
+
+/**
+ * Historical match performance summary for past bouts (Phase 14).
+ */
+export interface PlayerMatchHistoryEntry {
+  matchId: EntityId;
+  gameModeId: string;
+  levelId: string;
+  status: string;
+  isWinner: boolean;
+  score: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  damageDealt: number;
+  damageReceived: number;
+  durationSeconds: number;
+  endedAt: Date;
+}
+
+/**
+ * Comprehensive profile payload sent to the React ProfileScreen (Phase 14).
+ * Combines player persona, lifetime combat records, multi-dimensional
+ * derived ratios, weapon mastery cards, and chronological match logs.
+ */
+export interface FullPlayerProfileView extends PlayerProfileView {
+  derived: {
+    killDeathRatio: number;
+    winRatePercentage: number;
+    averageDamageDealt: number;
+    averageDamageReceived: number;
+    kdDifferential: number;
+    combatScore: number;
+  };
+  weaponMastery: PlayerWeaponMastery[];
+  recentMatches: PlayerMatchHistoryEntry[];
+}
+
