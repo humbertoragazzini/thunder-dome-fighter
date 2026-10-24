@@ -149,7 +149,7 @@ export function ProfileModal() {
               icon={<GiShield />}
               label="Damage Taken"
               value={(stats?.damageReceived ?? 0).toLocaleString()}
-              color="rose"
+              color="red"
             />
           </div>
         </div>
