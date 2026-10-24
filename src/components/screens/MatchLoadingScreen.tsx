@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { GiLightningTrio } from "react-icons/gi";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuthStore } from "../../store/useAuthStore";
+import { useMatchmakingStore } from "../../store/useMatchmakingStore";
 import { useNavigationStore } from "../../store/useNavigationStore";
 import { getColyseusUrl } from "../../config/network";
 import { Heading } from "../ui/atoms/Heading";
@@ -84,12 +85,28 @@ export function MatchLoadingScreen() {
     async function joinArena() {
       try {
         const client = new Client(colyseusUrl);
+        const reservation = useMatchmakingStore.getState().seatReservation;
+        const targetRoomId = useMatchmakingStore.getState().targetRoomId;
         const selectedModeId = useNavigationStore.getState().selectedMatchMode ?? "1v1";
-        const joinedRoom = await client.joinOrCreate("game", {
-          token,
-          modeId: selectedModeId,
-          levelId: "thunder-dome-alpha",
-        });
+
+        let joinedRoom;
+        if (reservation) {
+          setLoadingStep("Consuming allocated seat reservation...");
+          joinedRoom = await client.consumeSeatReservation(reservation);
+          useMatchmakingStore.getState().clearReservation();
+        } else if (targetRoomId) {
+          setLoadingStep(`Joining allocated match room ${targetRoomId}...`);
+          joinedRoom = await client.joinById(targetRoomId, {
+            token,
+            modeId: selectedModeId,
+          });
+        } else {
+          joinedRoom = await client.joinOrCreate("game", {
+            token,
+            modeId: selectedModeId,
+            levelId: "thunder-dome-alpha",
+          });
+        }
 
         // If the user navigated away before connection completed, leave cleanly
         if (!isMountedRef.current) {
