@@ -175,6 +175,8 @@ export class MatchStatsTracker {
     victimSessionId: string,
     weaponId: string = "FISTS",
     timestamp: number = Date.now(),
+    minDamageThresholdPct: number = 0,
+    victimMaxHealth: number = 100,
   ): string[] {
     const victim = this.participants.get(victimSessionId);
     if (victim) {
@@ -211,7 +213,9 @@ export class MatchStatsTracker {
     const awardedAssists: string[] = [];
     const history = this.damageHistory.get(victimSessionId) || [];
     const cutoff = timestamp - this.assistWindowMs;
-    const contributors = new Set<string>();
+    const damageByAttacker = new Map<string, number>();
+
+    const killer = killerSessionId ? this.participants.get(killerSessionId) : null;
 
     for (const entry of history) {
       if (
@@ -219,15 +223,28 @@ export class MatchStatsTracker {
         entry.attackerSessionId !== killerSessionId &&
         entry.attackerSessionId !== victimSessionId
       ) {
-        contributors.add(entry.attackerSessionId);
+        // In team modes, ensure the assister is on the same team as the killer
+        if (killer && killer.teamIndex >= 0) {
+          const assister = this.participants.get(entry.attackerSessionId);
+          if (!assister || assister.teamIndex !== killer.teamIndex) {
+            continue;
+          }
+        }
+
+        const current = damageByAttacker.get(entry.attackerSessionId) || 0;
+        damageByAttacker.set(entry.attackerSessionId, current + entry.damage);
       }
     }
 
-    for (const contributorSessionId of contributors) {
-      const assister = this.participants.get(contributorSessionId);
-      if (assister) {
-        assister.assists += 1;
-        awardedAssists.push(contributorSessionId);
+    const minDamageRequired = victimMaxHealth * minDamageThresholdPct;
+
+    for (const [contributorSessionId, damageDealt] of damageByAttacker) {
+      if (damageDealt >= minDamageRequired) {
+        const assister = this.participants.get(contributorSessionId);
+        if (assister) {
+          assister.assists += 1;
+          awardedAssists.push(contributorSessionId);
+        }
       }
     }
 
