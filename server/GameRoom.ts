@@ -1082,6 +1082,8 @@ export class GameRoom extends Room {
       ) {
         killerSessionId = attribution.attackerSessionId;
       }
+    }
+
     // Authoritatively track kill and death (Phase 13)
     const killerWeapon = killerSessionId
       ? (this.state.players.get(killerSessionId)?.heldItemId ?? "FISTS")
