@@ -41,9 +41,11 @@ model Player {
   updatedAt  DateTime     @updatedAt @map("updated_at")
 
   // Relations
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sessions   Session[]
-  stats      PlayerStats?
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions            Session[]
+  stats               PlayerStats?
+  matchParticipations MatchParticipant[]
+  itemStats           PlayerItemStats[]
 
   @@map("players")
 }
@@ -91,3 +93,97 @@ model PlayerStats {
 
   @@map("player_stats")
 }
+
+// ==================================================
+// 5. Match: Authoritative Game Instance Record
+// Created on match finalization (ADR-005, ADR-012)
+// ==================================================
+model Match {
+  id               String             @id @default(uuid())
+  roomCode         String?            @map("room_code")
+  gameModeId       String             @map("game_mode_id")
+  levelId          String             @map("level_id")
+  status           String             @default("COMPLETED") // "COMPLETED" | "CANCELLED"
+  winningTeamIndex Int?               @map("winning_team_index")
+  winningPlayerId  String?            @map("winning_player_id")
+  durationSeconds  Float              @default(0) @map("duration_seconds")
+  startedAt        DateTime           @default(now()) @map("started_at")
+  endedAt          DateTime?          @map("ended_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  participants     MatchParticipant[]
+  teams            MatchTeam[]
+  itemStats        PlayerItemStats[]
+
+  @@map("matches")
+}
+
+// ==================================================
+// 6. MatchParticipant: Individual Player Match Results
+// ==================================================
+model MatchParticipant {
+  id             String   @id @default(uuid())
+  matchId        String   @map("match_id")
+  playerId       String   @map("player_id")
+  teamIndex      Int      @default(0) @map("team_index")
+  finalScore     Int      @default(0) @map("final_score")
+  kills          Int      @default(0)
+  deaths         Int      @default(0)
+  assists        Int      @default(0)
+  damageDealt    Int      @default(0) @map("damage_dealt")
+  damageReceived Int      @default(0) @map("damage_received")
+  isWinner       Boolean  @default(false) @map("is_winner")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  match          Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player         Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+  @@index([playerId])
+  @@map("match_participants")
+}
+
+// ==================================================
+// 7. MatchTeam: Team Performance Aggregates
+// ==================================================
+model MatchTeam {
+  id         String   @id @default(uuid())
+  matchId    String   @map("match_id")
+  teamIndex  Int      @map("team_index")
+  teamName   String   @default("") @map("team_name")
+  score      Int      @default(0)
+  isWinner   Boolean  @default(false) @map("is_winner")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  match      Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, teamIndex])
+  @@map("match_teams")
+}
+
+// ==================================================
+// 8. PlayerItemStats: Weapon and Item Performance
+// ==================================================
+model PlayerItemStats {
+  id          String   @id @default(uuid())
+  matchId     String   @map("match_id")
+  playerId    String   @map("player_id")
+  itemId      String   @map("item_id")
+  hits        Int      @default(0)
+  kills       Int      @default(0)
+  damageDealt Int      @default(0) @map("damage_dealt")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  match       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player      Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId, itemId])
+  @@index([playerId, itemId])
+  @@map("player_item_stats")
+}
+
