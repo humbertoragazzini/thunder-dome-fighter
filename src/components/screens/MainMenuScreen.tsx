@@ -14,8 +14,11 @@
 // Replaces bare developer canvas overlays with a full arcade main menu.
 // ==================================================
 
-import { GiBoxingGlove, GiCrown, GiRadarDish, GiSwordsPower } from "react-icons/gi";
+import { FaUserGroup } from "react-icons/fa6";
+import { GiBoxingGlove, GiCrown, GiLightningTrio, GiRadarDish, GiSwordsPower } from "react-icons/gi";
+import { useMatchmakingStore } from "../../store/useMatchmakingStore";
 import { useNavigationStore } from "../../store/useNavigationStore";
+import { Button } from "../ui/atoms/Button";
 import { Heading } from "../ui/atoms/Heading";
 import { MenuCard } from "../ui/molecules/MenuCard";
 import { PlayerBanner } from "../ui/organisms/PlayerBanner";
@@ -23,6 +26,9 @@ import { ScreenLayout } from "../ui/templates/ScreenLayout";
 
 export function MainMenuScreen() {
   const navigateTo = useNavigationStore((state) => state.navigateTo);
+  const openModal = useNavigationStore((state) => state.openModal);
+  const startQueue = useMatchmakingStore((state) => state.startQueue);
+  const party = useMatchmakingStore((state) => state.party);
 
   return (
     <ScreenLayout
@@ -55,6 +61,48 @@ export function MainMenuScreen() {
           >
             Select combat mode to deploy into the arena
           </p>
+        </div>
+
+        {/* Quick Play & Squad Banner */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-gradient-to-r from-amber-950/60 via-slate-900/90 to-cyan-950/60 border border-amber-500/30 shadow-2xl backdrop-blur-xl">
+          <div className="flex items-center gap-3.5 flex-1 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 text-2xl shadow-inner shrink-0">
+              <GiLightningTrio />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-black text-amber-400 font-mono tracking-wide">
+                  QUICK PLAY (1v1 DUEL)
+                </span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              </div>
+              <span className="text-xs text-slate-400 truncate" style={{ fontFamily: "var(--font-tech)" }}>
+                Instant matchmaking into the authoritative Havok combat arena
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => openModal("PARTY")}
+              leftIcon={<FaUserGroup className="text-cyan-400" />}
+              className="flex-1 sm:flex-initial"
+            >
+              Squad {party ? `(${Object.keys(party.members).length})` : ""}
+            </Button>
+
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => startQueue("1v1")}
+              leftIcon={<GiBoxingGlove />}
+              className="flex-1 sm:flex-initial shadow-lg"
+            >
+              Quick Start
+            </Button>
+          </div>
         </div>
 
         {/* 2x2 Grid of Navigation Cards */}
