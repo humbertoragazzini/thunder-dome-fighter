@@ -36,6 +36,9 @@ export const ClientMessageType = {
   /** Leave current party */
   PARTY_LEAVE: "party-leave",
 
+  /** Toggle party member ready state */
+  PARTY_SET_READY: "party-set-ready",
+
   /** Enter the matchmaking queue (sent by solo player or party leader) */
   MATCH_QUEUE: "match-queue",
 
@@ -61,6 +64,10 @@ export interface PartyJoinPayload {
   inviteCode: string;
 }
 
+export interface PartySetReadyPayload {
+  isReady: boolean;
+}
+
 export interface MatchQueuePayload {
   gameModeId: GameModeId;
 }
@@ -81,6 +88,7 @@ export interface ClientMessagePayloadMap {
   [ClientMessageType.PARTY_CREATE]: Record<string, never>; // Empty payload {}
   [ClientMessageType.PARTY_JOIN]: PartyJoinPayload;
   [ClientMessageType.PARTY_LEAVE]: Record<string, never>;
+  [ClientMessageType.PARTY_SET_READY]: PartySetReadyPayload;
   [ClientMessageType.MATCH_QUEUE]: MatchQueuePayload;
   [ClientMessageType.MATCH_CANCEL_QUEUE]: Record<string, never>;
   [ClientMessageType.INTERACT]: InteractPayload;
