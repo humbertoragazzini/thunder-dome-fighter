@@ -23,6 +23,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import { authRoutes } from "./routes/auth.ts";
+import { playerRoutes } from "./routes/player.ts";
 
 export interface AppOptions {
   logger?: boolean;
@@ -118,6 +119,7 @@ export async function buildApp(
   // 5. Mount API Routes
   // --------------------------------------------------
   await app.register(authRoutes, { prefix: "/api/auth" });
+  await app.register(playerRoutes, { prefix: "/api/player" });
 
   return app;
 }
