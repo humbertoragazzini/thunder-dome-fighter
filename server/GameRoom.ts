@@ -729,8 +729,11 @@ export class GameRoom extends Room {
 
     // Hit Zone Details
     const hitZone = hit.hitZone ?? "TORSO";
-    const finalDamage = hit.finalDamage ?? moveDef.damage;
     const isCritical = hit.isCritical ?? (hitZone === "HEAD");
+    const finalDamage =
+      heldItemId !== "FISTS"
+        ? Math.round(moveDef.damage * (isCritical ? 1.5 : hitZone === "LIMBS" ? 0.75 : 1.0))
+        : (hit.finalDamage ?? moveDef.damage);
 
     // Dynamic Damage-Scaled Knockback Impulse (Phase 12 User Requirement: "more damage = more repelling")
     const dynamicKnockback = calculateDamageScaledKnockback(
