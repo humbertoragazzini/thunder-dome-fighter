@@ -217,9 +217,14 @@ export class MatchmakingRoom extends Room {
             partyId: party.id,
             playerIds,
             participants,
-            onMatchFound: (reservation, roomId) => {
-              // Dispatch seat reservation to all party members
-              for (const pid of playerIds) {
+            onMatchFound: (
+              reservation,
+              roomId,
+              participantPlayerId?: string,
+            ) => {
+              // Dispatch seat reservation to target party member (or all if unspecified)
+              const targets = participantPlayerId ? [participantPlayerId] : playerIds;
+              for (const pid of targets) {
                 const memberClient = this.clientByPlayerId.get(pid);
                 if (memberClient) {
                   const matchFoundPayload: MatchmakingStatusPayload = {
