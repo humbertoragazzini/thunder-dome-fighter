@@ -29,6 +29,8 @@ export function MainMenuScreen() {
   const openModal = useNavigationStore((state) => state.openModal);
   const startQueue = useMatchmakingStore((state) => state.startQueue);
   const party = useMatchmakingStore((state) => state.party);
+  const squadSize = party ? Object.keys(party.members).length : 0;
+  const isSquadActive = squadSize > 1;
 
   return (
     <ScreenLayout
@@ -66,18 +68,32 @@ export function MainMenuScreen() {
         {/* Quick Play & Squad Banner */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-gradient-to-r from-amber-950/60 via-slate-900/90 to-cyan-950/60 border border-amber-500/30 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center gap-3.5 flex-1 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 text-2xl shadow-inner shrink-0">
+            <div
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner shrink-0 ${
+                isSquadActive
+                  ? "bg-cyan-500/20 border border-cyan-500/30 text-cyan-400"
+                  : "bg-amber-500/20 border border-amber-500/30 text-amber-400"
+              }`}
+            >
               <GiLightningTrio />
             </div>
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-base font-black text-amber-400 font-mono tracking-wide">
-                  QUICK PLAY (1v1 DUEL)
+                <span
+                  className={`text-base font-black font-mono tracking-wide ${
+                    isSquadActive ? "text-cyan-400" : "text-amber-400"
+                  }`}
+                >
+                  {isSquadActive
+                    ? "QUICK PLAY (3v3 SQUAD)"
+                    : "QUICK PLAY (1v1 DUEL)"}
                 </span>
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               </div>
               <span className="text-xs text-slate-400 truncate" style={{ fontFamily: "var(--font-tech)" }}>
-                Instant matchmaking into the authoritative Havok combat arena
+                {isSquadActive
+                  ? `Queue your squad of ${squadSize} fighters into 3v3 Team Arena`
+                  : "Instant matchmaking into the authoritative Havok combat arena"}
               </span>
             </div>
           </div>
@@ -90,13 +106,13 @@ export function MainMenuScreen() {
               leftIcon={<FaUserGroup className="text-cyan-400" />}
               className="flex-1 sm:flex-initial"
             >
-              Squad {party ? `(${Object.keys(party.members).length})` : ""}
+              Squad {party ? `(${squadSize})` : ""}
             </Button>
 
             <Button
               variant="primary"
               size="md"
-              onClick={() => startQueue("1v1")}
+              onClick={() => startQueue(isSquadActive ? "3v3" : "1v1")}
               leftIcon={<GiBoxingGlove />}
               className="flex-1 sm:flex-initial shadow-lg"
             >
