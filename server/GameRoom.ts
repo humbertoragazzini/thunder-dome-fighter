@@ -1126,6 +1126,7 @@ export class GameRoom extends Room {
       Date.now(),
       minAssistPct,
       victimMaxHealth,
+      isTeamMode,
     );
     victimState.deaths++;
 
