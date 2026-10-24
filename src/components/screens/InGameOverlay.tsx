@@ -18,7 +18,7 @@
 // ==================================================
 
 import { useEffect, useState } from "react";
-import { FaBars, FaFlagCheckered, FaHourglassHalf, FaTrophy } from "react-icons/fa6";
+import { FaBars, FaFlagCheckered, FaHourglassHalf, FaTrophy, FaListOl } from "react-icons/fa6";
 import { GiGamepad, GiLightningShield } from "react-icons/gi";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuthStore } from "../../store/useAuthStore";
@@ -27,6 +27,7 @@ import { Badge } from "../ui/atoms/Badge";
 import { Button } from "../ui/atoms/Button";
 import { MatchPowerHUD } from "../ui/molecules/MatchPowerHUD";
 import { WeaponHUD } from "../ui/molecules/WeaponHUD";
+import { MatchScoreboardModal, type ScoreboardParticipant } from "../ui/molecules/MatchScoreboardModal";
 import { PauseMenuDialog } from "../ui/organisms/PauseMenuDialog";
 import { GAME_ITEMS } from "../../../shared/domain/GameItem";
 
@@ -42,6 +43,11 @@ interface FighterHUDData {
   health: number;
   maxHealth: number;
   score: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  damageDealt: number;
+  damageReceived: number;
   isDead: boolean;
   isInvulnerable: boolean;
   killStreak: number;
@@ -92,6 +98,8 @@ export function InGameOverlay() {
   const [remainingTimeSeconds, setRemainingTimeSeconds] = useState<number>(180);
   const [playerCount, setPlayerCount] = useState<number>(1);
   const [winningPlayerId, setWinningPlayerId] = useState<string>("");
+  const [isScoreboardOpen, setIsScoreboardOpen] = useState<boolean>(false);
+  const [scoreboardParticipants, setScoreboardParticipants] = useState<ScoreboardParticipant[]>([]);
 
   const [localFighter, setLocalFighter] = useState<FighterHUDData>({
     id: "",
@@ -99,6 +107,11 @@ export function InGameOverlay() {
     health: 100,
     maxHealth: 100,
     score: 0,
+    kills: 0,
+    deaths: 0,
+    assists: 0,
+    damageDealt: 0,
+    damageReceived: 0,
     isDead: false,
     isInvulnerable: false,
     killStreak: 0,
@@ -145,6 +158,7 @@ export function InGameOverlay() {
         const mySessionId = room.sessionId;
         let foundLocal: FighterHUDData | null = null;
         let foundOpponent: FighterHUDData | null = null;
+        const participantsList: ScoreboardParticipant[] = [];
 
         const entries: [string, any][] =
           typeof state.players.entries === "function"
@@ -153,12 +167,40 @@ export function InGameOverlay() {
 
         for (const [sessionId, pState] of entries) {
           const p = pState as any;
+          const isLocal = sessionId === mySessionId;
+          const fighterName = isLocal ? (player?.playerName ?? "You") : "Opponent";
+          const isWinner =
+            sessionId === state.winningPlayerId ||
+            (typeof state.winningTeamIndex === "number" &&
+              state.winningTeamIndex >= 0 &&
+              p.teamIndex === state.winningTeamIndex);
+
+          participantsList.push({
+            id: sessionId,
+            name: fighterName,
+            teamIndex: typeof p.teamIndex === "number" ? p.teamIndex : -1,
+            score: typeof p.score === "number" ? p.score : 0,
+            kills: typeof p.kills === "number" ? p.kills : 0,
+            deaths: typeof p.deaths === "number" ? p.deaths : 0,
+            assists: typeof p.assists === "number" ? p.assists : 0,
+            damageDealt: typeof p.damageDealt === "number" ? p.damageDealt : 0,
+            damageReceived: typeof p.damageReceived === "number" ? p.damageReceived : 0,
+            heldItemId: p.heldItemId ?? "FISTS",
+            isLocal,
+            isWinner,
+          });
+
           const fighterData: FighterHUDData = {
             id: sessionId,
-            name: sessionId === mySessionId ? (player?.playerName ?? "You") : "Opponent",
+            name: fighterName,
             health: typeof p.health === "number" ? p.health : 100,
             maxHealth: typeof p.maxHealth === "number" ? p.maxHealth : 100,
             score: typeof p.score === "number" ? p.score : 0,
+            kills: typeof p.kills === "number" ? p.kills : 0,
+            deaths: typeof p.deaths === "number" ? p.deaths : 0,
+            assists: typeof p.assists === "number" ? p.assists : 0,
+            damageDealt: typeof p.damageDealt === "number" ? p.damageDealt : 0,
+            damageReceived: typeof p.damageReceived === "number" ? p.damageReceived : 0,
             isDead: Boolean(p.isDead),
             isInvulnerable: Boolean(p.isInvulnerable),
             killStreak: typeof p.killStreak === "number" ? p.killStreak : 0,
@@ -172,12 +214,14 @@ export function InGameOverlay() {
             z: typeof p.z === "number" ? p.z : 0,
           };
 
-          if (sessionId === mySessionId) {
+          if (isLocal) {
             foundLocal = fighterData;
           } else {
             foundOpponent = fighterData;
           }
         }
+
+        setScoreboardParticipants(participantsList);
 
         if (foundLocal) {
           setLocalFighter(foundLocal);
@@ -245,11 +289,25 @@ export function InGameOverlay() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsPauseOpen((prev) => !prev);
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        setIsScoreboardOpen(true);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Tab") {
+        e.preventDefault();
+        setIsScoreboardOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
   }, []);
 
   const handleReturnToMenu = async () => {
@@ -329,8 +387,18 @@ export function InGameOverlay() {
             </span>
           </div>
 
-          {/* Right: Menu / Pause Trigger */}
+          {/* Right: Scoreboard & Pause Triggers */}
           <div className="pointer-events-auto flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsScoreboardOpen((prev) => !prev)}
+              leftIcon={<FaListOl />}
+              className="shadow-lg"
+            >
+              Stats <span className="hidden sm:inline text-xs text-slate-400 font-mono">[TAB]</span>
+            </Button>
+
             <Button
               variant="secondary"
               size="sm"
@@ -509,50 +577,7 @@ export function InGameOverlay() {
             </div>
           )}
 
-          {/* 3. MATCH END VICTORY / DEFEAT CARD */}
-          {matchStatus === "MATCH_END" && (
-            <div className="pointer-events-auto w-full max-w-md bg-slate-900/95 backdrop-blur-xl border-2 border-slate-700 rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center gap-6 shadow-[0_0_60px_rgba(0,0,0,0.8)] animate-fade-in">
-              <div
-                className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl shadow-xl ${
-                  isWinner
-                    ? "bg-amber-500/20 text-amber-400 border-2 border-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.4)] animate-bounce"
-                    : "bg-red-500/20 text-red-400 border-2 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.4)]"
-                }`}
-              >
-                {isWinner ? <FaTrophy /> : <FaFlagCheckered />}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <h2
-                  className={`text-2xl sm:text-3xl font-black uppercase tracking-wider ${
-                    isWinner ? "text-amber-400" : "text-slate-100"
-                  }`}
-                  style={{ fontFamily: "var(--font-game)" }}
-                >
-                  {isWinner ? "Victory!" : winningPlayerId ? "Defeat" : "Match Concluded"}
-                </h2>
-                <p
-                  className="text-sm text-slate-300"
-                  style={{ fontFamily: "var(--font-tech)" }}
-                >
-                  {isWinner
-                    ? "Outstanding fight! You reached 3 KOs and claimed victory in the Thunder Dome."
-                    : winningPlayerId
-                      ? "Good sparring session. Return to menu and prepare for the next bout."
-                      : "The match has reached completion."}
-                </p>
-              </div>
-
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={handleReturnToMenu}
-                className="w-full shadow-lg"
-              >
-                Return to Main Menu
-              </Button>
-            </div>
-          )}
+          {/* 3. MATCH END POST-MATCH PRESENTATION (Handled by MatchScoreboardModal) */}
         </div>
 
         {/* Bottom Bar: Weapon Equipment HUD & Controls Guide */}
@@ -561,7 +586,7 @@ export function InGameOverlay() {
           <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/85 backdrop-blur-md border border-slate-800/80 px-4 py-2.5 rounded-xl text-xs text-slate-300 shadow-lg">
             <GiGamepad className="text-amber-400 text-lg flex-shrink-0" />
             <span style={{ fontFamily: "var(--font-tech)" }}>
-              Move: <strong className="text-amber-400">W/S</strong> • Turn: <strong className="text-amber-400">A/D</strong> • Strafe: <strong className="text-amber-400">Q/E</strong> • Jump: <strong className="text-amber-400">SPACE</strong> • Attack: <strong className="text-amber-400">J/I</strong> (Click) • Kick: <strong className="text-amber-400">K</strong> • Push: <strong className="text-amber-400">L</strong> • Pickup: <strong className="text-emerald-400">E</strong> • Drop: <strong className="text-red-400">G</strong>
+              Move: <strong className="text-amber-400">W/S</strong> • Turn: <strong className="text-amber-400">A/D</strong> • Strafe: <strong className="text-amber-400">Q/E</strong> • Jump: <strong className="text-amber-400">SPACE</strong> • Attack: <strong className="text-amber-400">J/I</strong> (Click) • Kick: <strong className="text-amber-400">K</strong> • Push: <strong className="text-amber-400">L</strong> • Pickup: <strong className="text-emerald-400">E</strong> • Drop: <strong className="text-red-400">G</strong> • Scoreboard: <strong className="text-cyan-400">TAB</strong>
             </span>
           </div>
 
@@ -575,6 +600,33 @@ export function InGameOverlay() {
           />
         </div>
       </div>
+
+      {/* Live In-Game Scoreboard Modal (Tab Toggle) */}
+      {matchStatus !== "MATCH_END" && (
+        <MatchScoreboardModal
+          isOpen={isScoreboardOpen}
+          onClose={() => setIsScoreboardOpen(false)}
+          title="Live Match Scoreboard"
+          gameModeName={(room as any)?.state?.modeId ?? "1v1 Duel"}
+          arenaName={roomName}
+          timeRemaining={formatTimer(remainingTimeSeconds)}
+          participants={scoreboardParticipants}
+          isPostMatch={false}
+        />
+      )}
+
+      {/* Post-Match Scoreboard & Performance Breakdown Modal */}
+      {matchStatus === "MATCH_END" && (
+        <MatchScoreboardModal
+          isOpen={true}
+          title={isWinner ? "Victory!" : winningPlayerId ? "Defeat" : "Match Concluded"}
+          gameModeName={(room as any)?.state?.modeId ?? "1v1 Duel"}
+          arenaName={roomName}
+          participants={scoreboardParticipants}
+          isPostMatch={true}
+          onReturnToMenu={handleReturnToMenu}
+        />
+      )}
 
       {/* Pause Menu Dialog */}
       <PauseMenuDialog
