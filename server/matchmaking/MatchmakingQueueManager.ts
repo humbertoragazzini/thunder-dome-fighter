@@ -159,6 +159,68 @@ export class MatchmakingQueueManager {
   }
 
   /**
+   * Attempts to find two disjoint sets of tickets from the queue that each
+   * exactly fill a team bin of size targetTeamSize without splitting any ticket.
+   */
+  public findTeamBinPartition(
+    queue: QueuedTicket[],
+    targetTeamSize: number,
+  ): { team0: QueuedTicket[]; team1: QueuedTicket[]; matchedIndices: number[] } | null {
+    const n = queue.length;
+
+    // Helper: Find all combinations of remaining indices that sum to targetSum
+    function findSubsets(availableIndices: number[], targetSum: number): number[][] {
+      const results: number[][] = [];
+
+      function backtrack(
+        startIdx: number,
+        currentSum: number,
+        currentIndices: number[],
+      ) {
+        if (currentSum === targetSum) {
+          results.push([...currentIndices]);
+          return;
+        }
+        if (currentSum > targetSum || startIdx >= availableIndices.length) {
+          return;
+        }
+
+        for (let i = startIdx; i < availableIndices.length; i++) {
+          const ticketIdx = availableIndices[i];
+          const ticketSize = queue[ticketIdx].playerIds.length;
+          if (currentSum + ticketSize <= targetSum) {
+            currentIndices.push(ticketIdx);
+            backtrack(i + 1, currentSum + ticketSize, currentIndices);
+            currentIndices.pop();
+          }
+        }
+      }
+
+      backtrack(0, 0, []);
+      return results;
+    }
+
+    const allIndices = Array.from({ length: n }, (_, i) => i);
+    const candidateTeam0Subsets = findSubsets(allIndices, targetTeamSize);
+
+    for (const team0Indices of candidateTeam0Subsets) {
+      const team0Set = new Set(team0Indices);
+      const remainingIndices = allIndices.filter((idx) => !team0Set.has(idx));
+      const candidateTeam1Subsets = findSubsets(remainingIndices, targetTeamSize);
+
+      if (candidateTeam1Subsets.length > 0) {
+        const team1Indices = candidateTeam1Subsets[0];
+        const team0 = team0Indices.map((i) => queue[i]);
+        const team1 = team1Indices.map((i) => queue[i]);
+        const matchedIndices = [...team0Indices, ...team1Indices].sort((a, b) => b - a);
+        return { team0, team1, matchedIndices };
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Evaluates queue for the given mode and forms matches when player threshold is reached.
    */
   public async processQueue(modeId: GameModeId): Promise<void> {
@@ -173,7 +235,84 @@ export class MatchmakingQueueManager {
     const maxPlayers = modeConfig.maxPlayers;
     const queue = this.queues.get(modeId) ?? [];
 
-    // Calculate total players waiting
+    const isTeamMode = modeConfig.teamCount >= 2 && modeConfig.teamSize > 1;
+
+    // --------------------------------------------------
+    // Team Modes (3v3, 4v4): Bin-Packing Team Backfilling
+    // --------------------------------------------------
+    if (isTeamMode) {
+      const matchResult = this.findTeamBinPartition(queue, modeConfig.teamSize);
+      if (!matchResult) {
+        return; // Threshold or partition not satisfied
+      }
+
+      this.processingLocks.set(modeId, true);
+
+      try {
+        // Remove matched tickets from queue in descending order of indices
+        for (const idx of matchResult.matchedIndices) {
+          queue.splice(idx, 1);
+        }
+
+        const matchedTickets = [...matchResult.team0, ...matchResult.team1];
+        for (const t of matchedTickets) {
+          this.ticketById.delete(t.ticketId);
+          for (const pid of t.playerIds) {
+            this.playerToTicketId.delete(pid);
+          }
+        }
+
+        // Allocate Colyseus GameRoom
+        const room = await matchMaker.createRoom("game", {
+          modeId,
+          levelId: "thunder-dome-alpha",
+        });
+
+        // Reserve seats for Team 0 (Alpha)
+        for (const ticket of matchResult.team0) {
+          for (const participant of ticket.participants) {
+            const reservation = await matchMaker.reserveSeatFor(room, {
+              token: participant.token,
+              playerId: participant.playerId,
+              playerName: participant.playerName,
+              avatarUrl: participant.avatarUrl,
+              modeId,
+              teamIndex: 0,
+            });
+            ticket.onMatchFound(reservation, room.roomId);
+          }
+        }
+
+        // Reserve seats for Team 1 (Beta)
+        for (const ticket of matchResult.team1) {
+          for (const participant of ticket.participants) {
+            const reservation = await matchMaker.reserveSeatFor(room, {
+              token: participant.token,
+              playerId: participant.playerId,
+              playerName: participant.playerName,
+              avatarUrl: participant.avatarUrl,
+              modeId,
+              teamIndex: 1,
+            });
+            ticket.onMatchFound(reservation, room.roomId);
+          }
+        }
+      } catch (err) {
+        console.error(`❌ Matchmaking error processing team queue for ${modeId}:`, err);
+      } finally {
+        this.processingLocks.set(modeId, false);
+
+        // Check if more matches can be made immediately
+        if (queue.length > 0) {
+          void this.processQueue(modeId);
+        }
+      }
+      return;
+    }
+
+    // --------------------------------------------------
+    // Individual Modes (1v1, FFA): FIFO Accumulation
+    // --------------------------------------------------
     let totalPlayersWaiting = 0;
     for (const t of queue) {
       totalPlayersWaiting += t.playerIds.length;
@@ -229,14 +368,19 @@ export class MatchmakingQueueManager {
       });
 
       // Generate seat reservations for all participants
+      let playerSlotIndex = 0;
       for (const ticket of matchedTickets) {
         for (const participant of ticket.participants) {
+          const teamIndex = modeId === "1v1" ? playerSlotIndex % 2 : undefined;
+          playerSlotIndex++;
+
           const reservation = await matchMaker.reserveSeatFor(room, {
             token: participant.token,
             playerId: participant.playerId,
             playerName: participant.playerName,
             avatarUrl: participant.avatarUrl,
             modeId,
+            teamIndex,
           });
 
           ticket.onMatchFound(reservation, room.roomId);
