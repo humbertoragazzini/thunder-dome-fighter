@@ -41,7 +41,11 @@ import { CharacterInputController } from "../input/CharacterInputController";
 import type { TouchVirtualGamepadProvider } from "../input/providers/TouchVirtualGamepadProvider";
 import { TouchGamepadOverlay } from "./ui/organisms/TouchGamepadOverlay";
 import { CharacterVisualRig } from "../visuals/character/CharacterVisualRig";
-import { HERO_PALETTE } from "../visuals/character/CharacterRigConfig";
+import {
+  HERO_PALETTE,
+  TEAM_ALPHA_PALETTE,
+  TEAM_BETA_PALETTE,
+} from "../visuals/character/CharacterRigConfig";
 import { LevelVisualLoader } from "../visuals/level/LevelVisualLoader";
 import { CombatEffectsManager } from "../visuals/combat/CombatEffectsManager";
 import { ItemVisualManager } from "../visuals/items/ItemVisualManager";
@@ -226,6 +230,13 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
             localPlayerRig.triggerRagdoll();
           } else if (!localState.isDead && localPlayerRig.getIsRagdoll()) {
             localPlayerRig.resetFromRagdoll();
+          }
+
+          // Dynamic Team Color Assignment (Phase 16)
+          if (typeof localState.teamIndex === "number" && localState.teamIndex >= 0) {
+            const desiredPalette =
+              localState.teamIndex === 1 ? TEAM_BETA_PALETTE : TEAM_ALPHA_PALETTE;
+            localPlayerRig.setPalette(desiredPalette);
           }
         }
 
