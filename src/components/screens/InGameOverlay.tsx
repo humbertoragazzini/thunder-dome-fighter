@@ -502,7 +502,7 @@ export function InGameOverlay() {
                 <div className="flex items-center gap-2 w-full justify-between">
                   <span className="text-[10px] text-rose-400 font-mono font-bold uppercase">EAST</span>
                   <div className="flex items-center gap-2">
-                    <Badge variant="rose">
+                    <Badge variant="red">
                       {team1Score} / {modeId === "4v4" ? 15 : 10} KOs
                     </Badge>
                     <span
