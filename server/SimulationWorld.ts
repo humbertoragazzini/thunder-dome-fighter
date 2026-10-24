@@ -764,6 +764,7 @@ export class SimulatorWorld {
     attackerSessionId: string,
     action: Extract<AttackActionType, "LEFT_PUNCH" | "RIGHT_PUNCH" | "KICK" | "PUSH">,
     extensionProgress: number = 1.0,
+    isValidTarget?: (targetSessionId: string) => boolean,
   ): HitResolutionResult | null {
     const attacker = this.entities.get(attackerSessionId);
     if (!attacker) return null;
@@ -792,6 +793,7 @@ export class SimulatorWorld {
 
     for (const [targetId, target] of this.entities.entries()) {
       if (targetId === attackerSessionId) continue;
+      if (isValidTarget && !isValidTarget(targetId)) continue;
 
       // Skip invulnerable targets
       if (this.isEntityInvulnerable(targetId)) continue;
@@ -911,6 +913,7 @@ export class SimulatorWorld {
     attackerSessionId: string,
     range: number,
     coneAngleRad: number,
+    isValidTarget?: (targetSessionId: string) => boolean,
   ): {
     targetSessionId: string;
     distance: number;
@@ -934,6 +937,7 @@ export class SimulatorWorld {
         attackerSessionId,
         attacker.attackAction,
         1.0,
+        isValidTarget,
       );
       if (artHit) {
         return {
@@ -965,6 +969,7 @@ export class SimulatorWorld {
 
     for (const [targetId, target] of this.entities.entries()) {
       if (targetId === attackerSessionId) continue;
+      if (isValidTarget && !isValidTarget(targetId)) continue;
 
       const tgtPos = target.node.position;
       const dx = tgtPos.x - atkPos.x;
