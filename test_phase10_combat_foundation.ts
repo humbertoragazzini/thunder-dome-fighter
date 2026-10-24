@@ -24,7 +24,6 @@ import {
 import {
   ATTACK_FRAME_DATA,
   HURTBOX_ZONE_CONFIG,
-  COMBO_RULES,
 } from "./shared/combat/CombatConfig";
 
 function assert(condition: boolean, message: string): void {
