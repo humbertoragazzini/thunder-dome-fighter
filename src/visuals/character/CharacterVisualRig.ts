@@ -75,7 +75,13 @@ export class CharacterVisualRig implements ICharacterVisual {
 
   // Character identity and animator
   readonly name: string;
+  private scene: Scene;
   private animator: CharacterProceduralAnimator;
+
+  // Authoritative Socket Weapon Attachment (Phase 12)
+  private attachedWeaponMesh: Mesh | null = null;
+  private attachedWeaponMaterials: StandardMaterial[] = [];
+  private currentWeaponId: string = "FISTS";
 
   // Physical ragdoll collapse state on knockout
   private isRagdoll: boolean = false;
@@ -88,6 +94,7 @@ export class CharacterVisualRig implements ICharacterVisual {
     palette: CharacterPalette = HERO_PALETTE,
   ) {
     this.name = name;
+    this.scene = scene;
     this.animator = new CharacterProceduralAnimator();
 
     // --------------------------------------------------
@@ -525,9 +532,134 @@ export class CharacterVisualRig implements ICharacterVisual {
   }
 
   /**
+   * Attaches or detaches visual weapon meshes socketed to the right wrist joint
+   */
+  attachWeapon(itemId: string): void {
+    if (itemId === this.currentWeaponId) return;
+
+    this.detachWeapon();
+    this.currentWeaponId = itemId;
+
+    if (!itemId || itemId === "FISTS") {
+      return;
+    }
+
+    if (itemId === "ENERGY_BLADE") {
+      const rootBlade = new Mesh(`${this.name}-weapon-root`, this.scene);
+      rootBlade.parent = this.wristRightJoint;
+      rootBlade.position.set(0, -0.15, 0.18);
+      rootBlade.rotation.x = Math.PI * 0.45;
+
+      const hilt = MeshBuilder.CreateCylinder(
+        `${this.name}-blade-hilt`,
+        { diameter: 0.04, height: 0.22 },
+        this.scene,
+      );
+      hilt.parent = rootBlade;
+      const hiltMat = new StandardMaterial(`${this.name}-mat-hilt`, this.scene);
+      hiltMat.diffuseColor = new Color3(0.15, 0.15, 0.2);
+      hilt.material = hiltMat;
+      this.attachedWeaponMaterials.push(hiltMat);
+
+      const blade = MeshBuilder.CreateBox(
+        `${this.name}-blade-beam`,
+        { width: 0.02, height: 0.85, depth: 0.08 },
+        this.scene,
+      );
+      blade.parent = rootBlade;
+      blade.position.set(0, 0.45, 0);
+      const bladeMat = new StandardMaterial(`${this.name}-mat-energy-blade`, this.scene);
+      bladeMat.diffuseColor = new Color3(0.1, 0.8, 1.0);
+      bladeMat.emissiveColor = new Color3(0.2, 0.9, 1.0);
+      blade.material = bladeMat;
+      this.attachedWeaponMaterials.push(bladeMat);
+
+      this.attachedWeaponMesh = rootBlade;
+    } else if (itemId === "THUNDER_HAMMER") {
+      const rootHammer = new Mesh(`${this.name}-weapon-root`, this.scene);
+      rootHammer.parent = this.wristRightJoint;
+      rootHammer.position.set(0, -0.15, 0.18);
+      rootHammer.rotation.x = Math.PI * 0.45;
+
+      const shaft = MeshBuilder.CreateCylinder(
+        `${this.name}-hammer-shaft`,
+        { diameter: 0.05, height: 1.0 },
+        this.scene,
+      );
+      shaft.parent = rootHammer;
+      shaft.position.set(0, 0.35, 0);
+      const shaftMat = new StandardMaterial(`${this.name}-mat-hammer-shaft`, this.scene);
+      shaftMat.diffuseColor = new Color3(0.2, 0.2, 0.25);
+      shaft.material = shaftMat;
+      this.attachedWeaponMaterials.push(shaftMat);
+
+      const head = MeshBuilder.CreateBox(
+        `${this.name}-hammer-head`,
+        { width: 0.28, height: 0.24, depth: 0.38 },
+        this.scene,
+      );
+      head.parent = rootHammer;
+      head.position.set(0, 0.85, 0);
+      const headMat = new StandardMaterial(`${this.name}-mat-hammer-head`, this.scene);
+      headMat.diffuseColor = new Color3(0.8, 0.6, 0.1);
+      headMat.emissiveColor = new Color3(0.9, 0.7, 0.2);
+      head.material = headMat;
+      this.attachedWeaponMaterials.push(headMat);
+
+      this.attachedWeaponMesh = rootHammer;
+    } else if (itemId === "PLASMA_PISTOL") {
+      const rootPistol = new Mesh(`${this.name}-weapon-root`, this.scene);
+      rootPistol.parent = this.wristRightJoint;
+      rootPistol.position.set(0, -0.12, 0.15);
+      rootPistol.rotation.x = Math.PI * 0.5;
+
+      const grip = MeshBuilder.CreateBox(
+        `${this.name}-pistol-grip`,
+        { width: 0.05, height: 0.16, depth: 0.06 },
+        this.scene,
+      );
+      grip.parent = rootPistol;
+      grip.rotation.x = -Math.PI * 0.15;
+      const gripMat = new StandardMaterial(`${this.name}-mat-pistol-grip`, this.scene);
+      gripMat.diffuseColor = new Color3(0.15, 0.15, 0.2);
+      grip.material = gripMat;
+      this.attachedWeaponMaterials.push(gripMat);
+
+      const barrel = MeshBuilder.CreateBox(
+        `${this.name}-pistol-barrel`,
+        { width: 0.06, height: 0.1, depth: 0.35 },
+        this.scene,
+      );
+      barrel.parent = rootPistol;
+      barrel.position.set(0, 0.08, 0.12);
+      const barrelMat = new StandardMaterial(`${this.name}-mat-pistol-barrel`, this.scene);
+      barrelMat.diffuseColor = new Color3(0.6, 0.2, 0.9);
+      barrelMat.emissiveColor = new Color3(0.7, 0.3, 1.0);
+      barrel.material = barrelMat;
+      this.attachedWeaponMaterials.push(barrelMat);
+
+      this.attachedWeaponMesh = rootPistol;
+    }
+  }
+
+  detachWeapon(): void {
+    if (this.attachedWeaponMesh) {
+      this.attachedWeaponMesh.dispose();
+      this.attachedWeaponMesh = null;
+    }
+    for (const mat of this.attachedWeaponMaterials) {
+      mat.dispose();
+    }
+    this.attachedWeaponMaterials = [];
+    this.currentWeaponId = "FISTS";
+  }
+
+  /**
    * Cleans up all Babylon nodes, meshes, and materials
    */
   dispose(): void {
+    this.detachWeapon();
+
     for (const mesh of this.meshes) {
       mesh.dispose();
     }
