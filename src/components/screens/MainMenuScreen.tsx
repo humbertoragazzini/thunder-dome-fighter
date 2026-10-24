@@ -98,7 +98,7 @@ export function MainMenuScreen() {
             badgeText="READY"
             badgeVariant="purple"
             accentColor="purple"
-            onClick={() => openModal("PROFILE")}
+            onClick={() => navigateTo("PROFILE")}
           />
         </div>
       </div>
