@@ -17,7 +17,7 @@
 // combat clarity on their active offensive gear and nearby arena resources.
 // ==================================================
 
-import { FaCrosshairs, FaHandFist, FaRepeat, FaTrashCan } from "react-icons/fa6";
+import { FaCrosshairs, FaHandFist, FaTrashCan } from "react-icons/fa6";
 import { GiBroadsword, GiWarhammer, GiPistolGun } from "react-icons/gi";
 import { GAME_ITEMS } from "../../../../shared/domain/GameItem";
 

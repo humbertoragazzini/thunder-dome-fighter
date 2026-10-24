@@ -23,7 +23,6 @@
 import {
   Scene,
   TransformNode,
-  Mesh,
   MeshBuilder,
   StandardMaterial,
   Color3,
@@ -48,7 +47,6 @@ interface ItemVisualEntry {
 
 export class ItemVisualManager {
   private scene: Scene;
-  private room: Room | null = null;
   private items = new Map<string, ItemVisualEntry>();
   private animElapsedTime: number = 0;
   private audioCtx: AudioContext | null = null;
@@ -64,8 +62,6 @@ export class ItemVisualManager {
   }
 
   public attachRoom(room: Room): void {
-    this.room = room;
-
     // Listen to network events for audio-visual feedback
     room.onMessage("item:collected", (message: {
       playerId: string;
@@ -431,7 +427,7 @@ export class ItemVisualManager {
     }
   }
 
-  private handleItemCollected(spawnId: string, itemId: string, isLocalPlayer: boolean): void {
+  private handleItemCollected(spawnId: string, _itemId: string, isLocalPlayer: boolean): void {
     const visual = this.items.get(spawnId);
     if (visual) {
       visual.isAvailable = false;
