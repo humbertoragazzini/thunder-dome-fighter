@@ -1109,14 +1109,23 @@ export class GameRoom extends Room {
       }
     }
 
-    // Authoritatively track kill and death (Phase 13)
+    // Authoritatively track kill and death (Phase 13 & Phase 17)
     const killerWeapon = killerSessionId
       ? (this.state.players.get(killerSessionId)?.heldItemId ?? "FISTS")
       : "ENVIRONMENT";
+    const isTeamMode = Boolean(
+      this.gameMode && this.gameMode.teamCount >= 2 && this.gameMode.teamSize > 1,
+    );
+    const minAssistPct = isTeamMode ? 0.3 : 0;
+    const victimMaxHealth = victimState.maxHealth || 100;
+
     const awardedAssists = this.matchStatsTracker.recordKill(
       killerSessionId ?? null,
       victimSessionId,
       killerWeapon,
+      Date.now(),
+      minAssistPct,
+      victimMaxHealth,
     );
     victimState.deaths++;
 
