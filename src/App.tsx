@@ -24,10 +24,12 @@ import { AuthScreen } from "./components/screens/AuthScreen";
 import { InGameOverlay } from "./components/screens/InGameOverlay";
 import { MainMenuScreen } from "./components/screens/MainMenuScreen";
 import { MatchLoadingScreen } from "./components/screens/MatchLoadingScreen";
+import { MatchmakingScreen } from "./components/screens/MatchmakingScreen";
 import { PlayMenuScreen } from "./components/screens/PlayMenuScreen";
 import { ProfileScreen } from "./components/screens/ProfileScreen";
 import { DuplicateTabDialog } from "./components/ui/organisms/DuplicateTabDialog";
 import { ErrorDialog } from "./components/ui/organisms/ErrorDialog";
+import { PartyModal } from "./components/ui/organisms/PartyModal";
 import { ProfileModal } from "./components/ui/organisms/ProfileModal";
 import { useAppStore } from "./store/useAppStore";
 import { useAuthStore } from "./store/useAuthStore";
@@ -89,12 +91,14 @@ export default function App() {
         {currentScreen === "MAIN_MENU" && <MainMenuScreen />}
         {currentScreen === "PLAY_MENU" && <PlayMenuScreen />}
         {currentScreen === "PROFILE" && <ProfileScreen />}
+        {currentScreen === "MATCHMAKING" && <MatchmakingScreen />}
         {currentScreen === "MATCH_LOADING" && <MatchLoadingScreen />}
         {currentScreen === "IN_GAME" && <InGameOverlay />}
       </div>
 
       {/* Global Modals & Tab Enforcer */}
       <ProfileModal />
+      <PartyModal />
       <ErrorDialog />
       <DuplicateTabDialog />
     </div>
