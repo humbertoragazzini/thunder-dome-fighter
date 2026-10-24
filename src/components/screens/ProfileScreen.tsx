@@ -99,7 +99,6 @@ function formatDate(dateInput: Date | string): string {
 export function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<ProfileTab>("OVERVIEW");
 
-  const navigateTo = useNavigationStore((state) => state.navigateTo);
   const goBack = useNavigationStore((state) => state.goBack);
   const authPlayer = useAuthStore((state) => state.player);
   const authUser = useAuthStore((state) => state.user);

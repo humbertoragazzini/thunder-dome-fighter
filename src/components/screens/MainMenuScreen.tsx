@@ -23,7 +23,6 @@ import { ScreenLayout } from "../ui/templates/ScreenLayout";
 
 export function MainMenuScreen() {
   const navigateTo = useNavigationStore((state) => state.navigateTo);
-  const openModal = useNavigationStore((state) => state.openModal);
 
   return (
     <ScreenLayout
