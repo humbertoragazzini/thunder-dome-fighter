@@ -177,6 +177,7 @@ export class MatchStatsTracker {
     timestamp: number = Date.now(),
     minDamageThresholdPct: number = 0,
     victimMaxHealth: number = 100,
+    requireSameTeam: boolean = false,
   ): string[] {
     const victim = this.participants.get(victimSessionId);
     if (victim) {
@@ -224,7 +225,7 @@ export class MatchStatsTracker {
         entry.attackerSessionId !== victimSessionId
       ) {
         // In team modes, ensure the assister is on the same team as the killer
-        if (killer && killer.teamIndex >= 0) {
+        if (requireSameTeam && killer && killer.teamIndex >= 0) {
           const assister = this.participants.get(entry.attackerSessionId);
           if (!assister || assister.teamIndex !== killer.teamIndex) {
             continue;
