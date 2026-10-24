@@ -16,7 +16,7 @@
 // visibility into in-match rankings, combat performance, and final match outcomes.
 // ==================================================
 
-import { FaTrophy, FaSkull, FaCrosshairs, FaShieldHalved, FaXmark } from "react-icons/fa6";
+import { FaTrophy, FaXmark } from "react-icons/fa6";
 import { GiPunch, GiBroadsword, GiWarhammer, GiPistolGun } from "react-icons/gi";
 import { Badge } from "../atoms/Badge";
 import { Button } from "../atoms/Button";
@@ -97,7 +97,7 @@ export function MatchScoreboardModal({
               >
                 {title}
                 {isPostMatch && (
-                  <Badge variant="amber" size="sm">
+                  <Badge variant="amber">
                     FINAL
                   </Badge>
                 )}
@@ -170,12 +170,12 @@ export function MatchScoreboardModal({
                           {p.name}
                         </span>
                         {p.isLocal && (
-                          <Badge variant="cyan" size="sm">
+                          <Badge variant="cyan">
                             YOU
                           </Badge>
                         )}
                         {p.isWinner && (
-                          <Badge variant="amber" size="sm">
+                          <Badge variant="amber">
                             WINNER
                           </Badge>
                         )}
