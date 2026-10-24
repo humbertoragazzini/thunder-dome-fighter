@@ -31,7 +31,7 @@ export type AppScreen =
   | "IN_GAME"
   | "MATCH_RESULTS";
 
-export type ModalType = "PROFILE" | "SETTINGS" | "ERROR" | null;
+export type ModalType = "PROFILE" | "SETTINGS" | "PARTY" | "ERROR" | null;
 
 export type MatchMode = "1v1" | "3v3" | "4v4" | "ffa";
 
