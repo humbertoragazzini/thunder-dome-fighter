@@ -20,7 +20,12 @@ import {
 } from "../../shared/networking/InterpolationMath";
 
 import { CharacterVisualRig } from "../visuals/character/CharacterVisualRig";
-import { HERO_PALETTE, OPPONENT_PALETTE } from "../visuals/character/CharacterRigConfig";
+import {
+  HERO_PALETTE,
+  OPPONENT_PALETTE,
+  TEAM_ALPHA_PALETTE,
+  TEAM_BETA_PALETTE,
+} from "../visuals/character/CharacterRigConfig";
 import type { AttackActionType } from "../../shared/player/PlayerConfig";
 
 export interface RemotePlayerSnapshot {
@@ -148,7 +153,14 @@ export class RemotePlayerInterpolation {
         playerState.teamIndex >= 0 &&
         playerState.teamIndex === localTeamIndex;
 
-      const palette = isTeammate ? HERO_PALETTE : OPPONENT_PALETTE;
+      const palette =
+        playerState.teamIndex === 0
+          ? TEAM_ALPHA_PALETTE
+          : playerState.teamIndex === 1
+            ? TEAM_BETA_PALETTE
+            : isTeammate
+              ? HERO_PALETTE
+              : OPPONENT_PALETTE;
 
       // First time remote player appears: spawn visual rig immediately
       if (!visual) {
@@ -195,7 +207,8 @@ export class RemotePlayerInterpolation {
         continue;
       }
 
-      // Existing player: synchronize equipped weapon and skip duplicate ticks
+      // Existing player: synchronize palette, equipped weapon and skip duplicate ticks
+      visual.rig.setPalette(palette);
       visual.rig.attachWeapon(playerState.heldItemId ?? "FISTS");
       const latest = visual.snapshots[visual.snapshots.length - 1];
       if (latest && latest.serverTick === state.serverTick) {
