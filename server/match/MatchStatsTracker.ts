@@ -94,7 +94,7 @@ export class MatchStatsTracker {
   /**
    * Unregisters or marks a participant as disconnected.
    */
-  public unregisterParticipant(sessionId: string): void {
+  public unregisterParticipant(_sessionId: string): void {
     // Keep stats in memory for post-match finalization even if player disconnected
   }
 
