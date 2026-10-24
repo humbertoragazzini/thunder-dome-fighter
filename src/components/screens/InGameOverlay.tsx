@@ -26,7 +26,9 @@ import { useNavigationStore } from "../../store/useNavigationStore";
 import { Badge } from "../ui/atoms/Badge";
 import { Button } from "../ui/atoms/Button";
 import { MatchPowerHUD } from "../ui/molecules/MatchPowerHUD";
+import { WeaponHUD } from "../ui/molecules/WeaponHUD";
 import { PauseMenuDialog } from "../ui/organisms/PauseMenuDialog";
+import { GAME_ITEMS } from "../../../shared/domain/GameItem";
 
 function formatTimer(seconds: number): string {
   const mins = Math.floor(Math.max(0, seconds) / 60);
@@ -46,6 +48,11 @@ interface FighterHUDData {
   speedModifier: number;
   forceModifier: number;
   jumpModifier: number;
+  heldItemId: string;
+  ammo: number;
+  x: number;
+  y: number;
+  z: number;
 }
 
 function ScorePips({
@@ -98,13 +105,27 @@ export function InGameOverlay() {
     speedModifier: 1.0,
     forceModifier: 1.0,
     jumpModifier: 1.0,
+    heldItemId: "FISTS",
+    ammo: 0,
+    x: 0,
+    y: 0,
+    z: 0,
   });
   const [opponentFighter, setOpponentFighter] = useState<FighterHUDData | null>(null);
+  const [nearbyWeapon, setNearbyWeapon] = useState<{ id: string; name: string; accentColor: string } | null>(null);
+  const [healthToast, setHealthToast] = useState<{ amount: number; key: number } | null>(null);
 
   const room = useAppStore((state) => state.room);
   const setRoom = useAppStore((state) => state.setRoom);
   const player = useAuthStore((state) => state.player);
   const navigateTo = useNavigationStore((state) => state.navigateTo);
+
+  // Auto-dismiss health recovery toast after 2 seconds
+  useEffect(() => {
+    if (!healthToast) return;
+    const timer = setTimeout(() => setHealthToast(null), 2000);
+    return () => clearTimeout(timer);
+  }, [healthToast]);
 
   // Synchronize state machine updates from Colyseus room state
   useEffect(() => {
@@ -144,6 +165,11 @@ export function InGameOverlay() {
             speedModifier: typeof p.speedModifier === "number" ? p.speedModifier : 1.0,
             forceModifier: typeof p.forceModifier === "number" ? p.forceModifier : 1.0,
             jumpModifier: typeof p.jumpModifier === "number" ? p.jumpModifier : 1.0,
+            heldItemId: p.heldItemId ?? "FISTS",
+            ammo: typeof p.ammo === "number" ? p.ammo : 0,
+            x: typeof p.x === "number" ? p.x : 0,
+            y: typeof p.y === "number" ? p.y : 0,
+            z: typeof p.z === "number" ? p.z : 0,
           };
 
           if (sessionId === mySessionId) {
@@ -153,10 +179,51 @@ export function InGameOverlay() {
           }
         }
 
-        if (foundLocal) setLocalFighter(foundLocal);
+        if (foundLocal) {
+          setLocalFighter(foundLocal);
+
+          // Check proximity to available weapon pickup spawners (<2.0m)
+          if (state.itemPickups) {
+            let detectedWeapon: { id: string; name: string; accentColor: string } | null = null;
+            const pickupEntries: [string, any][] =
+              typeof state.itemPickups.entries === "function"
+                ? Array.from(state.itemPickups.entries())
+                : Object.entries(state.itemPickups);
+
+            for (const [_, pickup] of pickupEntries) {
+              if (pickup && pickup.isAvailable && pickup.category === "WEAPON") {
+                const dx = foundLocal.x - pickup.x;
+                const dz = foundLocal.z - pickup.z;
+                const dy = Math.abs(foundLocal.y - pickup.y);
+                if (dy <= 2.0 && dx * dx + dz * dz <= 2.0 * 2.0) {
+                  const itemDef = GAME_ITEMS[pickup.itemId];
+                  if (itemDef) {
+                    detectedWeapon = {
+                      id: itemDef.id,
+                      name: itemDef.name,
+                      accentColor: itemDef.accentColor,
+                    };
+                    break;
+                  }
+                }
+              }
+            }
+            setNearbyWeapon(detectedWeapon);
+          }
+        }
         if (foundOpponent) setOpponentFighter(foundOpponent);
       }
     };
+
+    // Health pickup feedback listener
+    room.onMessage("item:collected", (message: {
+      playerId: string;
+      healthRestored: number;
+    }) => {
+      if (message.playerId === room.sessionId && message.healthRestored > 0) {
+        setHealthToast({ amount: message.healthRestored, key: Date.now() });
+      }
+    });
 
     let isMounted = true;
     const handleStateChange = () => {
@@ -367,6 +434,16 @@ export function InGameOverlay() {
 
         {/* Center Screen: State Machine Callouts */}
         <div className="flex flex-col items-center justify-center my-auto gap-4">
+          {/* Health Recovery Toast Banner */}
+          {healthToast && (
+            <div className="pointer-events-auto bg-emerald-950/95 border-2 border-emerald-400 text-emerald-200 px-6 py-2.5 rounded-2xl shadow-[0_0_30px_rgba(16,185,129,0.7)] animate-bounce flex items-center gap-2.5">
+              <span className="text-xl">💚</span>
+              <span className="text-base font-black uppercase tracking-wider text-emerald-300" style={{ fontFamily: "var(--font-game)" }}>
+                +{healthToast.amount} HP RESTORED!
+              </span>
+            </div>
+          )}
+
           {/* Active Kill Streak Overdrive Banner */}
           {localFighter.killStreak >= 2 && !localFighter.isDead && matchStatus === "PLAYING" && (
             <div className="pointer-events-auto bg-amber-950/90 border-2 border-amber-500 text-amber-200 px-6 py-2.5 rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.6)] animate-pulse flex flex-col items-center">
@@ -478,15 +555,24 @@ export function InGameOverlay() {
           )}
         </div>
 
-        {/* Bottom Bar: Controls Guide */}
-        <div className="flex items-end justify-between w-full">
+        {/* Bottom Bar: Weapon Equipment HUD & Controls Guide */}
+        <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between w-full gap-3">
           {/* Controls Hints */}
           <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/85 backdrop-blur-md border border-slate-800/80 px-4 py-2.5 rounded-xl text-xs text-slate-300 shadow-lg">
             <GiGamepad className="text-amber-400 text-lg flex-shrink-0" />
             <span style={{ fontFamily: "var(--font-tech)" }}>
-              Move: <strong className="text-amber-400">W/S</strong> • Turn: <strong className="text-amber-400">A/D</strong> • Strafe: <strong className="text-amber-400">Q/E</strong> • Jump: <strong className="text-amber-400">SPACE</strong> • Punch (7): <strong className="text-amber-400">J/I</strong> (Click Combo) • Kick (12): <strong className="text-amber-400">K</strong> (Right Click) • Push: <strong className="text-amber-400">L</strong> (Shove to Void)
+              Move: <strong className="text-amber-400">W/S</strong> • Turn: <strong className="text-amber-400">A/D</strong> • Strafe: <strong className="text-amber-400">Q/E</strong> • Jump: <strong className="text-amber-400">SPACE</strong> • Attack: <strong className="text-amber-400">J/I</strong> (Click) • Kick: <strong className="text-amber-400">K</strong> • Push: <strong className="text-amber-400">L</strong> • Pickup: <strong className="text-emerald-400">E</strong> • Drop: <strong className="text-red-400">G</strong>
             </span>
           </div>
+
+          {/* Equipped Weapon HUD */}
+          <WeaponHUD
+            heldItemId={localFighter.heldItemId ?? "FISTS"}
+            ammo={localFighter.ammo ?? 0}
+            nearbyWeapon={nearbyWeapon}
+            onInteract={() => room?.send("player:interact")}
+            onDropWeapon={() => room?.send("player:drop-weapon")}
+          />
         </div>
       </div>
 
