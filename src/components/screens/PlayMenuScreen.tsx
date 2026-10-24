@@ -16,6 +16,7 @@
 
 import { FaArrowLeft } from "react-icons/fa6";
 import { GiBangingGavel, GiCarnivalMask, GiCrossedPistols, GiFist } from "react-icons/gi";
+import { useMatchmakingStore } from "../../store/useMatchmakingStore";
 import { type MatchMode, useNavigationStore } from "../../store/useNavigationStore";
 import { Button } from "../ui/atoms/Button";
 import { Heading } from "../ui/atoms/Heading";
@@ -23,13 +24,11 @@ import { MenuCard } from "../ui/molecules/MenuCard";
 import { ScreenLayout } from "../ui/templates/ScreenLayout";
 
 export function PlayMenuScreen() {
-  const navigateTo = useNavigationStore((state) => state.navigateTo);
   const goBack = useNavigationStore((state) => state.goBack);
-  const setSelectedMatchMode = useNavigationStore((state) => state.setSelectedMatchMode);
+  const startQueue = useMatchmakingStore((state) => state.startQueue);
 
-  const handleSelectMode = (mode: MatchMode) => {
-    setSelectedMatchMode(mode);
-    navigateTo("MATCH_LOADING");
+  const handleSelectMode = async (mode: MatchMode) => {
+    await startQueue(mode);
   };
 
   return (
