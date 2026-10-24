@@ -10,12 +10,12 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 12 — Generic GameItem & Weapon System** |
-| **Current Step** | **Step 12.1 — Define generic GameItem schema in shared/domain/GameItem.ts** |
-| **Last Completed Step** | **Step 11.6 — Invariant verification: Ensure modifiers are strictly purged on room teardown and never written to permanent player database profile** |
-| **Next Step** | **Step 12.1 — Define generic GameItem schema in shared/domain/GameItem.ts** |
-| **Overall Status** | **Phase 11 (Temporary Per-Match Progression & Kill Modifiers) 100% complete; moving to Phase 12.** |
-| **Last Updated** | **2026-10-18** |
+| **Current Phase** | **Phase 13 — Live Match Statistics & Idempotent Persistence** |
+| **Current Step** | **Step 13.1 — Implement runtime MatchStatsTracker inside GameRoom** |
+| **Last Completed Step** | **Step 12.6 — Implement weapon drop on player death or manual drop command** |
+| **Next Step** | **Step 13.1 — Implement runtime MatchStatsTracker inside GameRoom** |
+| **Overall Status** | **Phase 12 (Generic GameItem & Weapon System with Health Recovery and Damage-Scaled Repelling) 100% complete; moving to Phase 13.** |
+| **Last Updated** | **2026-10-24** |
 
 ---
 
@@ -649,21 +649,17 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 12 — Generic GameItem & Weapon System
 
-**Status:** Not Started `[ ]`  
-**Goal:** Server-authoritative item and weapon system with arena spawns, pickups, equips, usage, ammo, and drops.  
+**Status:** Completed `[x]`  
+**Goal:** Server-authoritative item and weapon system with arena spawns, pickups, equips, usage, ammo, drops, walk-over health items, and damage-scaled knockback physics.  
 **Dependencies:** Phase 10, Phase 11.  
 
 #### Steps
-- [ ] 12.1 Define generic `GameItem` schema in `shared/domain/GameItem.ts` (item ID, category `[WEAPON, POWERUP, TOOL]`, damage, range, cooldown, ammo capacity, mesh asset).
-- [ ] 12.2 Create initial weapon catalog:
-  - `FISTS`: Default melee weapon (short range, fast cooldown, moderate knockback).
-  - `ENERGY_BLADE`: Pickup melee weapon (extended range, higher damage, light trail).
-  - `THUNDER_HAMMER`: Heavy melee weapon (slow swing, devastating knockback, area impact).
-  - `PLASMA_PISTOL`: Ranged projectile weapon (limited ammo, projectile physics, ranged damage).
-- [ ] 12.3 Implement arena item spawn nodes in `LevelDefinition` with respawn timers.
-- [ ] 12.4 Implement server pickup validation: client sends `INTERACT()`, server checks distance (<2m), item availability, and grants item.
-- [ ] 12.5 Synchronize held weapon ID in `PlayerState`; client attaches weapon mesh to character hand bone.
-- [ ] 12.6 Implement weapon drop on player death or manual drop command.
+- [x] 12.1 Define generic `GameItem` schema in `shared/domain/GameItem.ts` (item ID, category `[WEAPON, POWERUP, TOOL]`, damage, range, cooldown, ammo capacity, health restoration, mesh asset, accentColor).
+- [x] 12.2 Create initial item & weapon catalog (`FISTS`, `ENERGY_BLADE`, `THUNDER_HAMMER`, `PLASMA_PISTOL`, `HEALTH_PACK_SMALL`, `HEALTH_PACK_LARGE`) and damage-scaled repel physics formula (`baseImpulse * (1 + damage / 20) * forceModifier`).
+- [x] 12.3 Implement arena item spawn nodes in `LevelDefinition` (`LEVEL_THUNDER_DOME_ALPHA`) with respawn timers and category filters.
+- [x] 12.4 Implement server pickup validation & mechanics: walk-over auto-collection for health packs (<1.5m, clamped to 100 HP, preserved when full health) and `player:interact` weapon equip (<2m).
+- [x] 12.5 Synchronize held weapon ID and ammo in `PlayerState`; client attaches weapon meshes to character wrist joints and renders floating rotating 3D pickups via `ItemVisualManager`.
+- [x] 12.6 Implement weapon drop on player death or manual `player:drop-weapon` command, ammo depletion auto-reverts to FISTS, and authoritative spawner respawn cooldowns.
 
 #### Completion Criteria
 - Weapons spawn in arena, can be picked up, wielded with custom animations, fired/swung with distinct physics, and dropped.
