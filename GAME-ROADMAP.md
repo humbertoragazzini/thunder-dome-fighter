@@ -10,11 +10,11 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 15 — Quick Play & Matchmaking Queue System** |
-| **Current Step** | **Step 15.1 — Implement MatchmakingQueueManager supporting queues for 1v1, 3v3, 4v4, and FFA** |
-| **Last Completed Step** | **Phase 14 — Persistent Player Profiles & Lifetime Statistics (14.1 - 14.4)** |
-| **Next Step** | **Step 15.1 — Implement MatchmakingQueueManager supporting queues for 1v1, 3v3, 4v4, and FFA** |
-| **Overall Status** | **Phase 14 (Persistent Player Profiles & Lifetime Statistics) 100% complete; moving to Phase 15.** |
+| **Current Phase** | **Phase 16 — 3v3 Team Mode Support & Atomic Party Matchmaking** |
+| **Current Step** | **Step 16.1 — Configure GameMode_3v3 (2 teams, 3 players each, team score limit 10 kills)** |
+| **Last Completed Step** | **Phase 15 — Quick Play & Matchmaking Queue System (15.1 - 15.7)** |
+| **Next Step** | **Step 16.1 — Configure GameMode_3v3 (2 teams, 3 players each, team score limit 10 kills)** |
+| **Overall Status** | **Phase 15 (Quick Play & Matchmaking Queue System) 100% complete; moving to Phase 16.** |
 | **Last Updated** | **2026-10-24** |
 
 ---
@@ -730,18 +730,18 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 15 — Quick Play & Matchmaking Queue System
 
-**Status:** Not Started `[ ]`  
+**Status:** Completed `[x]`  
 **Goal:** Streamlined matchmaking service placing players into available or new rooms automatically based on selected GameMode.  
 **Dependencies:** Phase 7, Phase 8, Phase 14.  
 
 #### Steps
-- [ ] 15.1 Implement `MatchmakingQueueManager` supporting queues for `1v1`, `3v3`, `4v4`, and `FFA`.
-- [ ] 15.2 Client selects mode from `PlayMenuScreen` and sends `JoinQueue(modeId)`.
-- [ ] 15.3 Queue manager monitors player pools, matches required participant counts, requests new room creation from Colyseus `matchMaker`, and issues seat reservations.
-- [ ] 15.4 Client receives reservation and automatically connects to the designated room.
-- [ ] 15.5 Implement `QuickStart` button on Main Menu: immediately queues player into their most recently played or default mode (`1v1`).
-- [ ] 15.6 Display queue elapsed time, estimated time, and allow clean queue cancellation.
-- [ ] 15.7 Implement **Party & Friend Invitation System**:
+- [x] 15.1 Implement `MatchmakingQueueManager` supporting queues for `1v1`, `3v3`, `4v4`, and `FFA`.
+- [x] 15.2 Client selects mode from `PlayMenuScreen` and sends `JoinQueue(modeId)`.
+- [x] 15.3 Queue manager monitors player pools, matches required participant counts, requests new room creation from Colyseus `matchMaker`, and issues seat reservations.
+- [x] 15.4 Client receives reservation and automatically connects to the designated room.
+- [x] 15.5 Implement `QuickStart` button on Main Menu: immediately queues player into their most recently played or default mode (`1v1`).
+- [x] 15.6 Display queue elapsed time, estimated time, and allow clean queue cancellation.
+- [x] 15.7 Implement **Party & Friend Invitation System**:
   - Players can create a `Party` (generating a shareable invite code or direct friend invite).
   - Friends join the party lobby overlay (showing party member avatars and ready statuses).
   - Party Leader initiates matchmaking for the entire group simultaneously as an indivisible ticket.
@@ -751,8 +751,9 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 - Friends can assemble in a party and queue together under their party leader.
 
 #### Verification
-- Automated test: Launch 2 simulated queue clients; assert matchmaker pairs them and both receive valid room seat reservations within 1 second.
-- Party test: 2 clients form a party, leader queues, verify both clients receive synchronized queue states.
+- Automated test suite (`scratch/test_phase15_matchmaking_and_parties.ts`): All 6 tests passed (Party lifecycle, 6-char codes, leader succession, solo queue & clean cancellation, automated 1v1 matchmaking & seat reservation consumption, party indivisibility ADR-013, mode isolation, and disconnect cleanup).
+- Regression test suites (`scratch/test_phase14_player_profiles.ts`, `scratch/test_phase13_match_stats_and_persistence.ts`, `scratch/test_phase12_weapon_and_item_system.ts`): All 23 tests passed with zero regressions.
+- TypeScript build (`tsc -b`), linter (`npm run lint`), and production bundle (`vite build`): 100% clean with zero errors.
 
 ---
 
