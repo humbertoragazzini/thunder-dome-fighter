@@ -10,11 +10,11 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 13 — Live Match Statistics & Idempotent Persistence** |
-| **Current Step** | **Step 13.1 — Implement runtime MatchStatsTracker inside GameRoom** |
-| **Last Completed Step** | **Step 12.6 — Implement weapon drop on player death or manual drop command** |
-| **Next Step** | **Step 13.1 — Implement runtime MatchStatsTracker inside GameRoom** |
-| **Overall Status** | **Phase 12 (Generic GameItem & Weapon System with Health Recovery and Damage-Scaled Repelling) 100% complete; moving to Phase 13.** |
+| **Current Phase** | **Phase 14 — Persistent Player Profiles & Lifetime Statistics** |
+| **Current Step** | **Step 14.1 — Implement Fastify API endpoint `/api/player/profile` querying Prisma** |
+| **Last Completed Step** | **Step 13.5 — Handle unexpected server crashes: unfinalized matches marked as CANCELLED** |
+| **Next Step** | **Step 14.1 — Implement Fastify API endpoint `/api/player/profile` querying Prisma** |
+| **Overall Status** | **Phase 13 (Live Match Statistics & Idempotent Persistence) 100% complete; moving to Phase 14.** |
 | **Last Updated** | **2026-10-24** |
 
 ---
@@ -673,21 +673,21 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 13 — Live Match Statistics & Idempotent Persistence
 
-**Status:** Not Started `[ ]`  
+**Status:** Completed `[x]`  
 **Goal:** Track in-memory match stats during gameplay and persist validated results atomically to PostgreSQL on match conclusion.  
 **Dependencies:** Phase 8, Phase 12.  
 
 #### Steps
-- [ ] 13.1 Implement runtime `MatchStatsTracker` inside `GameRoom` (accumulates kills, deaths, assists, damage dealt/taken, weapon-specific hits/kills).
-- [ ] 13.2 Implement live `Scoreboard` data synchronization via Colyseus state or on-demand message.
-- [ ] 13.3 Design Prisma schema for match persistence: `Match`, `MatchParticipant`, `MatchTeam`, `PlayerItemStats`.
-- [ ] 13.4 Implement idempotent match finalization transaction via `prisma.$transaction`:
+- [x] 13.1 Implement runtime `MatchStatsTracker` inside `GameRoom` (accumulates kills, deaths, assists, damage dealt/taken, weapon-specific hits/kills).
+- [x] 13.2 Implement live `Scoreboard` data synchronization via Colyseus state or on-demand message.
+- [x] 13.3 Design Prisma schema for match persistence: `Match`, `MatchParticipant`, `MatchTeam`, `PlayerItemStats`.
+- [x] 13.4 Implement idempotent match finalization transaction via `prisma.$transaction`:
   - Record completed `Match`.
   - Record participant results.
   - Update `PlayerStats` (increment matches, wins, losses, kills, deaths, damage).
   - Update `PlayerItemStats` for weapons used.
   - Enforce unique `matchId` constraint to prevent double-counting.
-- [ ] 13.5 Handle unexpected server crashes: unfinalized matches marked as `CANCELLED` without corrupting player lifetime stats.
+- [x] 13.5 Handle unexpected server crashes: unfinalized matches marked as `CANCELLED` without corrupting player lifetime stats.
 
 #### Completion Criteria
 - Match results persist accurately to PostgreSQL within a single atomic Prisma transaction.
