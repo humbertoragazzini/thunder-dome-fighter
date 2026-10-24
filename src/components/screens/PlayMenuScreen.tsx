@@ -26,6 +26,9 @@ import { ScreenLayout } from "../ui/templates/ScreenLayout";
 export function PlayMenuScreen() {
   const goBack = useNavigationStore((state) => state.goBack);
   const startQueue = useMatchmakingStore((state) => state.startQueue);
+  const party = useMatchmakingStore((state) => state.party);
+
+  const squadSize = party ? Object.keys(party.members).length : 0;
 
   const handleSelectMode = async (mode: MatchMode) => {
     await startQueue(mode);
@@ -54,38 +57,65 @@ export function PlayMenuScreen() {
     >
       <div className="w-full max-w-4xl flex flex-col gap-6 py-4">
         <div className="flex flex-col items-center sm:items-start text-center sm:text-left gap-1">
-          <Heading level="h2" color="fire">
-            Deploy to the Arena
-          </Heading>
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
+            <Heading level="h2" color="fire">
+              Deploy to the Arena
+            </Heading>
+            {squadSize > 1 && (
+              <span className="text-xs px-2.5 py-1 rounded-md bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 font-mono font-bold">
+                Squad Active ({squadSize} Fighters)
+              </span>
+            )}
+          </div>
           <p
             className="text-xs md:text-sm text-slate-400 font-bold uppercase tracking-wider"
             style={{ fontFamily: "var(--font-tech)" }}
           >
-            Choose your battle configuration
+            {squadSize > 1
+              ? "Select an arena mode that supports your active squad capacity"
+              : "Choose your battle configuration"}
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <MenuCard
             title="1v1 Arena Duel"
-            description="High-stakes one-on-one duel. Pure authoritative physics, zero latency excuses, total dominance."
+            description={
+              squadSize > 1
+                ? `1v1 duels require solo play. Your squad currently has ${squadSize} fighters.`
+                : "High-stakes one-on-one duel. Pure authoritative physics, zero latency excuses, total dominance."
+            }
             icon={<GiFist className="text-amber-400" />}
-            badgeText="ACTIVE"
-            badgeVariant="emerald"
-            badgePulse
+            badgeText={squadSize > 1 ? "SQUAD TOO LARGE" : "ACTIVE"}
+            badgeVariant={squadSize > 1 ? "slate" : "emerald"}
+            badgePulse={squadSize <= 1}
             accentColor="amber"
-            onClick={() => handleSelectMode("1v1")}
+            disabled={squadSize > 1}
+            onClick={squadSize <= 1 ? () => handleSelectMode("1v1") : undefined}
           />
 
           <MenuCard
             title="3v3 Team Arena"
-            description="Trios tactical arena skirmish. Coordinate offensive pushes, flank angles, and team combos."
+            description={
+              squadSize === 2
+                ? "Trios tactical arena skirmish. Your squad of 2 will fight together on the same team and be backfilled with 1 solo teammate."
+                : squadSize === 3
+                  ? "Trios tactical arena skirmish. Full 3-player squad fighting for arena dominance."
+                  : "Trios tactical arena skirmish. Coordinate offensive pushes, flank angles, and team combos."
+            }
             icon={<GiBangingGavel className="text-cyan-400" />}
-            badgeText="ACTIVE"
-            badgeVariant="emerald"
-            badgePulse
+            badgeText={
+              squadSize > 3
+                ? "SQUAD > 3"
+                : squadSize > 1
+                  ? `SQUAD READY (${squadSize}/3)`
+                  : "ACTIVE"
+            }
+            badgeVariant={squadSize > 3 ? "slate" : "emerald"}
+            badgePulse={squadSize <= 3}
             accentColor="cyan"
-            onClick={() => handleSelectMode("3v3")}
+            disabled={squadSize > 3}
+            onClick={squadSize <= 3 ? () => handleSelectMode("3v3") : undefined}
           />
 
           <MenuCard
@@ -100,13 +130,18 @@ export function PlayMenuScreen() {
 
           <MenuCard
             title="20-Player Free-For-All"
-            description="Maximum chaos stadium brawl. Up to 20 fighters in an open arena. Consecutive kills grant temporary physical streak bonuses!"
+            description={
+              squadSize > 1
+                ? "Free-for-all is individual combat only. Squads cannot queue for FFA."
+                : "Maximum chaos stadium brawl. Up to 20 fighters in an open arena. Consecutive kills grant temporary physical streak bonuses!"
+            }
             icon={<GiCarnivalMask className="text-amber-400" />}
-            badgeText="ACTIVE"
-            badgeVariant="emerald"
-            badgePulse
+            badgeText={squadSize > 1 ? "SOLO ONLY" : "ACTIVE"}
+            badgeVariant={squadSize > 1 ? "slate" : "emerald"}
+            badgePulse={squadSize <= 1}
             accentColor="fire"
-            onClick={() => handleSelectMode("ffa")}
+            disabled={squadSize > 1}
+            onClick={squadSize <= 1 ? () => handleSelectMode("ffa") : undefined}
           />
         </div>
       </div>
