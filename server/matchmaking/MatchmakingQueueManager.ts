@@ -38,7 +38,11 @@ export interface QueuedTicket {
   playerIds: string[];
   participants: QueuedParticipant[];
   queuedAt: number;
-  onMatchFound: (reservation: any, roomId: string) => void;
+  onMatchFound: (
+    reservation: any,
+    roomId: string,
+    participantPlayerId?: string,
+  ) => void;
 }
 
 export class MatchmakingQueueManager {
@@ -279,7 +283,7 @@ export class MatchmakingQueueManager {
               modeId,
               teamIndex: 0,
             });
-            ticket.onMatchFound(reservation, room.roomId);
+            ticket.onMatchFound(reservation, room.roomId, participant.playerId);
           }
         }
 
@@ -294,7 +298,7 @@ export class MatchmakingQueueManager {
               modeId,
               teamIndex: 1,
             });
-            ticket.onMatchFound(reservation, room.roomId);
+            ticket.onMatchFound(reservation, room.roomId, participant.playerId);
           }
         }
       } catch (err) {
@@ -383,7 +387,7 @@ export class MatchmakingQueueManager {
             teamIndex,
           });
 
-          ticket.onMatchFound(reservation, room.roomId);
+          ticket.onMatchFound(reservation, room.roomId, participant.playerId);
         }
       }
     } catch (err) {
