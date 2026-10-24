@@ -30,7 +30,14 @@ import {
   FaRightToBracket,
   FaUserGroup,
 } from "react-icons/fa6";
-import { GiCrossedSwords, GiFist } from "react-icons/gi";
+import {
+  GiBangingGavel,
+  GiCarnivalMask,
+  GiCrossedPistols,
+  GiCrossedSwords,
+  GiFist,
+} from "react-icons/gi";
+import type { GameModeId } from "../../../../shared/domain/GameMode.ts";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useMatchmakingStore } from "../../../store/useMatchmakingStore";
 import { useNavigationStore } from "../../../store/useNavigationStore";
@@ -39,6 +46,50 @@ import { Button } from "../atoms/Button";
 import { Heading } from "../atoms/Heading";
 import { Input } from "../atoms/Input";
 import { ModalBackdrop } from "../templates/ModalBackdrop";
+
+interface ModeOption {
+  id: GameModeId;
+  name: string;
+  teamSize: number;
+  subtitle: string;
+  status: "active" | "phase17";
+  icon: React.ReactNode;
+}
+
+const MODE_OPTIONS: ModeOption[] = [
+  {
+    id: "3v3",
+    name: "3v3 Team Arena",
+    teamSize: 3,
+    subtitle: "2 teams of 3 • 10 KOs",
+    status: "active",
+    icon: <GiBangingGavel className="text-cyan-400" />,
+  },
+  {
+    id: "1v1",
+    name: "1v1 Arena Duel",
+    teamSize: 1,
+    subtitle: "1 vs 1 duel • 3 KOs",
+    status: "active",
+    icon: <GiFist className="text-amber-400" />,
+  },
+  {
+    id: "4v4",
+    name: "4v4 Squad Brawl",
+    teamSize: 4,
+    subtitle: "2 teams of 4 • 15 KOs",
+    status: "phase17",
+    icon: <GiCrossedPistols className="text-purple-400" />,
+  },
+  {
+    id: "ffa",
+    name: "20-Player FFA",
+    teamSize: 1,
+    subtitle: "Free-for-all chaos",
+    status: "active",
+    icon: <GiCarnivalMask className="text-orange-400" />,
+  },
+];
 
 export function PartyModal() {
   const activeModal = useNavigationStore((state) => state.activeModal);
@@ -55,6 +106,7 @@ export function PartyModal() {
   const [inputCode, setInputCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selectedMode, setSelectedMode] = useState<GameModeId>("3v3");
 
   if (activeModal !== "PARTY") {
     return null;
@@ -64,6 +116,21 @@ export function PartyModal() {
   const membersList = party ? Object.values(party.members) : [];
   const currentMember = authPlayer?.id && party ? party.members[authPlayer.id] : null;
   const allMembersReady = membersList.length > 0 && membersList.every((m) => m.isReady);
+
+  const squadSize = membersList.length;
+  // If squad has > 1 member and selectedMode is 1v1 or ffa, fallback to 3v3
+  const effectiveMode: GameModeId =
+    squadSize > 1 && (selectedMode === "1v1" || selectedMode === "ffa")
+      ? "3v3"
+      : selectedMode;
+
+  const currentOption = MODE_OPTIONS.find((m) => m.id === effectiveMode);
+  const isModeValid = Boolean(
+    currentOption &&
+      currentOption.status === "active" &&
+      squadSize <= currentOption.teamSize &&
+      !(effectiveMode === "ffa" && squadSize > 1),
+  );
 
   const handleCopyCode = async () => {
     if (!party) return;
@@ -97,8 +164,9 @@ export function PartyModal() {
   };
 
   const handleStartQueue = async () => {
+    if (!isModeValid) return;
     closeModal();
-    await startQueue("1v1");
+    await startQueue(effectiveMode);
   };
 
   return (
@@ -259,6 +327,97 @@ export function PartyModal() {
               </div>
             </div>
 
+            {/* Game Mode Selection */}
+            <div className="flex flex-col gap-2 pt-2 border-t border-slate-800/80">
+              <div className="flex items-center justify-between">
+                <span
+                  className="text-xs font-bold text-slate-300 uppercase tracking-wider"
+                  style={{ fontFamily: "var(--font-tech)" }}
+                >
+                  Target Match Mode
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {isLeader ? "Leader Selection" : "Selected by Leader"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {MODE_OPTIONS.map((opt) => {
+                  const isSelected = effectiveMode === opt.id;
+                  const isSquadTooLarge = squadSize > opt.teamSize;
+                  const isPhase17 = opt.status === "phase17";
+                  const isFfaSquad = opt.id === "ffa" && squadSize > 1;
+                  const isDisabled = !isLeader || isPhase17 || isSquadTooLarge || isFfaSquad;
+
+                  let badgeLabel = "";
+                  let badgeVariant: "slate" | "cyan" | "purple" = "slate";
+
+                  if (isPhase17) {
+                    badgeLabel = "PHASE 17";
+                    badgeVariant = "purple";
+                  } else if (isSquadTooLarge) {
+                    badgeLabel = `MAX ${opt.teamSize}`;
+                    badgeVariant = "slate";
+                  } else if (isFfaSquad) {
+                    badgeLabel = "SOLO ONLY";
+                    badgeVariant = "slate";
+                  } else if (opt.id === "3v3" && squadSize > 1) {
+                    badgeLabel = `${squadSize}/3 SQUAD`;
+                    badgeVariant = "cyan";
+                  }
+
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => setSelectedMode(opt.id)}
+                      className={`flex flex-col p-2.5 rounded-xl border text-left transition-all ${
+                        isSelected
+                          ? "bg-cyan-950/40 border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.2)] text-white"
+                          : isDisabled
+                            ? "bg-slate-950/40 border-slate-800/50 text-slate-500 cursor-not-allowed opacity-60"
+                            : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 w-full mb-1">
+                        <span className="text-xs font-bold truncate flex items-center gap-1.5">
+                          {opt.icon}
+                          {opt.name}
+                        </span>
+                        {badgeLabel && (
+                          <Badge variant={badgeVariant} className="text-[9px] px-1.5 py-0">
+                            {badgeLabel}
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {opt.subtitle}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Informative squad backfill hint for 3v3 */}
+              {effectiveMode === "3v3" && squadSize === 2 && (
+                <div className="p-2 rounded-lg bg-cyan-950/30 border border-cyan-500/30 text-[11px] text-cyan-300/90 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
+                  <span>
+                    Squad of 2 will fight together on Team Alpha/Beta and be backfilled with 1 solo teammate.
+                  </span>
+                </div>
+              )}
+              {effectiveMode === "3v3" && squadSize === 3 && (
+                <div className="p-2 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-[11px] text-emerald-300/90 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                  <span>
+                    Full 3-player squad! You will be placed together on the same team against the opposing squad.
+                  </span>
+                </div>
+              )}
+            </div>
+
             {/* Squad Actions */}
             <div className="flex flex-col gap-2.5 pt-2 border-t border-slate-800/80">
               {/* Ready Up Button (if not leader) */}
@@ -280,13 +439,15 @@ export function PartyModal() {
                   variant="primary"
                   size="md"
                   onClick={handleStartQueue}
-                  disabled={!allMembersReady}
+                  disabled={!allMembersReady || !isModeValid}
                   leftIcon={<GiCrossedSwords />}
                   className="w-full shadow-lg"
                 >
-                  {allMembersReady
-                    ? "Find Match (Quick Play 1v1)"
-                    : "Waiting for Squad to Ready Up..."}
+                  {!allMembersReady
+                    ? "Waiting for Squad to Ready Up..."
+                    : !isModeValid
+                      ? "Selected Mode Unavailable for Squad"
+                      : `Find Match (${currentOption?.name || "Queue"})`}
                 </Button>
               )}
 
