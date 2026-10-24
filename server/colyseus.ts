@@ -1,11 +1,13 @@
 import { defineServer, defineRoom } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./GameRoom";
+import { MatchmakingRoom } from "./matchmaking/MatchmakingRoom";
 
 const gameServer = defineServer({
   transport: new WebSocketTransport(),
   rooms: {
     game: defineRoom(GameRoom).filterBy(["modeId", "levelId"]),
+    matchmaking: defineRoom(MatchmakingRoom),
   },
 });
 
