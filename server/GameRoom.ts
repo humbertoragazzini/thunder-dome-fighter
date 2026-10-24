@@ -42,7 +42,7 @@ import {
 } from "../shared/domain/MatchPlayerState";
 import { GAME_ITEMS } from "../shared/domain/GameItem";
 import { calculateDamageScaledKnockback } from "../shared/player/PlayerPhysicsMath";
-import { MatchStatsTracker, type MatchSummaryPayload } from "./match/MatchStatsTracker.js";
+import { MatchStatsTracker } from "./match/MatchStatsTracker.js";
 import { MatchFinalizer } from "./match/MatchFinalizer.js";
 
 export interface GameRoomOptions {
