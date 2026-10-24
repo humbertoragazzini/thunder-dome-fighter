@@ -19,6 +19,7 @@
 // physics, positions, health, and outcomes; clients stream inputs only.
 // ==================================================
 
+import crypto from "node:crypto";
 import { type Client, Room, ServerError } from "colyseus";
 import { GameState, ItemPickupState, PlayerState } from "./GameState";
 import { SimulatorWorld } from "./SimulationWorld";
@@ -41,6 +42,8 @@ import {
 } from "../shared/domain/MatchPlayerState";
 import { GAME_ITEMS } from "../shared/domain/GameItem";
 import { calculateDamageScaledKnockback } from "../shared/player/PlayerPhysicsMath";
+import { MatchStatsTracker, type MatchSummaryPayload } from "./match/MatchStatsTracker.js";
+import { MatchFinalizer } from "./match/MatchFinalizer.js";
 
 export interface GameRoomOptions {
   serverName?: string;
@@ -167,6 +170,12 @@ export class GameRoom extends Room {
   private simulationWorld!: SimulatorWorld;
   private gameMode!: GameMode;
   private level!: LevelDefinition;
+
+  // Authoritative Match Statistics & Persistence (Phase 13)
+  public matchId: string = crypto.randomUUID();
+  public matchStatsTracker: MatchStatsTracker = new MatchStatsTracker();
+  public matchStartTime: Date = new Date();
+  public isFinalized: boolean = false;
 
   getGameMode(): GameMode {
     return this.gameMode;
@@ -445,11 +454,24 @@ export class GameRoom extends Room {
     playerState.lastAttackAction = "NONE";
     playerState.heldItemId = "FISTS";
     playerState.ammo = 0;
+    playerState.kills = 0;
+    playerState.deaths = 0;
+    playerState.assists = 0;
+    playerState.damageDealt = 0;
+    playerState.damageReceived = 0;
     playerState.isDead = false;
     playerState.isInvulnerable = false;
     playerState.x = spawnPoint.position.x;
     playerState.y = spawnPoint.position.y;
     playerState.z = spawnPoint.position.z;
+
+    // Register participant in MatchStatsTracker (Phase 13)
+    const persistentPlayerId = auth?.playerId || client.sessionId;
+    this.matchStatsTracker.registerParticipant(
+      client.sessionId,
+      persistentPlayerId,
+      teamAssignment.teamIndex,
+    );
 
     const halfYaw = spawnPoint.rotationYaw / 2;
     playerState.rx = 0;
@@ -557,6 +579,7 @@ export class GameRoom extends Room {
 
   public startMatch() {
     console.log("⚔️ MATCH STARTED: Physical gameplay simulation active!");
+    this.matchStartTime = new Date();
     this.state.matchStatus = "PLAYING";
     this.state.countdownSeconds = 0;
     this.state.remainingTimeSeconds = GameRoom.MATCH_DURATION_SEC;
@@ -581,6 +604,11 @@ export class GameRoom extends Room {
   }
 
   public endMatch(reason: string, winnerPlayerId?: string, winnerTeamIndex?: number) {
+    if (this.isFinalized) {
+      return;
+    }
+    this.isFinalized = true;
+
     console.log(`🏁 MATCH ENDED [Reason: ${reason}]. Winner: ${winnerPlayerId ?? "Draw"}`);
     this.state.matchStatus = "MATCH_END";
     this.simulationWorld.setGameplayActive(false);
@@ -609,6 +637,49 @@ export class GameRoom extends Room {
     if (winnerTeamIndex !== undefined) {
       this.state.winningTeamIndex = winnerTeamIndex;
     }
+
+    // Sync final scores to match tracker
+    for (const [sId, pState] of this.state.players.entries()) {
+      this.matchStatsTracker.setScore(sId, pState.score);
+    }
+
+    // Resolve winning player's persistent ID if winnerPlayerId is a sessionId
+    let persistentWinnerId = winnerPlayerId;
+    if (winnerPlayerId && this.clients) {
+      const winnerClient = this.clients.find((c) => c.sessionId === winnerPlayerId);
+      const winnerAuth = winnerClient?.auth as AuthenticatedUser | undefined;
+      if (winnerAuth?.playerId) {
+        persistentWinnerId = winnerAuth.playerId;
+      }
+    }
+
+    const endedAt = new Date();
+    const summary = this.matchStatsTracker.exportMatchSummary(
+      this.matchId,
+      this.gameMode.id,
+      this.level.id,
+      this.matchStartTime,
+      endedAt,
+      persistentWinnerId,
+      winnerTeamIndex,
+      this.roomId,
+    );
+
+    // Broadcast discrete match summary event with full scorecard
+    try {
+      this.broadcast("match:summary", summary);
+    } catch {
+      // In headless test environments with mock clients, broadcast transport may not be attached
+    }
+
+    // Persist to PostgreSQL idempotently (ADR-012)
+    MatchFinalizer.finalizeMatch(summary)
+      .then((res) => {
+        console.log(`💾 Match ${summary.matchId} finalized: ${res.status} (alreadyFinalized: ${res.alreadyFinalized})`);
+      })
+      .catch((err) => {
+        console.error(`❌ Match finalization error for ${summary.matchId}:`, err);
+      });
   }
 
   // ==================================================
@@ -758,6 +829,19 @@ export class GameRoom extends Room {
 
     // Apply damage authoritatively
     victimState.health = Math.max(0, victimState.health - finalDamage);
+
+    // Update live combat metrics in PlayerState and MatchStatsTracker (Phase 13)
+    this.matchStatsTracker.recordDamage(
+      attackerSessionId,
+      victimSessionId,
+      heldItemId,
+      finalDamage,
+    );
+    if (attackerState) {
+      attackerState.damageDealt += finalDamage;
+    }
+    victimState.damageReceived += finalDamage;
+
     console.log(
       `💥 Hit landed! Attacker ${attackerSessionId} used ${action} (weapon: ${heldItemId}) on ${victimSessionId} [Zone: ${hitZone}, Crit: ${isCritical}]. Damage: ${finalDamage}, Repel: ${dynamicKnockback.toFixed(2)}, Target HP: ${victimState.health}`,
     );
@@ -998,12 +1082,29 @@ export class GameRoom extends Room {
       ) {
         killerSessionId = attribution.attackerSessionId;
       }
+    // Authoritatively track kill and death (Phase 13)
+    const killerWeapon = killerSessionId
+      ? (this.state.players.get(killerSessionId)?.heldItemId ?? "FISTS")
+      : "ENVIRONMENT";
+    const awardedAssists = this.matchStatsTracker.recordKill(
+      killerSessionId ?? null,
+      victimSessionId,
+      killerWeapon,
+    );
+    victimState.deaths++;
+
+    for (const assisterSessionId of awardedAssists) {
+      const assisterState = this.state.players.get(assisterSessionId);
+      if (assisterState) {
+        assisterState.assists++;
+      }
     }
 
     if (killerSessionId && killerSessionId !== victimSessionId) {
       const killerState = this.state.players.get(killerSessionId);
       if (killerState) {
         killerState.score++;
+        killerState.kills++;
         killerState.killStreak++;
 
         // Mode-Gated Kill Streak Modifiers (Phase 11): Active only in FFA, strictly disabled in 1v1 / team
@@ -1115,5 +1216,17 @@ export class GameRoom extends Room {
     this.respawnTimers.clear();
     this.simulationWorld?.dispose();
     this.lastAcceptedSequenceBySessionId.clear();
+
+    // If room is disposed while actively PLAYING without clean endMatch, mark CANCELLED (Phase 13)
+    if (this.state.matchStatus === "PLAYING" && !this.isFinalized) {
+      MatchFinalizer.cancelMatch(
+        this.matchId,
+        this.gameMode?.id ?? "1v1",
+        this.level?.id ?? "thunder-dome-alpha",
+        this.roomId,
+      ).catch((err) => {
+        console.error("Error cancelling abandoned match on dispose:", err);
+      });
+    }
   }
 }
