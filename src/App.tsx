@@ -25,6 +25,7 @@ import { InGameOverlay } from "./components/screens/InGameOverlay";
 import { MainMenuScreen } from "./components/screens/MainMenuScreen";
 import { MatchLoadingScreen } from "./components/screens/MatchLoadingScreen";
 import { PlayMenuScreen } from "./components/screens/PlayMenuScreen";
+import { ProfileScreen } from "./components/screens/ProfileScreen";
 import { DuplicateTabDialog } from "./components/ui/organisms/DuplicateTabDialog";
 import { ErrorDialog } from "./components/ui/organisms/ErrorDialog";
 import { ProfileModal } from "./components/ui/organisms/ProfileModal";
@@ -87,6 +88,7 @@ export default function App() {
         {currentScreen === "AUTH" && <AuthScreen />}
         {currentScreen === "MAIN_MENU" && <MainMenuScreen />}
         {currentScreen === "PLAY_MENU" && <PlayMenuScreen />}
+        {currentScreen === "PROFILE" && <ProfileScreen />}
         {currentScreen === "MATCH_LOADING" && <MatchLoadingScreen />}
         {currentScreen === "IN_GAME" && <InGameOverlay />}
       </div>
