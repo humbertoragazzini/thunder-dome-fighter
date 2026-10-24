@@ -57,6 +57,7 @@ export interface ItemSpawnPoint {
   id: string;
   position: Vector3D;
   allowedCategories: Array<"WEAPON" | "POWERUP" | "TOOL">;
+  defaultItemId?: string;
   respawnSeconds: number;
 }
 
@@ -226,23 +227,53 @@ export const LEVEL_THUNDER_DOME_ALPHA: LevelDefinition = {
     },
   ],
   itemSpawns: [
+    // 1. Center Arena: Heavy Melee (Thunder Hammer)
     {
       id: "item-center",
       position: { x: 0, y: 0.5, z: 0 },
       allowedCategories: ["WEAPON"],
+      defaultItemId: "THUNDER_HAMMER",
       respawnSeconds: 30,
     },
+    // 2. North Platform: Ranged (Plasma Pistol)
     {
       id: "item-north",
-      position: { x: 0, y: 1.5, z: 7.5 },
-      allowedCategories: ["WEAPON", "POWERUP"],
+      position: { x: 0, y: 1.7, z: 7.5 },
+      allowedCategories: ["WEAPON"],
+      defaultItemId: "PLASMA_PISTOL",
       respawnSeconds: 20,
     },
+    // 3. South Platform: Light Melee (Energy Blade)
     {
       id: "item-south",
-      position: { x: 0, y: 1.5, z: -7.5 },
-      allowedCategories: ["WEAPON", "POWERUP"],
+      position: { x: 0, y: 1.7, z: -7.5 },
+      allowedCategories: ["WEAPON"],
+      defaultItemId: "ENERGY_BLADE",
       respawnSeconds: 20,
+    },
+    // 4. West Flank: Minor Health Stim (+25 HP)
+    {
+      id: "item-health-west",
+      position: { x: -7.0, y: 0.5, z: 0 },
+      allowedCategories: ["POWERUP"],
+      defaultItemId: "HEALTH_PACK_SMALL",
+      respawnSeconds: 15,
+    },
+    // 5. East Flank: Minor Health Stim (+25 HP)
+    {
+      id: "item-health-east",
+      position: { x: 7.0, y: 0.5, z: 0 },
+      allowedCategories: ["POWERUP"],
+      defaultItemId: "HEALTH_PACK_SMALL",
+      respawnSeconds: 15,
+    },
+    // 6. Contested Apex: Mega Health Stim (+50 HP)
+    {
+      id: "item-health-center",
+      position: { x: 0, y: 0.5, z: 3.5 },
+      allowedCategories: ["POWERUP"],
+      defaultItemId: "HEALTH_PACK_LARGE",
+      respawnSeconds: 30,
     },
   ],
   collisionHulls: [
