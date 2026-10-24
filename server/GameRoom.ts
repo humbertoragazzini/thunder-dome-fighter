@@ -20,13 +20,14 @@
 // ==================================================
 
 import { type Client, Room, ServerError } from "colyseus";
-import { GameState, PlayerState } from "./GameState";
+import { GameState, ItemPickupState, PlayerState } from "./GameState";
 import { SimulatorWorld } from "./SimulationWorld";
 import {
   type PlayerInputCommand,
   type CharacterInputCommand,
   type AttackActionType,
   PHYSICS_DT_MS,
+  PHYSICS_DT_SECONDS,
   COMBAT_CONFIG,
 } from "../shared/player/PlayerConfig";
 import { verifySessionToken, type AuthenticatedUser } from "./auth/TokenVerifier.ts";
@@ -38,6 +39,8 @@ import {
   computeKillStreakModifiers,
   DEFAULT_MATCH_PLAYER_MODIFIERS,
 } from "../shared/domain/MatchPlayerState";
+import { GAME_ITEMS } from "../shared/domain/GameItem";
+import { calculateDamageScaledKnockback } from "../shared/player/PlayerPhysicsMath";
 
 export interface GameRoomOptions {
   serverName?: string;
@@ -256,16 +259,51 @@ export class GameRoom extends Room {
 
     this.simulationWorld = new SimulatorWorld(this.level);
 
+    // Initialize authoritative arena item & weapon spawners (Phase 12)
+    if (this.gameMode.enableItemSpawns && this.level.itemSpawns) {
+      for (const spawner of this.level.itemSpawns) {
+        const pickup = new ItemPickupState();
+        pickup.spawnId = spawner.id;
+        pickup.itemId =
+          spawner.defaultItemId ??
+          (spawner.allowedCategories.includes("WEAPON")
+            ? "ENERGY_BLADE"
+            : "HEALTH_PACK_SMALL");
+        pickup.category =
+          spawner.allowedCategories.includes("POWERUP") &&
+          !spawner.allowedCategories.includes("WEAPON")
+            ? "POWERUP"
+            : (spawner.allowedCategories[0] ?? "WEAPON");
+        pickup.isAvailable = true;
+        pickup.respawnRemainingSeconds = 0;
+        pickup.x = spawner.position.x;
+        pickup.y = spawner.position.y;
+        pickup.z = spawner.position.z;
+        this.state.itemPickups.set(spawner.id, pickup);
+      }
+    }
+
     await this.simulationWorld.initialize(() => {
       this.syncSimulationState();
       if (this.state.matchStatus === "PLAYING") {
         this.checkVoidFalls();
+        this.checkItemPickups();
+        this.updateItemRespawnTimers(PHYSICS_DT_SECONDS);
       }
     });
 
     // Register input network message
     this.onMessage("player-input", (client, message) => {
       this.handlePlayerInput(client, message);
+    });
+
+    // Register item interaction & weapon drop network messages (Phase 12)
+    this.onMessage("player:interact", (client) => {
+      this.handlePlayerInteract(client.sessionId);
+    });
+
+    this.onMessage("player:drop-weapon", (client) => {
+      this.handlePlayerDropWeapon(client.sessionId);
     });
   }
 
@@ -405,6 +443,8 @@ export class GameRoom extends Room {
     playerState.forceModifier = 1.0;
     playerState.jumpModifier = 1.0;
     playerState.lastAttackAction = "NONE";
+    playerState.heldItemId = "FISTS";
+    playerState.ammo = 0;
     playerState.isDead = false;
     playerState.isInvulnerable = false;
     playerState.x = spawnPoint.position.x;
@@ -585,21 +625,66 @@ export class GameRoom extends Room {
       return;
     }
 
-    // Lookup combat move definition
-    const moveDef =
-      action === "LEFT_PUNCH"
-        ? COMBAT_CONFIG.LEFT_PUNCH
-        : action === "RIGHT_PUNCH"
-          ? COMBAT_CONFIG.RIGHT_PUNCH
-          : action === "KICK"
-            ? COMBAT_CONFIG.KICK
-            : action === "PUSH"
-              ? COMBAT_CONFIG.PUSH
-              : action === "LIGHT_PUNCH"
-                ? COMBAT_CONFIG.LIGHT_PUNCH
-                : action === "HEAVY_PUNCH"
-                  ? COMBAT_CONFIG.HEAVY_PUNCH
-                  : null;
+    const attackerState = this.state.players.get(attackerSessionId);
+    const heldItemId = attackerState?.heldItemId ?? "FISTS";
+    const heldWeapon = GAME_ITEMS[heldItemId];
+
+    // Determine combat move definition (equipped weapon overrides standard unarmed punch)
+    let moveDef: {
+      damage: number;
+      range: number;
+      coneAngleRad: number;
+      knockbackImpulse: number;
+      cooldownSeconds: number;
+    } | null = null;
+
+    if (
+      heldWeapon &&
+      heldItemId !== "FISTS" &&
+      (action === "LEFT_PUNCH" ||
+        action === "RIGHT_PUNCH" ||
+        action === "LIGHT_PUNCH" ||
+        action === "HEAVY_PUNCH")
+    ) {
+      // Weapon attack
+      moveDef = {
+        damage: heldWeapon.damage,
+        range: heldWeapon.range,
+        coneAngleRad: heldWeapon.coneAngleRad,
+        knockbackImpulse: heldWeapon.knockbackImpulse,
+        cooldownSeconds: heldWeapon.cooldownSeconds,
+      };
+
+      // Handle ranged weapon ammo
+      if (heldWeapon.weaponType === "RANGED" && attackerState) {
+        if (attackerState.ammo > 0) {
+          attackerState.ammo--;
+          if (attackerState.ammo <= 0) {
+            console.log(`🔫 Player ${attackerSessionId} depleted ammo for ${heldWeapon.name}, reverting to FISTS`);
+            attackerState.heldItemId = "FISTS";
+          }
+        } else {
+          attackerState.heldItemId = "FISTS";
+          return;
+        }
+      }
+    } else {
+      // Unarmed / default combat moves
+      moveDef =
+        action === "LEFT_PUNCH"
+          ? COMBAT_CONFIG.LEFT_PUNCH
+          : action === "RIGHT_PUNCH"
+            ? COMBAT_CONFIG.RIGHT_PUNCH
+            : action === "KICK"
+              ? COMBAT_CONFIG.KICK
+              : action === "PUSH"
+                ? COMBAT_CONFIG.PUSH
+                : action === "LIGHT_PUNCH"
+                  ? COMBAT_CONFIG.LIGHT_PUNCH
+                  : action === "HEAVY_PUNCH"
+                    ? COMBAT_CONFIG.HEAVY_PUNCH
+                    : null;
+    }
 
     if (!moveDef) return;
 
@@ -610,7 +695,6 @@ export class GameRoom extends Room {
     // Apply cooldown to attacker
     this.simulationWorld.setAttackCooldown(attackerSessionId, moveDef.cooldownSeconds);
 
-    const attackerState = this.state.players.get(attackerSessionId);
     const attackState = this.simulationWorld.getEntityAttackState(attackerSessionId);
     if (attackerState) {
       attackerState.lastAttackAction = action;
@@ -648,11 +732,18 @@ export class GameRoom extends Room {
     const finalDamage = hit.finalDamage ?? moveDef.damage;
     const isCritical = hit.isCritical ?? (hitZone === "HEAD");
 
+    // Dynamic Damage-Scaled Knockback Impulse (Phase 12 User Requirement: "more damage = more repelling")
+    const dynamicKnockback = calculateDamageScaledKnockback(
+      moveDef.knockbackImpulse,
+      finalDamage,
+      1.0, // attacker forceModifier is multiplied inside applyKnockbackImpulse
+    );
+
     // Impart physical knockback impulse in Havok
     this.simulationWorld.applyKnockbackImpulse(
       attackerSessionId,
       victimSessionId,
-      moveDef.knockbackImpulse,
+      dynamicKnockback,
       hit.knockbackDirection,
     );
 
@@ -665,7 +756,7 @@ export class GameRoom extends Room {
     // Apply damage authoritatively
     victimState.health = Math.max(0, victimState.health - finalDamage);
     console.log(
-      `💥 Hit landed! Attacker ${attackerSessionId} used ${action} on ${victimSessionId} [Zone: ${hitZone}, Crit: ${isCritical}]. Damage: ${finalDamage}, Target HP: ${victimState.health}`,
+      `💥 Hit landed! Attacker ${attackerSessionId} used ${action} (weapon: ${heldItemId}) on ${victimSessionId} [Zone: ${hitZone}, Crit: ${isCritical}]. Damage: ${finalDamage}, Repel: ${dynamicKnockback.toFixed(2)}, Target HP: ${victimState.health}`,
     );
 
     // Broadcast discrete combat hit event
@@ -673,7 +764,7 @@ export class GameRoom extends Room {
       this.broadcast("combat:damage-applied", {
         attackerPlayerId: attackerSessionId,
         victimPlayerId: victimSessionId,
-        weaponId: action,
+        weaponId: heldItemId !== "FISTS" ? heldItemId : action,
         attackAction: action,
         hitZone,
         comboCount: attackState?.comboCount ?? 0,
@@ -686,9 +777,9 @@ export class GameRoom extends Room {
         },
         knockbackForce: hit.knockbackDirection
           ? {
-              x: hit.knockbackDirection.x * moveDef.knockbackImpulse,
-              y: hit.knockbackDirection.y * moveDef.knockbackImpulse,
-              z: hit.knockbackDirection.z * moveDef.knockbackImpulse,
+              x: hit.knockbackDirection.x * dynamicKnockback,
+              y: hit.knockbackDirection.y * dynamicKnockback,
+              z: hit.knockbackDirection.z * dynamicKnockback,
             }
           : { x: 0, y: 0.5, z: 0 },
         isCritical,
@@ -714,6 +805,164 @@ export class GameRoom extends Room {
     }
   }
 
+  // ==================================================
+  // ITEM & WEAPON PICKUP LOGIC (PHASE 12)
+  // ==================================================
+
+  public checkItemPickups(): void {
+    if (!this.gameMode.enableItemSpawns) return;
+
+    for (const playerState of this.state.players.values()) {
+      if (playerState.isDead) continue;
+
+      for (const pickup of this.state.itemPickups.values()) {
+        if (!pickup.isAvailable) continue;
+
+        const item = GAME_ITEMS[pickup.itemId];
+        if (!item) continue;
+
+        // Walk-over auto-collection proximity check (<1.5m horizontal, <2.0m vertical)
+        const dx = playerState.x - pickup.x;
+        const dz = playerState.z - pickup.z;
+        const dy = Math.abs(playerState.y - pickup.y);
+        const distSq = dx * dx + dz * dz;
+
+        if (distSq <= 1.5 * 1.5 && dy <= 2.0) {
+          // Health Packs: walk-over collection only if player is below maxHealth
+          if (pickup.category === "POWERUP" || item.category === "POWERUP") {
+            if (playerState.health < playerState.maxHealth) {
+              const healAmount = item.healthRestore ?? (item.id === "HEALTH_PACK_LARGE" ? 50 : 25);
+              const oldHealth = playerState.health;
+              playerState.health = Math.min(playerState.maxHealth, playerState.health + healAmount);
+              const actualHealed = playerState.health - oldHealth;
+
+              const spawnerDef = this.level.itemSpawns?.find((s) => s.id === pickup.spawnId);
+              pickup.isAvailable = false;
+              pickup.respawnRemainingSeconds = spawnerDef?.respawnSeconds ?? 15;
+
+              console.log(
+                `💚 Player ${playerState.playerId} collected ${item.name} (+${actualHealed} HP). Health: ${oldHealth} -> ${playerState.health}`,
+              );
+
+              try {
+                this.broadcast("item:collected", {
+                  playerId: playerState.playerId,
+                  spawnId: pickup.spawnId,
+                  itemId: pickup.itemId,
+                  healthRestored: actualHealed,
+                  remainingHealth: playerState.health,
+                });
+              } catch {
+                // Mock client fallback
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  public updateItemRespawnTimers(deltaSeconds: number): void {
+    if (!this.gameMode.enableItemSpawns) return;
+
+    for (const pickup of this.state.itemPickups.values()) {
+      if (!pickup.isAvailable) {
+        pickup.respawnRemainingSeconds -= deltaSeconds;
+        if (pickup.respawnRemainingSeconds <= 0) {
+          pickup.isAvailable = true;
+          pickup.respawnRemainingSeconds = 0;
+          console.log(`✨ Item respawned at node ${pickup.spawnId}: ${pickup.itemId}`);
+          try {
+            this.broadcast("item:respawned", {
+              spawnId: pickup.spawnId,
+              itemId: pickup.itemId,
+            });
+          } catch {
+            // Mock client fallback
+          }
+        }
+      }
+    }
+  }
+
+  public handlePlayerInteract(sessionId: string): void {
+    if (this.state.matchStatus !== "PLAYING" || !this.gameMode.enableItemSpawns) return;
+
+    const playerState = this.state.players.get(sessionId);
+    if (!playerState || playerState.isDead) return;
+
+    // Search for nearest available weapon pickup within interaction radius (<2.0m)
+    let closestPickup: ItemPickupState | null = null;
+    let closestDistSq = 2.0 * 2.0;
+
+    for (const pickup of this.state.itemPickups.values()) {
+      if (!pickup.isAvailable) continue;
+      if (pickup.category !== "WEAPON") continue;
+
+      const dx = playerState.x - pickup.x;
+      const dz = playerState.z - pickup.z;
+      const dy = Math.abs(playerState.y - pickup.y);
+      if (dy > 2.0) continue;
+
+      const distSq = dx * dx + dz * dz;
+      if (distSq <= closestDistSq) {
+        closestDistSq = distSq;
+        closestPickup = pickup;
+      }
+    }
+
+    if (!closestPickup) return;
+
+    const item = GAME_ITEMS[closestPickup.itemId];
+    if (!item) return;
+
+    // Equip weapon
+    playerState.heldItemId = item.id;
+    playerState.ammo = item.ammoCapacity;
+
+    const spawnerDef = this.level.itemSpawns?.find((s) => s.id === closestPickup?.spawnId);
+    closestPickup.isAvailable = false;
+    closestPickup.respawnRemainingSeconds = spawnerDef?.respawnSeconds ?? 20;
+
+    console.log(
+      `🗡️ Player ${sessionId} equipped ${item.name} (${item.id}) with ${playerState.ammo} ammo`,
+    );
+
+    try {
+      this.broadcast("player:item-equipped", {
+        playerId: sessionId,
+        itemId: item.id,
+        ammo: playerState.ammo,
+        spawnId: closestPickup.spawnId,
+      });
+    } catch {
+      // Mock client fallback
+    }
+  }
+
+  public handlePlayerDropWeapon(sessionId: string): void {
+    if (this.state.matchStatus !== "PLAYING") return;
+
+    const playerState = this.state.players.get(sessionId);
+    if (!playerState || playerState.isDead) return;
+
+    if (playerState.heldItemId !== "FISTS") {
+      const droppedItemId = playerState.heldItemId;
+      playerState.heldItemId = "FISTS";
+      playerState.ammo = 0;
+      console.log(`🫳 Player ${sessionId} dropped weapon: ${droppedItemId}`);
+      try {
+        this.broadcast("player:item-equipped", {
+          playerId: sessionId,
+          itemId: "FISTS",
+          ammo: 0,
+        });
+      } catch {
+        // Mock client fallback
+      }
+    }
+  }
+
   public eliminatePlayer(
     victimSessionId: string,
     cause: "COMBAT_DAMAGE" | "VOID_FALL",
@@ -724,6 +973,8 @@ export class GameRoom extends Room {
 
     victimState.isDead = true;
     victimState.health = 0;
+    victimState.heldItemId = "FISTS";
+    victimState.ammo = 0;
 
     // Reset victim's kill streak and physical modifiers to baseline 1.0x (Phase 11)
     victimState.killStreak = 0;
@@ -819,6 +1070,8 @@ export class GameRoom extends Room {
     playerState.health = 100;
     playerState.isDead = false;
     playerState.isInvulnerable = true;
+    playerState.heldItemId = "FISTS";
+    playerState.ammo = 0;
     playerState.killStreak = 0;
     playerState.speedModifier = 1.0;
     playerState.forceModifier = 1.0;
