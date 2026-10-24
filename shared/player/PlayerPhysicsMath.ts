@@ -204,3 +204,27 @@ export function calculateJumpImpulse(
   }
   return out;
 }
+
+/**
+ * Calculates dynamic knockback / repelling impulse scaled by actual damage dealt.
+ *
+ * WHAT IT DOES:
+ * Ensures all successful hits repel opponents physically, with higher damage attacks
+ * (heavy weapons, kicks, critical headshots) imparting proportionally stronger repelling impulse.
+ *
+ * HOW IT WORKS:
+ * Scales baseImpulse by a damage factor (1.0 + damage / 20.0) and attacker forceModifier:
+ * repelImpulse = baseImpulse * (1.0 + damage / 20.0) * forceModifier.
+ *
+ * WHY IT EXISTS:
+ * Fulfills the "more damage = more repelling" combat feel across all weapons and unarmed strikes.
+ */
+export function calculateDamageScaledKnockback(
+  baseImpulse: number,
+  damageDealt: number,
+  forceModifier: number = 1.0,
+): number {
+  const damageFactor = 1.0 + Math.max(0, damageDealt) / 20.0;
+  return baseImpulse * damageFactor * Math.max(0.1, forceModifier);
+}
+

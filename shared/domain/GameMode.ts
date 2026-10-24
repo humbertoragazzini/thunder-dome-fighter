@@ -56,6 +56,9 @@ export interface GameMode {
 
   /** Whether kill streak physical bonuses (+speed, +force, +jump) are active in this mode */
   enableKillStreakModifiers: boolean;
+
+  /** Whether arena item and weapon spawners are active in this mode */
+  enableItemSpawns: boolean;
 }
 
 // ==================================================
@@ -75,6 +78,7 @@ export const GAME_MODE_1V1: GameMode = {
   respawnDelaySeconds: 3,
   friendlyFire: false,
   enableKillStreakModifiers: false,
+  enableItemSpawns: true,
 };
 
 export const GAME_MODE_3V3: GameMode = {
@@ -90,6 +94,7 @@ export const GAME_MODE_3V3: GameMode = {
   respawnDelaySeconds: 4,
   friendlyFire: false,
   enableKillStreakModifiers: false,
+  enableItemSpawns: true,
 };
 
 export const GAME_MODE_4V4: GameMode = {
@@ -105,6 +110,7 @@ export const GAME_MODE_4V4: GameMode = {
   respawnDelaySeconds: 5,
   friendlyFire: false,
   enableKillStreakModifiers: false,
+  enableItemSpawns: true,
 };
 
 export const GAME_MODE_FFA: GameMode = {
@@ -120,6 +126,7 @@ export const GAME_MODE_FFA: GameMode = {
   respawnDelaySeconds: 3,
   friendlyFire: true,
   enableKillStreakModifiers: true,
+  enableItemSpawns: true,
 };
 
 /**

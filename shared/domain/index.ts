@@ -15,6 +15,7 @@
 
 export * from "./Identity.ts";
 export * from "./GameMode.ts";
+export * from "./GameItem.ts";
 export * from "./Level.ts";
 export * from "./Match.ts";
 export * from "./Party.ts";
