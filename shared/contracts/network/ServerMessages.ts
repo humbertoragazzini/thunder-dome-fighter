@@ -16,6 +16,7 @@
 
 import type { MatchStatus, MatchSummaryView } from "../../domain/Match.ts";
 import type { Party } from "../../domain/Party.ts";
+import type { GameModeId } from "../../domain/GameMode.ts";
 
 /**
  * Message channel identifiers for server-to-client traffic.
@@ -58,8 +59,12 @@ export interface MatchCountdownPayload {
 }
 
 export interface MatchmakingStatusPayload {
-  status: "QUEUED" | "MATCH_FOUND" | "CONNECTING" | "FAILED";
+  status: "IDLE" | "QUEUED" | "MATCH_FOUND" | "CONNECTING" | "FAILED";
+  gameModeId?: GameModeId;
   estimatedWaitSeconds?: number;
+  reservation?: any;
+  roomId?: string;
+  reason?: string;
 }
 
 export interface PartyUpdatedPayload {
