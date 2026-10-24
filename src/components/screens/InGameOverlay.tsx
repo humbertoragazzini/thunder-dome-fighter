@@ -101,6 +101,13 @@ export function InGameOverlay() {
   const [isScoreboardOpen, setIsScoreboardOpen] = useState<boolean>(false);
   const [scoreboardParticipants, setScoreboardParticipants] = useState<ScoreboardParticipant[]>([]);
 
+  // Synchronized Team Mode State (Phase 16)
+  const [modeId, setModeId] = useState<string>("1v1");
+  const [team0Score, setTeam0Score] = useState<number>(0);
+  const [team1Score, setTeam1Score] = useState<number>(0);
+  const [team0Fighters, setTeam0Fighters] = useState<FighterHUDData[]>([]);
+  const [team1Fighters, setTeam1Fighters] = useState<FighterHUDData[]>([]);
+
   const [localFighter, setLocalFighter] = useState<FighterHUDData>({
     id: "",
     name: "Fighter",
@@ -147,10 +154,13 @@ export function InGameOverlay() {
     const syncState = () => {
       const state = room.state as any;
       if (!state) return;
+      if (state.modeId) setModeId(state.modeId);
       if (state.matchStatus) setMatchStatus(state.matchStatus);
       if (typeof state.countdownSeconds === "number") setCountdownSeconds(state.countdownSeconds);
       if (typeof state.remainingTimeSeconds === "number") setRemainingTimeSeconds(state.remainingTimeSeconds);
       if (typeof state.winningPlayerId === "string") setWinningPlayerId(state.winningPlayerId);
+      if (typeof state.team0Score === "number") setTeam0Score(state.team0Score);
+      if (typeof state.team1Score === "number") setTeam1Score(state.team1Score);
       if (state.players) {
         const count = typeof state.players.size === "number" ? state.players.size : Object.keys(state.players).length;
         setPlayerCount(count);
@@ -159,6 +169,8 @@ export function InGameOverlay() {
         let foundLocal: FighterHUDData | null = null;
         let foundOpponent: FighterHUDData | null = null;
         const participantsList: ScoreboardParticipant[] = [];
+        const team0List: FighterHUDData[] = [];
+        const team1List: FighterHUDData[] = [];
 
         const entries: [string, any][] =
           typeof state.players.entries === "function"
@@ -219,9 +231,17 @@ export function InGameOverlay() {
           } else {
             foundOpponent = fighterData;
           }
+
+          if (p.teamIndex === 0) {
+            team0List.push(fighterData);
+          } else if (p.teamIndex === 1) {
+            team1List.push(fighterData);
+          }
         }
 
         setScoreboardParticipants(participantsList);
+        setTeam0Fighters(team0List);
+        setTeam1Fighters(team1List);
 
         if (foundLocal) {
           setLocalFighter(foundLocal);
@@ -411,94 +431,237 @@ export function InGameOverlay() {
           </div>
         </div>
 
-        {/* Top Dual Fighter Health Bars (Fighting Game HUD) */}
-        <div className="w-full max-w-4xl mx-auto flex flex-col items-center gap-2 px-2 py-1">
-          <div className="w-full flex items-center justify-between gap-4">
-            {/* Left Fighter: Local Player */}
-            <div className="flex-1 flex flex-col gap-1 items-start">
-              <div className="flex items-center gap-2 w-full justify-between">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-sm font-black uppercase tracking-wider text-cyan-300 drop-shadow"
-                    style={{ fontFamily: "var(--font-game)" }}
-                  >
-                    {localFighter.name}
-                  </span>
-                  {localFighter.isInvulnerable && (
-                    <Badge variant="cyan" pulse>
-                      <GiLightningShield className="mr-1 inline" /> SHIELD 2s
+        {/* Top Health / Scoreboard Bars */}
+        {modeId === "3v3" || modeId === "4v4" ? (
+          /* 3v3 / 4v4 Team Arena HUD */
+          <div className="w-full max-w-5xl mx-auto flex flex-col items-center gap-2 px-2 py-1">
+            <div className="w-full flex items-center justify-between gap-4">
+              {/* Team Alpha (Cyan) */}
+              <div className="flex-1 flex flex-col gap-1 items-start">
+                <div className="flex items-center gap-2 w-full justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-sm sm:text-base font-black uppercase tracking-wider text-cyan-300 drop-shadow"
+                      style={{ fontFamily: "var(--font-game)" }}
+                    >
+                      TEAM ALPHA
+                    </span>
+                    <Badge variant="cyan">
+                      {team0Score} / {modeId === "4v4" ? 15 : 10} KOs
                     </Badge>
-                  )}
+                  </div>
+                  <span className="text-[10px] text-cyan-400 font-mono font-bold uppercase">WEST</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-400 font-mono font-bold uppercase">KOs</span>
-                  <ScorePips score={localFighter.score} color="cyan" />
+
+                {/* Team Alpha Progress Bar */}
+                <div className="w-full h-3 bg-slate-900/90 border border-cyan-500/40 rounded-full overflow-hidden relative shadow-[0_0_12px_rgba(6,182,212,0.3)]">
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-300 ease-out"
+                    style={{
+                      width: `${Math.min(100, (team0Score / (modeId === "4v4" ? 15 : 10)) * 100)}%`,
+                    }}
+                  />
+                </div>
+
+                {/* Team Alpha Roster Pills */}
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {team0Fighters.map((f) => (
+                    <div
+                      key={f.id}
+                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-mono ${
+                        f.isDead
+                          ? "bg-slate-900/70 border-slate-700 text-slate-500"
+                          : f.id === localFighter.id
+                            ? "bg-cyan-950/80 border-cyan-400 text-cyan-200 shadow-sm"
+                            : "bg-slate-900/80 border-cyan-700/60 text-slate-300"
+                      }`}
+                    >
+                      <span className="font-bold truncate max-w-[80px]">
+                        {f.id === localFighter.id ? "You" : f.name}
+                      </span>
+                      <span className="font-bold text-[10px] text-cyan-400">
+                        {f.isDead ? "KO" : `${f.health}HP`}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              {/* Health Bar Outer */}
-              <div className="w-full h-5 bg-slate-900/90 border border-cyan-500/40 rounded-lg overflow-hidden relative shadow-[0_0_15px_rgba(6,182,212,0.2)]">
-                <div
-                  className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-200 ease-out"
-                  style={{ width: `${Math.max(0, Math.min(100, localFighter.health))}%` }}
-                />
-                <span className="absolute inset-0 flex items-center justify-start pl-2 text-[11px] font-mono font-black text-white drop-shadow">
+
+              {/* Center VS Pip */}
+              <div className="flex flex-col items-center justify-center px-1">
+                <span
+                  className="text-xs font-black tracking-widest text-amber-400 bg-slate-900/90 border border-slate-700 px-2.5 py-1 rounded-md shadow-md"
+                  style={{ fontFamily: "var(--font-game)" }}
+                >
+                  VS
+                </span>
+              </div>
+
+              {/* Team Beta (Crimson) */}
+              <div className="flex-1 flex flex-col gap-1 items-end">
+                <div className="flex items-center gap-2 w-full justify-between">
+                  <span className="text-[10px] text-rose-400 font-mono font-bold uppercase">EAST</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="rose">
+                      {team1Score} / {modeId === "4v4" ? 15 : 10} KOs
+                    </Badge>
+                    <span
+                      className="text-sm sm:text-base font-black uppercase tracking-wider text-rose-400 drop-shadow"
+                      style={{ fontFamily: "var(--font-game)" }}
+                    >
+                      TEAM BETA
+                    </span>
+                  </div>
+                </div>
+
+                {/* Team Beta Progress Bar */}
+                <div className="w-full h-3 bg-slate-900/90 border border-rose-500/40 rounded-full overflow-hidden relative shadow-[0_0_12px_rgba(244,63,94,0.3)]">
+                  <div
+                    className="h-full bg-gradient-to-l from-rose-600 to-rose-400 transition-all duration-300 ease-out ml-auto"
+                    style={{
+                      width: `${Math.min(100, (team1Score / (modeId === "4v4" ? 15 : 10)) * 100)}%`,
+                    }}
+                  />
+                </div>
+
+                {/* Team Beta Roster Pills */}
+                <div className="flex items-center gap-2 mt-1 flex-wrap justify-end">
+                  {team1Fighters.map((f) => (
+                    <div
+                      key={f.id}
+                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-mono ${
+                        f.isDead
+                          ? "bg-slate-900/70 border-slate-700 text-slate-500"
+                          : f.id === localFighter.id
+                            ? "bg-rose-950/80 border-rose-400 text-rose-200 shadow-sm"
+                            : "bg-slate-900/80 border-rose-700/60 text-slate-300"
+                      }`}
+                    >
+                      <span className="font-bold truncate max-w-[80px]">
+                        {f.id === localFighter.id ? "You" : f.name}
+                      </span>
+                      <span className="font-bold text-[10px] text-rose-400">
+                        {f.isDead ? "KO" : `${f.health}HP`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Local Fighter Primary Health in Team Mode */}
+            <div className="w-full max-w-md mx-auto flex flex-col gap-1 items-center mt-1">
+              <div className="w-full flex items-center justify-between text-xs px-1 font-mono">
+                <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                  Your Vitals ({localFighter.name})
+                  {localFighter.isInvulnerable && (
+                    <Badge variant="cyan" pulse>
+                      <GiLightningShield className="mr-0.5 inline" /> SHIELD
+                    </Badge>
+                  )}
+                </span>
+                <span className="font-bold text-cyan-400">
                   {localFighter.health} / {localFighter.maxHealth} HP
                 </span>
               </div>
-            </div>
-
-            {/* Center VS Pip */}
-            <div className="flex flex-col items-center justify-center px-1">
-              <span
-                className="text-xs font-black tracking-widest text-amber-400 bg-slate-900/90 border border-slate-700 px-2.5 py-1 rounded-md shadow-md"
-                style={{ fontFamily: "var(--font-game)" }}
-              >
-                VS
-              </span>
-            </div>
-
-            {/* Right Fighter: Opponent */}
-            <div className="flex-1 flex flex-col gap-1 items-end">
-              <div className="flex items-center gap-2 w-full justify-between">
-                <div className="flex items-center gap-2">
-                  <ScorePips score={opponentFighter?.score ?? 0} color="rose" />
-                  <span className="text-[10px] text-slate-400 font-mono font-bold uppercase">KOs</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {opponentFighter?.isInvulnerable && (
-                    <Badge variant="cyan" pulse>
-                      <GiLightningShield className="mr-1 inline" /> SHIELD 2s
-                    </Badge>
-                  )}
-                  <span
-                    className="text-sm font-black uppercase tracking-wider text-rose-400 drop-shadow"
-                    style={{ fontFamily: "var(--font-game)" }}
-                  >
-                    {opponentFighter ? opponentFighter.name : "Waiting for Opponent..."}
-                  </span>
-                </div>
-              </div>
-              {/* Health Bar Outer */}
-              <div className="w-full h-5 bg-slate-900/90 border border-rose-500/40 rounded-lg overflow-hidden relative shadow-[0_0_15px_rgba(244,63,94,0.2)]">
+              <div className="w-full h-3.5 bg-slate-900/90 border border-slate-700 rounded-lg overflow-hidden relative shadow-md">
                 <div
-                  className="h-full bg-gradient-to-l from-rose-600 to-rose-400 transition-all duration-200 ease-out ml-auto"
-                  style={{ width: `${Math.max(0, Math.min(100, opponentFighter?.health ?? 100))}%` }}
+                  className="h-full bg-gradient-to-r from-emerald-600 via-cyan-500 to-cyan-400 transition-all duration-200 ease-out"
+                  style={{ width: `${Math.max(0, Math.min(100, localFighter.health))}%` }}
                 />
-                <span className="absolute inset-0 flex items-center justify-end pr-2 text-[11px] font-mono font-black text-white drop-shadow">
-                  {opponentFighter ? opponentFighter.health : 0} / {opponentFighter?.maxHealth ?? 100} HP
-                </span>
               </div>
             </div>
           </div>
+        ) : (
+          /* Top Dual Fighter Health Bars (1v1 / FFA Fighting Game HUD) */
+          <div className="w-full max-w-4xl mx-auto flex flex-col items-center gap-2 px-2 py-1">
+            <div className="w-full flex items-center justify-between gap-4">
+              {/* Left Fighter: Local Player */}
+              <div className="flex-1 flex flex-col gap-1 items-start">
+                <div className="flex items-center gap-2 w-full justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-sm font-black uppercase tracking-wider text-cyan-300 drop-shadow"
+                      style={{ fontFamily: "var(--font-game)" }}
+                    >
+                      {localFighter.name}
+                    </span>
+                    {localFighter.isInvulnerable && (
+                      <Badge variant="cyan" pulse>
+                        <GiLightningShield className="mr-1 inline" /> SHIELD 2s
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 font-mono font-bold uppercase">KOs</span>
+                    <ScorePips score={localFighter.score} color="cyan" />
+                  </div>
+                </div>
+                {/* Health Bar Outer */}
+                <div className="w-full h-5 bg-slate-900/90 border border-cyan-500/40 rounded-lg overflow-hidden relative shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-200 ease-out"
+                    style={{ width: `${Math.max(0, Math.min(100, localFighter.health))}%` }}
+                  />
+                  <span className="absolute inset-0 flex items-center justify-start pl-2 text-[11px] font-mono font-black text-white drop-shadow">
+                    {localFighter.health} / {localFighter.maxHealth} HP
+                  </span>
+                </div>
+              </div>
 
-          {/* Active Kill Streak Modifiers (FFA Only) */}
-          <MatchPowerHUD
-            killStreak={localFighter.killStreak}
-            speedModifier={localFighter.speedModifier}
-            forceModifier={localFighter.forceModifier}
-            jumpModifier={localFighter.jumpModifier}
-          />
-        </div>
+              {/* Center VS Pip */}
+              <div className="flex flex-col items-center justify-center px-1">
+                <span
+                  className="text-xs font-black tracking-widest text-amber-400 bg-slate-900/90 border border-slate-700 px-2.5 py-1 rounded-md shadow-md"
+                  style={{ fontFamily: "var(--font-game)" }}
+                >
+                  VS
+                </span>
+              </div>
+
+              {/* Right Fighter: Opponent */}
+              <div className="flex-1 flex flex-col gap-1 items-end">
+                <div className="flex items-center gap-2 w-full justify-between">
+                  <div className="flex items-center gap-2">
+                    <ScorePips score={opponentFighter?.score ?? 0} color="rose" />
+                    <span className="text-[10px] text-slate-400 font-mono font-bold uppercase">KOs</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {opponentFighter?.isInvulnerable && (
+                      <Badge variant="cyan" pulse>
+                        <GiLightningShield className="mr-1 inline" /> SHIELD 2s
+                      </Badge>
+                    )}
+                    <span
+                      className="text-sm font-black uppercase tracking-wider text-rose-400 drop-shadow"
+                      style={{ fontFamily: "var(--font-game)" }}
+                    >
+                      {opponentFighter ? opponentFighter.name : "Waiting for Opponent..."}
+                    </span>
+                  </div>
+                </div>
+                {/* Health Bar Outer */}
+                <div className="w-full h-5 bg-slate-900/90 border border-rose-500/40 rounded-lg overflow-hidden relative shadow-[0_0_15px_rgba(244,63,94,0.2)]">
+                  <div
+                    className="h-full bg-gradient-to-l from-rose-600 to-rose-400 transition-all duration-200 ease-out ml-auto"
+                    style={{ width: `${Math.max(0, Math.min(100, opponentFighter?.health ?? 100))}%` }}
+                  />
+                  <span className="absolute inset-0 flex items-center justify-end pr-2 text-[11px] font-mono font-black text-white drop-shadow">
+                    {opponentFighter ? opponentFighter.health : 0} / {opponentFighter?.maxHealth ?? 100} HP
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Active Kill Streak Modifiers (FFA Only) */}
+            <MatchPowerHUD
+              killStreak={localFighter.killStreak}
+              speedModifier={localFighter.speedModifier}
+              forceModifier={localFighter.forceModifier}
+              jumpModifier={localFighter.jumpModifier}
+            />
+          </div>
+        )}
 
         {/* Center Screen: State Machine Callouts */}
         <div className="flex flex-col items-center justify-center my-auto gap-4">
@@ -541,7 +704,7 @@ export function InGameOverlay() {
                 TARGET ELIMINATED!
               </span>
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
-                +1 KO Awarded • First to 3 Wins
+                +1 KO Awarded • First to {modeId === "3v3" ? 10 : modeId === "4v4" ? 15 : 3} Wins
               </span>
             </div>
           )}
@@ -554,7 +717,8 @@ export function InGameOverlay() {
                 className="text-sm md:text-base font-black uppercase text-amber-300 tracking-wider"
                 style={{ fontFamily: "var(--font-game)" }}
               >
-                Waiting for Opponent ({playerCount}/2)... Controls locked
+                Waiting for Fighters ({playerCount}/
+                {modeId === "3v3" ? 6 : modeId === "4v4" ? 8 : 2})... Controls locked
               </span>
             </div>
           )}
