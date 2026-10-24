@@ -18,7 +18,7 @@
 // ==================================================
 
 import { useEffect, useState } from "react";
-import { FaBars, FaFlagCheckered, FaHourglassHalf, FaTrophy, FaListOl } from "react-icons/fa6";
+import { FaBars, FaHourglassHalf, FaListOl } from "react-icons/fa6";
 import { GiGamepad, GiLightningShield } from "react-icons/gi";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuthStore } from "../../store/useAuthStore";
