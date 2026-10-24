@@ -14,10 +14,11 @@
 // Allows players to inspect their career progression and combat record.
 // ==================================================
 
-import { FaHandFist, FaSkull, FaUserNinja } from "react-icons/fa6";
+import { FaFire, FaHandFist, FaSkull, FaUserNinja } from "react-icons/fa6";
 import { GiCrossedSwords, GiPodiumWinner, GiRibbonMedal, GiShield, GiTargetPrize, GiTrophy } from "react-icons/gi";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useNavigationStore } from "../../../store/useNavigationStore";
+import { Button } from "../atoms/Button";
 import { Heading } from "../atoms/Heading";
 import { StatBadge } from "../molecules/StatBadge";
 import { ModalBackdrop } from "../templates/ModalBackdrop";
@@ -137,10 +138,35 @@ export function ProfileModal() {
               label="Win Rate"
               value={winRate}
               color="emerald"
-              className="col-span-2 sm:col-span-3"
+            />
+            <StatBadge
+              icon={<FaFire />}
+              label="Damage Dealt"
+              value={(stats?.damageDealt ?? 0).toLocaleString()}
+              color="emerald"
+            />
+            <StatBadge
+              icon={<GiShield />}
+              label="Damage Taken"
+              value={(stats?.damageReceived ?? 0).toLocaleString()}
+              color="rose"
             />
           </div>
         </div>
+
+        {/* Action to Full Dossier */}
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => {
+            closeModal();
+            useNavigationStore.getState().navigateTo("PROFILE");
+          }}
+          className="w-full shadow-lg"
+          leftIcon={<GiPodiumWinner />}
+        >
+          Open Full Career Dossier & Weapons
+        </Button>
 
         <p
           className="text-center text-xs text-slate-500 italic"
