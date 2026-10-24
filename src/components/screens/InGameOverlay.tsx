@@ -560,9 +560,16 @@ export function InGameOverlay() {
                     </Badge>
                   )}
                 </span>
-                <span className="font-bold text-cyan-400">
-                  {localFighter.health} / {localFighter.maxHealth} HP
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 font-mono font-bold bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700/60">
+                    K: <span className="text-amber-300">{localFighter.kills}</span> | D:{" "}
+                    <span className="text-rose-400">{localFighter.deaths}</span> | A:{" "}
+                    <span className="text-cyan-400">{localFighter.assists}</span>
+                  </span>
+                  <span className="font-bold text-cyan-400">
+                    {localFighter.health} / {localFighter.maxHealth} HP
+                  </span>
+                </div>
               </div>
               <div className="w-full h-3.5 bg-slate-900/90 border border-slate-700 rounded-lg overflow-hidden relative shadow-md">
                 <div
