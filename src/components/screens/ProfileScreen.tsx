@@ -353,7 +353,7 @@ export function ProfileScreen() {
                   icon={<FaShieldHalved />}
                   label="Total DMG Taken"
                   value={stats.damageReceived.toLocaleString()}
-                  color="rose"
+                  color="red"
                 />
               </div>
 
