@@ -253,7 +253,8 @@ export class GameRoom extends Room {
     this.state.levelId = this.level.id;
     this.state.matchStatus = "WAITING_FOR_PLAYERS";
     this.state.countdownSeconds = 0;
-    this.state.remainingTimeSeconds = GameRoom.MATCH_DURATION_SEC;
+    const timeLimit = this.gameMode?.timeLimitSeconds ?? GameRoom.MATCH_DURATION_SEC;
+    this.state.remainingTimeSeconds = timeLimit > 0 ? timeLimit : GameRoom.MATCH_DURATION_SEC;
     this.state.winningTeamIndex = -1;
     this.state.winningPlayerId = "";
 
@@ -582,7 +583,8 @@ export class GameRoom extends Room {
     this.matchStartTime = new Date();
     this.state.matchStatus = "PLAYING";
     this.state.countdownSeconds = 0;
-    this.state.remainingTimeSeconds = GameRoom.MATCH_DURATION_SEC;
+    const timeLimit = this.gameMode?.timeLimitSeconds ?? GameRoom.MATCH_DURATION_SEC;
+    this.state.remainingTimeSeconds = timeLimit > 0 ? timeLimit : GameRoom.MATCH_DURATION_SEC;
     this.simulationWorld.setGameplayActive(true);
 
     if (this.matchDurationTimer) {
@@ -629,6 +631,17 @@ export class GameRoom extends Room {
     if (this.matchDurationTimer) {
       clearInterval(this.matchDurationTimer);
       this.matchDurationTimer = null;
+    }
+
+    const isTeamMode = this.gameMode.teamCount >= 2 && this.gameMode.teamSize > 1;
+    if (winnerTeamIndex === undefined && isTeamMode) {
+      if (this.state.team0Score > this.state.team1Score) {
+        winnerTeamIndex = 0;
+      } else if (this.state.team1Score > this.state.team0Score) {
+        winnerTeamIndex = 1;
+      } else {
+        winnerTeamIndex = -1;
+      }
     }
 
     if (winnerPlayerId !== undefined) {
@@ -772,11 +785,23 @@ export class GameRoom extends Room {
       attackerState.comboCount = attackState?.comboCount ?? 0;
     }
 
-    // Perform spatial query check
+    const isFriendly = (targetSessionId: string): boolean => {
+      if (this.gameMode.friendlyFire) return false;
+      const victim = this.state.players.get(targetSessionId);
+      return Boolean(
+        attackerState &&
+        victim &&
+        attackerState.teamIndex >= 0 &&
+        attackerState.teamIndex === victim.teamIndex,
+      );
+    };
+
+    // Perform spatial query check with friendly-fire filter
     const hit = this.simulationWorld.checkMeleeHit(
       attackerSessionId,
       moveDef.range,
       moveDef.coneAngleRad,
+      (targetId) => !isFriendly(targetId),
     );
 
     if (!hit) {
@@ -785,7 +810,7 @@ export class GameRoom extends Room {
 
     const victimSessionId = hit.targetSessionId;
     const victimState = this.state.players.get(victimSessionId);
-    if (!victimState || victimState.isDead) {
+    if (!victimState || victimState.isDead || isFriendly(victimSessionId)) {
       return;
     }
 
@@ -1109,6 +1134,13 @@ export class GameRoom extends Room {
         killerState.kills++;
         killerState.killStreak++;
 
+        // Track Team Score (Phase 16)
+        if (killerState.teamIndex === 0) {
+          this.state.team0Score++;
+        } else if (killerState.teamIndex === 1) {
+          this.state.team1Score++;
+        }
+
         // Mode-Gated Kill Streak Modifiers (Phase 11): Active only in FFA, strictly disabled in 1v1 / team
         const isModifierEnabled = Boolean(this.gameMode?.enableKillStreakModifiers);
         const modifiers = computeKillStreakModifiers(killerState.killStreak, isModifierEnabled);
@@ -1119,7 +1151,7 @@ export class GameRoom extends Room {
         this.simulationWorld.setEntityModifiers(killerSessionId, modifiers);
 
         console.log(
-          `🏆 Kill awarded to ${killerSessionId} (cause: ${cause})! Score: ${killerState.score}/${this.gameMode?.scoreLimit ?? COMBAT_CONFIG.MATCH_WIN_KILLS}, Streak: ${killerState.killStreak} [Speed: ${modifiers.speedModifier}x, Force: ${modifiers.forceModifier}x, Jump: ${modifiers.jumpModifier}x, ModeEnabled: ${isModifierEnabled}]`,
+          `🏆 Kill awarded to ${killerSessionId} (cause: ${cause})! Score: ${killerState.score}/${this.gameMode?.scoreLimit ?? COMBAT_CONFIG.MATCH_WIN_KILLS}, Streak: ${killerState.killStreak} [Team0: ${this.state.team0Score}, Team1: ${this.state.team1Score}]`,
         );
 
         if (isModifierEnabled && killerState.killStreak >= 1) {
@@ -1138,9 +1170,22 @@ export class GameRoom extends Room {
 
         // Check match victory condition based on gameMode.scoreLimit
         const scoreLimit = this.gameMode?.scoreLimit ?? COMBAT_CONFIG.MATCH_WIN_KILLS;
-        if (killerState.score >= scoreLimit) {
-          this.endMatch("SCORE_LIMIT", killerSessionId, killerState.teamIndex);
-          return;
+        const isTeamMode = this.gameMode.teamCount >= 2 && this.gameMode.teamSize > 1;
+
+        if (isTeamMode) {
+          if (this.state.team0Score >= scoreLimit) {
+            this.endMatch("SCORE_LIMIT", killerSessionId, 0);
+            return;
+          }
+          if (this.state.team1Score >= scoreLimit) {
+            this.endMatch("SCORE_LIMIT", killerSessionId, 1);
+            return;
+          }
+        } else {
+          if (killerState.score >= scoreLimit) {
+            this.endMatch("SCORE_LIMIT", killerSessionId, killerState.teamIndex);
+            return;
+          }
         }
       }
     }
