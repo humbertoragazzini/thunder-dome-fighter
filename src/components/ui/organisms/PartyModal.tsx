@@ -30,7 +30,7 @@ import {
   FaRightToBracket,
   FaUserGroup,
 } from "react-icons/fa6";
-import { GiCrossedSwords, GiFist, GiPodiumWinner } from "react-icons/gi";
+import { GiCrossedSwords, GiFist } from "react-icons/gi";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useMatchmakingStore } from "../../../store/useMatchmakingStore";
 import { useNavigationStore } from "../../../store/useNavigationStore";

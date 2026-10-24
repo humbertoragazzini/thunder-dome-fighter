@@ -17,14 +17,8 @@
 // for opponents, eliminating blank or frozen screens.
 // ==================================================
 
-import { FaXmark } from "react-icons/fa6";
-import {
-  GiCrossedSwords,
-  GiFist,
-  GiRadarSweep,
-  GiShield,
-  GiUsers,
-} from "react-icons/gi";
+import { FaUserGroup, FaXmark } from "react-icons/fa6";
+import { GiFist, GiRadarSweep } from "react-icons/gi";
 import { GAME_MODES } from "../../../shared/domain/GameMode.ts";
 import { useMatchmakingStore } from "../../store/useMatchmakingStore";
 import { Badge } from "../ui/atoms/Badge";
@@ -155,7 +149,7 @@ export function MatchmakingScreen() {
           <div className="w-full max-w-md flex flex-col gap-2 p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-sm">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
               <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider" style={{ fontFamily: "var(--font-tech)" }}>
-                <GiUsers className="text-cyan-400" />
+                <FaUserGroup className="text-cyan-400" />
                 Squad Members
               </span>
               <span className="font-mono text-[11px] text-cyan-400">
