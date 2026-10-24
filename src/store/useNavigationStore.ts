@@ -25,6 +25,7 @@ export type AppScreen =
   | "AUTH"
   | "MAIN_MENU"
   | "PLAY_MENU"
+  | "PROFILE"
   | "MATCHMAKING"
   | "MATCH_LOADING"
   | "IN_GAME"
