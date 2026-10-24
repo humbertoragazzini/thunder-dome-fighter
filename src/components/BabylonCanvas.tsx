@@ -86,6 +86,12 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
 
     // Centralized multi-device input controller
     const inputController = new CharacterInputController();
+    inputController.keyboard.onInteract = () => {
+      room?.send("player:interact");
+    };
+    inputController.keyboard.onDropWeapon = () => {
+      room?.send("player:drop-weapon");
+    };
     inputController.initialize();
     inputControllerRef.current = inputController;
     setTouchProvider(inputController.touch);
