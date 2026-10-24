@@ -50,6 +50,10 @@ export const PlayerState = schema(
     forceModifier: t.number().default(1.0),
     jumpModifier: t.number().default(1.0),
 
+    // Authoritative Weapon & Item State (Phase 12)
+    heldItemId: t.string().default("FISTS"),
+    ammo: t.number().default(0),
+
     x: t.number().default(0),
     y: t.number().default(0),
     z: t.number().default(0),
@@ -74,6 +78,27 @@ export type PlayerState = SchemaType<typeof PlayerState>;
 
 
 // ==================================================
+// ITEM PICKUP NETWORK STATE (PHASE 12)
+// ==================================================
+
+export const ItemPickupState = schema(
+  {
+    spawnId: t.string().default(""),
+    itemId: t.string().default(""),
+    category: t.string().default("WEAPON"),
+    isAvailable: t.boolean().default(true),
+    respawnRemainingSeconds: t.number().default(0),
+    x: t.number().default(0),
+    y: t.number().default(0),
+    z: t.number().default(0),
+  },
+  "ItemPickupState",
+);
+
+export type ItemPickupState = SchemaType<typeof ItemPickupState>;
+
+
+// ==================================================
 // GAME NETWORK STATE
 // ==================================================
 
@@ -95,6 +120,7 @@ export const GameState = schema(
     winningPlayerId: t.string().default(""),
 
     players: t.map(PlayerState),
+    itemPickups: t.map(ItemPickupState),
   },
   "GameState",
 );
