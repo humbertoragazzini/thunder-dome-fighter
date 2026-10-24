@@ -36,6 +36,7 @@ export interface AuthPlayer {
   id: string;
   playerName: string;
   avatarUrl: string | null;
+  createdAt?: string | Date;
 }
 
 export interface AuthDerivedStats {
