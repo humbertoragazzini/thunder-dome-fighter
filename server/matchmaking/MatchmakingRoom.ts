@@ -180,6 +180,19 @@ export class MatchmakingRoom extends Room {
             return;
           }
 
+          // Verify party size does not exceed mode capacity
+          const modeDef = GAME_MODES[gameModeId];
+          const maxTeamSize = modeDef?.teamSize ?? (modeDef?.maxPlayers ?? 4);
+          if (membersList.length > maxTeamSize) {
+            const errPayload: ServerErrorPayload = {
+              code: "PARTY_TOO_LARGE",
+              message: `Party size of ${membersList.length} exceeds maximum team size of ${maxTeamSize} for ${gameModeId}.`,
+              fatal: false,
+            };
+            client.send(ServerMessageType.SERVER_ERROR, errPayload);
+            return;
+          }
+
           // Gather participants with tokens
           const participants: QueuedParticipant[] = membersList.map((m) => {
             const memberClient = this.clientByPlayerId.get(m.playerId);
