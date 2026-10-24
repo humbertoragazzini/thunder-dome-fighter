@@ -40,6 +40,7 @@ import {
   matchmakingQueueManager,
   type QueuedParticipant,
 } from "./MatchmakingQueueManager.ts";
+import { GAME_MODES } from "../../shared/domain/GameMode.ts";
 
 export interface MatchmakingClientAuth {
   user: AuthenticatedUser;
