@@ -126,6 +126,10 @@ export const GameState = schema(
     winningTeamIndex: t.number().default(-1),
     winningPlayerId: t.string().default(""),
 
+    // Synchronized Team Scores (Phase 16)
+    team0Score: t.number().default(0),
+    team1Score: t.number().default(0),
+
     players: t.map(PlayerState),
     itemPickups: t.map(ItemPickupState),
   },
