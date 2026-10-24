@@ -174,54 +174,54 @@ export const LEVEL_THUNDER_DOME_ALPHA: LevelDefinition = {
     max: { x: 25, y: 25, z: 25 },
   },
   playerSpawns: [
-    // Team Alpha / Player 1 spawns (West side facing East)
+    // Team Alpha / Player 1 spawns (West side facing East, staggered assault formation)
     {
       id: "spawn-alpha-1",
-      position: { x: -10, y: 0.55, z: 0 },
+      position: { x: -10, y: 0.55, z: 2 },
       rotationYaw: Math.PI / 2,
       teamIndex: 0,
     },
     {
       id: "spawn-alpha-2",
-      position: { x: -10, y: 0.55, z: 4 },
+      position: { x: -10, y: 0.55, z: -2 },
       rotationYaw: Math.PI / 2,
       teamIndex: 0,
     },
     {
       id: "spawn-alpha-3",
-      position: { x: -10, y: 0.55, z: -4 },
+      position: { x: -13, y: 0.55, z: 4 },
       rotationYaw: Math.PI / 2,
       teamIndex: 0,
     },
     {
       id: "spawn-alpha-4",
-      position: { x: -12, y: 0.55, z: 0 },
+      position: { x: -13, y: 0.55, z: -4 },
       rotationYaw: Math.PI / 2,
       teamIndex: 0,
     },
 
-    // Team Beta / Player 2 spawns (East side facing West)
+    // Team Beta / Player 2 spawns (East side facing West, staggered assault formation)
     {
       id: "spawn-beta-1",
-      position: { x: 10, y: 0.55, z: 0 },
+      position: { x: 10, y: 0.55, z: 2 },
       rotationYaw: -Math.PI / 2,
       teamIndex: 1,
     },
     {
       id: "spawn-beta-2",
-      position: { x: 10, y: 0.55, z: 4 },
+      position: { x: 10, y: 0.55, z: -2 },
       rotationYaw: -Math.PI / 2,
       teamIndex: 1,
     },
     {
       id: "spawn-beta-3",
-      position: { x: 10, y: 0.55, z: -4 },
+      position: { x: 13, y: 0.55, z: 4 },
       rotationYaw: -Math.PI / 2,
       teamIndex: 1,
     },
     {
       id: "spawn-beta-4",
-      position: { x: 12, y: 0.55, z: 0 },
+      position: { x: 13, y: 0.55, z: -4 },
       rotationYaw: -Math.PI / 2,
       teamIndex: 1,
     },
