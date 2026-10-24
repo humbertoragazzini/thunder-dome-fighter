@@ -54,6 +54,13 @@ export const PlayerState = schema(
     heldItemId: t.string().default("FISTS"),
     ammo: t.number().default(0),
 
+    // Live Authoritative Combat Metrics (Phase 13)
+    kills: t.number().default(0),
+    deaths: t.number().default(0),
+    assists: t.number().default(0),
+    damageDealt: t.number().default(0),
+    damageReceived: t.number().default(0),
+
     x: t.number().default(0),
     y: t.number().default(0),
     z: t.number().default(0),
