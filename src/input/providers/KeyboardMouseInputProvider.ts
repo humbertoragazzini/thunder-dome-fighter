@@ -28,6 +28,9 @@ export class KeyboardMouseInputProvider implements IInputProvider {
   private currentAttack: AttackActionType = "NONE";
   private lastPunchHand: "LEFT" | "RIGHT" = "RIGHT";
 
+  public onInteract?: () => void;
+  public onDropWeapon?: () => void;
+
   private handleKeyDown = (e: KeyboardEvent) => {
     // Avoid capturing inputs if the user is typing in an input field / textarea
     const target = e.target as HTMLElement | null;
@@ -40,6 +43,12 @@ export class KeyboardMouseInputProvider implements IInputProvider {
 
     if (e.code === "Space") {
       this.jumpPressed = true;
+    }
+
+    if (e.code === "KeyE") {
+      this.onInteract?.();
+    } else if (e.code === "KeyG") {
+      this.onDropWeapon?.();
     }
 
     if (e.code === "KeyJ") {
