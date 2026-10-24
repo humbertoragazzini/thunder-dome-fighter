@@ -44,6 +44,7 @@ import { CharacterVisualRig } from "../visuals/character/CharacterVisualRig";
 import { HERO_PALETTE } from "../visuals/character/CharacterRigConfig";
 import { LevelVisualLoader } from "../visuals/level/LevelVisualLoader";
 import { CombatEffectsManager } from "../visuals/combat/CombatEffectsManager";
+import { ItemVisualManager } from "../visuals/items/ItemVisualManager";
 import {
   GRAVITY,
   type CharacterInputCommand,
@@ -66,6 +67,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
   const localPlayerRigRef = useRef<CharacterVisualRig | null>(null);
   const levelVisualLoaderRef = useRef<LevelVisualLoader | null>(null);
   const combatEffectsRef = useRef<CombatEffectsManager | null>(null);
+  const itemVisualManagerRef = useRef<ItemVisualManager | null>(null);
   const stateChangeHandlerRef = useRef<((state: any) => void) | null>(null);
 
   const [touchProvider, setTouchProvider] = useState<TouchVirtualGamepadProvider | null>(null);
@@ -185,6 +187,9 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
       const combatEffects = new CombatEffectsManager(scene);
       combatEffectsRef.current = combatEffects;
 
+      const itemVisualManager = new ItemVisualManager(scene, room);
+      itemVisualManagerRef.current = itemVisualManager;
+
       // ==================================================
       // COLYSEUS STATE SYNCHRONIZATION
       // ==================================================
@@ -192,6 +197,10 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
       const handleStateChange = (state: any) => {
         if (!state?.players || !room) {
           return;
+        }
+
+        if (state.itemPickups) {
+          itemVisualManager.updateState(state.itemPickups);
         }
 
         const localState =
@@ -263,6 +272,7 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
       if (disposed) {
         localPlayerRig.dispose();
         combatEffects.dispose();
+        itemVisualManager.dispose();
         scene.dispose();
         engine.dispose();
         return;
@@ -300,6 +310,12 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
             ? room.state.players.get(room.sessionId)
             : room.state.players[room.sessionId]
           : null;
+
+        // Synchronize equipped weapon on local character rig
+        localPlayerRig.attachWeapon(localState?.heldItemId ?? "FISTS");
+
+        // Animate floating arena item pickups
+        itemVisualManager.update(deltaSeconds);
 
         // 3. Procedural biped locomotion and combat gestures
         localPlayerRig.update(
@@ -371,6 +387,9 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
 
       combatEffectsRef.current?.dispose();
       combatEffectsRef.current = null;
+
+      itemVisualManagerRef.current?.dispose();
+      itemVisualManagerRef.current = null;
 
       sceneRef.current?.dispose();
       engineRef.current?.dispose();
