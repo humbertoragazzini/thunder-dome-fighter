@@ -78,7 +78,7 @@ const MODE_OPTIONS: ModeOption[] = [
     name: "4v4 Squad Brawl",
     teamSize: 4,
     subtitle: "2 teams of 4 • 15 KOs",
-    status: "phase17",
+    status: "active",
     icon: <GiCrossedPistols className="text-purple-400" />,
   },
   {
@@ -118,11 +118,13 @@ export function PartyModal() {
   const allMembersReady = membersList.length > 0 && membersList.every((m) => m.isReady);
 
   const squadSize = membersList.length;
-  // If squad has > 1 member and selectedMode is 1v1 or ffa, fallback to 3v3
+  // If squad has 4 members, fallback to 4v4; if squad has > 1 member and selectedMode is 1v1 or ffa, fallback to 3v3
   const effectiveMode: GameModeId =
-    squadSize > 1 && (selectedMode === "1v1" || selectedMode === "ffa")
-      ? "3v3"
-      : selectedMode;
+    squadSize > 3
+      ? "4v4"
+      : squadSize > 1 && (selectedMode === "1v1" || selectedMode === "ffa")
+        ? "3v3"
+        : selectedMode;
 
   const currentOption = MODE_OPTIONS.find((m) => m.id === effectiveMode);
   const isModeValid = Boolean(
@@ -361,6 +363,9 @@ export function PartyModal() {
                   } else if (isFfaSquad) {
                     badgeLabel = "SOLO ONLY";
                     badgeVariant = "slate";
+                  } else if (opt.id === "4v4" && squadSize > 1) {
+                    badgeLabel = `${squadSize}/4 SQUAD`;
+                    badgeVariant = "purple";
                   } else if (opt.id === "3v3" && squadSize > 1) {
                     badgeLabel = `${squadSize}/3 SQUAD`;
                     badgeVariant = "cyan";
@@ -413,6 +418,24 @@ export function PartyModal() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                   <span>
                     Full 3-player squad! You will be placed together on the same team against the opposing squad.
+                  </span>
+                </div>
+              )}
+
+              {/* Informative squad backfill hint for 4v4 */}
+              {effectiveMode === "4v4" && squadSize >= 2 && squadSize < 4 && (
+                <div className="p-2 rounded-lg bg-purple-950/30 border border-purple-500/30 text-[11px] text-purple-300/90 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
+                  <span>
+                    Squad of {squadSize} will fight together on Team Alpha/Beta and be backfilled to 4 players.
+                  </span>
+                </div>
+              )}
+              {effectiveMode === "4v4" && squadSize === 4 && (
+                <div className="p-2 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-[11px] text-emerald-300/90 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                  <span>
+                    Full 4-player squad! You will be placed together on the same team against the opposing squad.
                   </span>
                 </div>
               )}
