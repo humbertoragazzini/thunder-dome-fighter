@@ -120,12 +120,26 @@ export function PlayMenuScreen() {
 
           <MenuCard
             title="4v4 Squad Brawl"
-            description="Full-squad tactical warfare. Synergy, zoning, and high-impact ultimate clashes."
+            description={
+              squadSize === 4
+                ? "Full 4-player squad tactical warfare! Dominate the arena with complete team synergy."
+                : squadSize > 1
+                  ? `Tactical 4v4 warfare. Your squad of ${squadSize} will fight together and be backfilled to 4 players.`
+                  : "Full-squad tactical warfare. Synergy, zoning, assist tracking, and 15-kill score limit."
+            }
             icon={<GiCrossedPistols className="text-purple-400" />}
-            badgeText="PHASE 17"
-            badgeVariant="purple"
+            badgeText={
+              squadSize > 4
+                ? "SQUAD > 4"
+                : squadSize > 1
+                  ? `SQUAD READY (${squadSize}/4)`
+                  : "ACTIVE"
+            }
+            badgeVariant={squadSize > 4 ? "slate" : "emerald"}
+            badgePulse={squadSize <= 4}
             accentColor="purple"
-            disabled
+            disabled={squadSize > 4}
+            onClick={squadSize <= 4 ? () => handleSelectMode("4v4") : undefined}
           />
 
           <MenuCard
