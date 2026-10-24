@@ -81,10 +81,11 @@ export function PlayMenuScreen() {
             title="3v3 Team Arena"
             description="Trios tactical arena skirmish. Coordinate offensive pushes, flank angles, and team combos."
             icon={<GiBangingGavel className="text-cyan-400" />}
-            badgeText="PHASE 16"
-            badgeVariant="cyan"
+            badgeText="ACTIVE"
+            badgeVariant="emerald"
+            badgePulse
             accentColor="cyan"
-            disabled
+            onClick={() => handleSelectMode("3v3")}
           />
 
           <MenuCard
