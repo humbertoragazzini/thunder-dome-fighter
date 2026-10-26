@@ -176,3 +176,72 @@ export const TEAM_ALPHA_PALETTE: CharacterPalette = HERO_PALETTE;
  */
 export const TEAM_BETA_PALETTE: CharacterPalette = OPPONENT_PALETTE;
 
+/**
+ * Dynamic Free-For-All Opponent Palettes (Cycles through distinct neon colorways for 20-player lobbies)
+ */
+export const FFA_PALETTES: CharacterPalette[] = [
+  OPPONENT_PALETTE, // Crimson Fire
+  {
+    name: "FFA-NeonPurple",
+    suitPrimary: new Color3(0.68, 0.15, 0.95), // Neon Purple
+    suitSecondary: new Color3(0.18, 0.05, 0.28), // Dark Violet
+    fists: new Color3(0.95, 0.2, 0.8), // Hot Pink Gloves
+    boots: new Color3(0.2, 0.1, 0.3),
+    skin: new Color3(0.94, 0.8, 0.7),
+    visor: new Color3(1.0, 0.2, 0.8), // Magenta Glow
+    visorGlow: new Color3(0.8, 0.1, 0.6),
+  },
+  {
+    name: "FFA-AcidEmerald",
+    suitPrimary: new Color3(0.1, 0.85, 0.35), // Acid Emerald Green
+    suitSecondary: new Color3(0.05, 0.22, 0.1), // Dark Forest
+    fists: new Color3(0.85, 0.95, 0.1), // Lime Gold Gloves
+    boots: new Color3(0.1, 0.2, 0.12),
+    skin: new Color3(0.92, 0.78, 0.68),
+    visor: new Color3(0.4, 1.0, 0.2), // Bright Lime Visor
+    visorGlow: new Color3(0.2, 0.8, 0.1),
+  },
+  {
+    name: "FFA-FlameOrange",
+    suitPrimary: new Color3(0.95, 0.45, 0.05), // Flame Orange
+    suitSecondary: new Color3(0.28, 0.12, 0.04), // Burnt Rust
+    fists: new Color3(0.98, 0.85, 0.1), // Sun Gold Gloves
+    boots: new Color3(0.22, 0.12, 0.08),
+    skin: new Color3(0.94, 0.8, 0.7),
+    visor: new Color3(1.0, 0.6, 0.0), // Solar Flare Eyes
+    visorGlow: new Color3(0.9, 0.4, 0.0),
+  },
+  {
+    name: "FFA-DeepIndigo",
+    suitPrimary: new Color3(0.25, 0.3, 0.95), // Deep Royal Indigo
+    suitSecondary: new Color3(0.08, 0.08, 0.25), // Nightfall
+    fists: new Color3(0.1, 0.85, 0.95), // Cyan Punchers
+    boots: new Color3(0.1, 0.1, 0.22),
+    skin: new Color3(0.92, 0.78, 0.68),
+    visor: new Color3(0.2, 0.7, 1.0), // Blue Spark
+    visorGlow: new Color3(0.1, 0.4, 0.8),
+  },
+  {
+    name: "FFA-CyberAmber",
+    suitPrimary: new Color3(0.95, 0.75, 0.1), // Cyber Amber
+    suitSecondary: new Color3(0.25, 0.18, 0.05), // Dark Bronze
+    fists: new Color3(0.95, 0.2, 0.2), // Red Accent Gloves
+    boots: new Color3(0.2, 0.16, 0.08),
+    skin: new Color3(0.94, 0.8, 0.7),
+    visor: new Color3(1.0, 0.9, 0.2), // Electric Amber
+    visorGlow: new Color3(0.8, 0.7, 0.1),
+  },
+];
+
+/**
+ * Returns a deterministic, visually distinct palette for FFA opponents based on playerId hash.
+ */
+export function getFfaPaletteForPlayer(identifier: string): CharacterPalette {
+  let hash = 0;
+  for (let i = 0; i < identifier.length; i++) {
+    hash = (hash * 31 + identifier.charCodeAt(i)) | 0;
+  }
+  const index = Math.abs(hash) % FFA_PALETTES.length;
+  return FFA_PALETTES[index];
+}
+
