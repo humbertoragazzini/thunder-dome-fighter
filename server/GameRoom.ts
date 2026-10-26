@@ -214,22 +214,34 @@ export class GameRoom extends Room {
 
         if (!currentPlayer) return;
 
-        currentPlayer.x = x;
-        currentPlayer.y = y;
-        currentPlayer.z = z;
-        currentPlayer.rx = rx;
-        currentPlayer.ry = ry;
-        currentPlayer.rz = rz;
-        currentPlayer.rw = rw;
-        currentPlayer.vx = vx;
-        currentPlayer.vy = vy;
-        currentPlayer.vz = vz;
-        currentPlayer.avx = avx;
-        currentPlayer.avy = avy;
-        currentPlayer.avz = avz;
-        currentPlayer.lastProcessedInputSequence = lastProcessedInputSequence;
-        currentPlayer.isInvulnerable = this.simulationWorld.isEntityInvulnerable(playerId);
-        currentPlayer.isStunned = this.simulationWorld.isEntityStunned(playerId);
+        // Epsilon culling (Step 18.4): Only dirty fields when delta exceeds epsilon
+        // to prevent unnecessary network serialization for stationary/resting entities.
+        if (Math.abs(currentPlayer.x - x) > 0.001) currentPlayer.x = x;
+        if (Math.abs(currentPlayer.y - y) > 0.001) currentPlayer.y = y;
+        if (Math.abs(currentPlayer.z - z) > 0.001) currentPlayer.z = z;
+        if (Math.abs(currentPlayer.rx - rx) > 0.001) currentPlayer.rx = rx;
+        if (Math.abs(currentPlayer.ry - ry) > 0.001) currentPlayer.ry = ry;
+        if (Math.abs(currentPlayer.rz - rz) > 0.001) currentPlayer.rz = rz;
+        if (Math.abs(currentPlayer.rw - rw) > 0.001) currentPlayer.rw = rw;
+        if (Math.abs(currentPlayer.vx - vx) > 0.01) currentPlayer.vx = vx;
+        if (Math.abs(currentPlayer.vy - vy) > 0.01) currentPlayer.vy = vy;
+        if (Math.abs(currentPlayer.vz - vz) > 0.01) currentPlayer.vz = vz;
+        if (Math.abs(currentPlayer.avx - avx) > 0.01) currentPlayer.avx = avx;
+        if (Math.abs(currentPlayer.avy - avy) > 0.01) currentPlayer.avy = avy;
+        if (Math.abs(currentPlayer.avz - avz) > 0.01) currentPlayer.avz = avz;
+        if (currentPlayer.lastProcessedInputSequence !== lastProcessedInputSequence) {
+          currentPlayer.lastProcessedInputSequence = lastProcessedInputSequence;
+        }
+
+        const invuln = this.simulationWorld.isEntityInvulnerable(playerId);
+        if (currentPlayer.isInvulnerable !== invuln) {
+          currentPlayer.isInvulnerable = invuln;
+        }
+
+        const stunned = this.simulationWorld.isEntityStunned(playerId);
+        if (currentPlayer.isStunned !== stunned) {
+          currentPlayer.isStunned = stunned;
+        }
       },
     );
   }
@@ -432,11 +444,20 @@ export class GameRoom extends Room {
       requestedTeam,
     );
 
+    // Active opponent positions for anti-spawn-camping when joining an active FFA match
+    const activeOpponents =
+      this.gameMode.teamCount === 0 && this.state.players.size > 0
+        ? Array.from(this.state.players.values())
+            .filter((p) => !p.isDead)
+            .map((p) => ({ x: p.x, y: p.y, z: p.z }))
+        : undefined;
+
     // Deterministically resolve starting spawn location based on team affinity and slot
     const spawnPoint = resolveSpawnPoint(
       this.level,
       teamAssignment.slotInTeam,
       teamAssignment.teamIndex >= 0 ? teamAssignment.teamIndex : undefined,
+      activeOpponents,
     );
 
     this.simulationWorld.spawnEntity(client.sessionId, spawnPoint);
@@ -641,6 +662,26 @@ export class GameRoom extends Room {
         winnerTeamIndex = 1;
       } else {
         winnerTeamIndex = -1;
+      }
+    } else if (winnerPlayerId === undefined && !isTeamMode) {
+      // Free-For-All or 1v1 timeout: Resolve winner by highest individual score/kills
+      let topScore = -1;
+      let topKills = -1;
+      let topSessionId: string | undefined = undefined;
+      for (const [sId, pState] of this.state.players.entries()) {
+        if (
+          pState.score > topScore ||
+          (pState.score === topScore && pState.kills > topKills)
+        ) {
+          topScore = pState.score;
+          topKills = pState.kills;
+          topSessionId = sId;
+        }
+      }
+      if (topSessionId) {
+        winnerPlayerId = topSessionId;
+        const winnerState = this.state.players.get(topSessionId);
+        winnerTeamIndex = winnerState ? winnerState.teamIndex : -1;
       }
     }
 
@@ -1220,10 +1261,15 @@ export class GameRoom extends Room {
     const playerState = this.state.players.get(sessionId);
     if (!playerState) return;
 
+    const activeOpponents = Array.from(this.state.players.entries())
+      .filter(([sId, p]) => sId !== sessionId && !p.isDead)
+      .map(([_, p]) => ({ x: p.x, y: p.y, z: p.z }));
+
     const spawnPoint = resolveSpawnPoint(
       this.level,
       0,
       playerState.teamIndex >= 0 ? playerState.teamIndex : undefined,
+      activeOpponents.length > 0 ? activeOpponents : undefined,
     );
 
     this.simulationWorld.respawnEntity(sessionId, spawnPoint);
