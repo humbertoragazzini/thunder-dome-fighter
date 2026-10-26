@@ -225,6 +225,75 @@ export const LEVEL_THUNDER_DOME_ALPHA: LevelDefinition = {
       rotationYaw: -Math.PI / 2,
       teamIndex: 1,
     },
+
+    // --------------------------------------------------
+    // Neutral & Free-For-All (FFA) Spawns (12 distinct perimeter/platform positions)
+    // Inward-facing yaw rotations, minimum clearance >= 3.6m from all other spawns.
+    // --------------------------------------------------
+    // North Perimeter Arc
+    {
+      id: "spawn-ffa-1",
+      position: { x: -6, y: 0.55, z: 11 },
+      rotationYaw: Math.atan2(6, -11),
+    },
+    {
+      id: "spawn-ffa-2",
+      position: { x: 0, y: 0.55, z: 13 },
+      rotationYaw: Math.PI,
+    },
+    {
+      id: "spawn-ffa-3",
+      position: { x: 6, y: 0.55, z: 11 },
+      rotationYaw: Math.atan2(-6, -11),
+    },
+    // South Perimeter Arc
+    {
+      id: "spawn-ffa-4",
+      position: { x: -6, y: 0.55, z: -11 },
+      rotationYaw: Math.atan2(6, 11),
+    },
+    {
+      id: "spawn-ffa-5",
+      position: { x: 0, y: 0.55, z: -13 },
+      rotationYaw: 0,
+    },
+    {
+      id: "spawn-ffa-6",
+      position: { x: 6, y: 0.55, z: -11 },
+      rotationYaw: Math.atan2(-6, 11),
+    },
+    // Flank Quadrants
+    {
+      id: "spawn-ffa-7",
+      position: { x: -11, y: 0.55, z: 7 },
+      rotationYaw: Math.atan2(11, -7),
+    },
+    {
+      id: "spawn-ffa-8",
+      position: { x: 11, y: 0.55, z: 7 },
+      rotationYaw: Math.atan2(-11, -7),
+    },
+    {
+      id: "spawn-ffa-9",
+      position: { x: -11, y: 0.55, z: -7 },
+      rotationYaw: Math.atan2(11, 7),
+    },
+    {
+      id: "spawn-ffa-10",
+      position: { x: 11, y: 0.55, z: -7 },
+      rotationYaw: Math.atan2(-11, 7),
+    },
+    // Elevated Platform Sparring Overlooks
+    {
+      id: "spawn-ffa-11",
+      position: { x: -1.5, y: 1.75, z: 7.5 },
+      rotationYaw: Math.PI,
+    },
+    {
+      id: "spawn-ffa-12",
+      position: { x: 1.5, y: 1.75, z: -7.5 },
+      rotationYaw: 0,
+    },
   ],
   itemSpawns: [
     // 1. Center Arena: Heavy Melee (Thunder Hammer)
