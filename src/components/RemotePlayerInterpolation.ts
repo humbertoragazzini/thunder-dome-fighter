@@ -25,6 +25,7 @@ import {
   OPPONENT_PALETTE,
   TEAM_ALPHA_PALETTE,
   TEAM_BETA_PALETTE,
+  getFfaPaletteForPlayer,
 } from "../visuals/character/CharacterRigConfig";
 import type { AttackActionType } from "../../shared/player/PlayerConfig";
 
@@ -145,13 +146,15 @@ export class RemotePlayerInterpolation {
         playerState.vz ?? 0,
       );
 
-      // Determine palette based on team affinity
+      // Determine palette based on team affinity or FFA
       const isTeammate =
         localTeamIndex !== undefined &&
         localTeamIndex >= 0 &&
         playerState.teamIndex !== undefined &&
         playerState.teamIndex >= 0 &&
         playerState.teamIndex === localTeamIndex;
+
+      const isFfa = playerState.teamIndex === undefined || playerState.teamIndex < 0;
 
       const palette =
         playerState.teamIndex === 0
@@ -160,7 +163,9 @@ export class RemotePlayerInterpolation {
             ? TEAM_BETA_PALETTE
             : isTeammate
               ? HERO_PALETTE
-              : OPPONENT_PALETTE;
+              : isFfa
+                ? getFfaPaletteForPlayer(playerId)
+                : OPPONENT_PALETTE;
 
       // First time remote player appears: spawn visual rig immediately
       if (!visual) {
