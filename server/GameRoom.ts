@@ -1263,7 +1263,7 @@ export class GameRoom extends Room {
 
     const activeOpponents = Array.from(this.state.players.entries())
       .filter(([sId, p]) => sId !== sessionId && !p.isDead)
-      .map(([_, p]) => ({ x: p.x, y: p.y, z: p.z }));
+      .map(([, p]) => ({ x: p.x, y: p.y, z: p.z }));
 
     const spawnPoint = resolveSpawnPoint(
       this.level,
