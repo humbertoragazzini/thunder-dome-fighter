@@ -181,6 +181,17 @@ export class MatchmakingRoom extends Room {
             return;
           }
 
+          // Reject squads for Free-For-All (strictly solo-only)
+          if (gameModeId === "ffa" && membersList.length > 1) {
+            const errPayload: ServerErrorPayload = {
+              code: "SOLO_ONLY",
+              message: "Free-For-All is individual combat only. Squads cannot queue for FFA.",
+              fatal: false,
+            };
+            client.send(ServerMessageType.SERVER_ERROR, errPayload);
+            return;
+          }
+
           // Verify party size does not exceed mode capacity
           const modeDef = GAME_MODES[gameModeId];
           const maxTeamSize = modeDef?.teamSize ?? (modeDef?.maxPlayers ?? 4);
