@@ -107,6 +107,7 @@ export function InGameOverlay() {
   const [team1Score, setTeam1Score] = useState<number>(0);
   const [team0Fighters, setTeam0Fighters] = useState<FighterHUDData[]>([]);
   const [team1Fighters, setTeam1Fighters] = useState<FighterHUDData[]>([]);
+  const [allFighters, setAllFighters] = useState<FighterHUDData[]>([]);
 
   const [localFighter, setLocalFighter] = useState<FighterHUDData>({
     id: "",
@@ -171,6 +172,7 @@ export function InGameOverlay() {
         const participantsList: ScoreboardParticipant[] = [];
         const team0List: FighterHUDData[] = [];
         const team1List: FighterHUDData[] = [];
+        const allFightersList: FighterHUDData[] = [];
 
         const entries: [string, any][] =
           typeof state.players.entries === "function"
@@ -226,6 +228,8 @@ export function InGameOverlay() {
             z: typeof p.z === "number" ? p.z : 0,
           };
 
+          allFightersList.push(fighterData);
+
           if (isLocal) {
             foundLocal = fighterData;
           } else {
@@ -239,6 +243,8 @@ export function InGameOverlay() {
           }
         }
 
+        allFightersList.sort((a, b) => b.score - a.score || b.kills - a.kills);
+        setAllFighters(allFightersList);
         setScoreboardParticipants(participantsList);
         setTeam0Fighters(team0List);
         setTeam1Fighters(team1List);
@@ -579,8 +585,168 @@ export function InGameOverlay() {
               </div>
             </div>
           </div>
+        ) : modeId === "ffa" ? (
+          /* 20-Player Free-For-All Stadium HUD */
+          <div className="w-full max-w-5xl mx-auto flex flex-col items-center gap-2 px-2 py-1">
+            <div className="w-full flex flex-col md:flex-row items-center justify-between gap-3">
+              {/* Left/Center: FFA Match Header & Local Vitals */}
+              <div className="flex-1 w-full flex flex-col gap-1 items-start">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="text-sm sm:text-base font-black uppercase tracking-wider text-orange-400 drop-shadow"
+                    style={{ fontFamily: "var(--font-game)" }}
+                  >
+                    FREE-FOR-ALL BRAWL
+                  </span>
+                  <Badge variant="amber">Target: 25 KOs</Badge>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {allFighters.filter((f) => !f.isDead).length}/{allFighters.length} Fighters Alive
+                  </span>
+                </div>
+
+                {/* Local Fighter Primary Vitals in FFA */}
+                <div className="w-full flex items-center justify-between text-xs px-1 font-mono mt-0.5">
+                  <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                    {localFighter.name}
+                    {localFighter.isInvulnerable && (
+                      <Badge variant="cyan" pulse>
+                        <GiLightningShield className="mr-0.5 inline" /> SHIELD
+                      </Badge>
+                    )}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 font-mono font-bold bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700/60">
+                      K: <span className="text-amber-300">{localFighter.kills}</span> | D:{" "}
+                      <span className="text-rose-400">{localFighter.deaths}</span> | A:{" "}
+                      <span className="text-cyan-400">{localFighter.assists}</span>
+                    </span>
+                    <span className="font-bold text-cyan-400">
+                      {localFighter.health} / {localFighter.maxHealth} HP
+                    </span>
+                  </div>
+                </div>
+                <div className="w-full h-3.5 bg-slate-900/90 border border-slate-700 rounded-lg overflow-hidden relative shadow-md">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-600 via-cyan-500 to-cyan-400 transition-all duration-200 ease-out"
+                    style={{ width: `${Math.max(0, Math.min(100, localFighter.health))}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Right: Dynamic Top 5 Leaderboard Widget */}
+              <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md border border-amber-500/30 rounded-xl p-2.5 shadow-[0_0_15px_rgba(0,0,0,0.5)] min-w-[260px] w-full md:w-auto">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-1 mb-1">
+                  <span
+                    className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-1.5"
+                    style={{ fontFamily: "var(--font-game)" }}
+                  >
+                    🏆 Top 5 Fighters
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    Goal: 25 KOs
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  {allFighters.slice(0, 5).map((f, idx) => {
+                    const isSelf = f.id === localFighter.id;
+                    return (
+                      <div
+                        key={f.id}
+                        className={`flex items-center justify-between px-2 py-0.5 rounded text-[11px] font-mono ${
+                          isSelf
+                            ? "bg-cyan-950/80 border border-cyan-400/80 text-cyan-200 shadow-sm"
+                            : f.isDead
+                              ? "bg-slate-900/50 text-slate-500"
+                              : "bg-slate-800/60 text-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 truncate max-w-[150px]">
+                          <span
+                            className={`font-bold ${
+                              idx === 0
+                                ? "text-amber-400"
+                                : idx === 1
+                                  ? "text-slate-300"
+                                  : idx === 2
+                                    ? "text-amber-600"
+                                    : "text-slate-400"
+                            }`}
+                          >
+                            #{idx + 1}
+                          </span>
+                          <span className="truncate font-semibold">{f.name}</span>
+                          {isSelf && (
+                            <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1 rounded font-bold">
+                              YOU
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-[10px] font-bold ${
+                              f.isDead ? "text-slate-500" : "text-emerald-400"
+                            }`}
+                          >
+                            {f.isDead ? "KO" : `${f.health}HP`}
+                          </span>
+                          <span className="font-black text-amber-300 font-mono">
+                            {f.score} KOs
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* If local player is ranked >= 6, show persistent bottom rank row */}
+                  {(() => {
+                    const localRank = allFighters.findIndex((f) => f.id === localFighter.id) + 1;
+                    if (localRank > 5) {
+                      return (
+                        <>
+                          <div className="text-[9px] text-center text-slate-500 font-mono tracking-widest leading-none">
+                            • • •
+                          </div>
+                          <div className="flex items-center justify-between px-2 py-0.5 rounded text-[11px] font-mono bg-cyan-950/80 border border-cyan-400/80 text-cyan-200 shadow-sm">
+                            <div className="flex items-center gap-1.5 truncate max-w-[150px]">
+                              <span className="font-bold text-cyan-400">#{localRank}</span>
+                              <span className="truncate font-semibold">{localFighter.name}</span>
+                              <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1 rounded font-bold">
+                                YOU
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`text-[10px] font-bold ${
+                                  localFighter.isDead ? "text-slate-500" : "text-emerald-400"
+                                }`}
+                              >
+                                {localFighter.isDead ? "KO" : `${localFighter.health}HP`}
+                              </span>
+                              <span className="font-black text-amber-300 font-mono">
+                                {localFighter.score} KOs
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Active Kill Streak Modifiers (FFA Only) */}
+            <MatchPowerHUD
+              killStreak={localFighter.killStreak}
+              speedModifier={localFighter.speedModifier}
+              forceModifier={localFighter.forceModifier}
+              jumpModifier={localFighter.jumpModifier}
+            />
+          </div>
         ) : (
-          /* Top Dual Fighter Health Bars (1v1 / FFA Fighting Game HUD) */
+          /* Top Dual Fighter Health Bars (1v1 Arena Duel HUD) */
           <div className="w-full max-w-4xl mx-auto flex flex-col items-center gap-2 px-2 py-1">
             <div className="w-full flex items-center justify-between gap-4">
               {/* Left Fighter: Local Player */}
