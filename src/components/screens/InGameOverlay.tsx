@@ -19,7 +19,7 @@
 
 import { useEffect, useState } from "react";
 import { FaBars, FaHourglassHalf, FaListOl } from "react-icons/fa6";
-import { GiGamepad, GiLightningShield, GiRadarDish } from "react-icons/gi";
+import { GiGamepad, GiLightningShield } from "react-icons/gi";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useNavigationStore } from "../../store/useNavigationStore";
@@ -143,6 +143,7 @@ export function InGameOverlay() {
   const navigateTo = useNavigationStore((state) => state.navigateTo);
   const openModal = useNavigationStore((state) => state.openModal);
 
+  const activeTransport = useNetworkDiagnosticsStore((state) => state.activeTransport);
   const ping = useNetworkDiagnosticsStore((state) => state.ping);
   const fps = useNetworkDiagnosticsStore((state) => state.fps);
 
@@ -440,7 +441,7 @@ export function InGameOverlay() {
             {/* Live Network & Latency Telemetry Chip */}
             <button
               onClick={() => openModal("DIAGNOSTICS")}
-              title="Click or press [F3] to open Server Diagnostics"
+              title={`Active Transport: ${activeTransport}. Click or press [F3] to open Server Diagnostics`}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-mono font-bold shadow-lg transition-all backdrop-blur-md cursor-pointer ${
                 ping === null
                   ? "bg-slate-900/80 border-slate-700 text-slate-400"
@@ -453,7 +454,10 @@ export function InGameOverlay() {
                         : "bg-rose-950/70 border-rose-500/40 text-rose-300 hover:border-rose-400"
               }`}
             >
-              <GiRadarDish className="text-sm" />
+              <span className={activeTransport.includes("UDP") ? "text-emerald-400 font-black" : "text-cyan-400 font-black"}>
+                {activeTransport.includes("UDP") ? "⚡ UDP" : activeTransport.includes("TCP") ? "🔌 TCP" : "NET"}
+              </span>
+              <span className="text-slate-500">•</span>
               <span>{ping !== null ? `${ping}ms` : "--"}</span>
               <span className="text-slate-500">•</span>
               <span className="text-slate-300">{fps} FPS</span>
