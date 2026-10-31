@@ -23,7 +23,8 @@
 
 import { Client, type Room } from "@colyseus/sdk";
 import { create } from "zustand";
-import { getColyseusUrl } from "../config/network";
+import { connectWithDualTransport } from "../config/network";
+import { useNetworkDiagnosticsStore } from "./useNetworkDiagnosticsStore";
 import { ClientMessageType } from "../../shared/contracts/network/ClientMessages.ts";
 import {
   ServerMessageType,
@@ -118,9 +119,10 @@ export const useMatchmakingStore = create<MatchmakingState>((set, get) => ({
     set({ isConnecting: true, error: null });
 
     try {
-      const colyseusUrl = getColyseusUrl();
-      const client = new Client(colyseusUrl);
-      const room = await client.joinOrCreate("matchmaking", { token });
+      const room = await connectWithDualTransport(
+        (client) => client.joinOrCreate("matchmaking", { token }),
+        (protocol) => useNetworkDiagnosticsStore.getState().setActiveTransport(protocol),
+      );
 
       // Listen for party synchronization
       room.onMessage(
