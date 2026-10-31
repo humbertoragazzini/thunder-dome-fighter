@@ -32,39 +32,57 @@ import { defineServer, defineRoom } from "colyseus";
 import { H3Transport } from "@colyseus/h3-transport";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./GameRoom";
+import { X509Certificate } from "node:crypto";
 import { MatchmakingRoom } from "./matchmaking/MatchmakingRoom";
 
 const host = process.env.COLYSEUS_HOST ?? "0.0.0.0";
 
-// Ensure a browser-trusted ECDSA certificate is prepared for WebTransport HTTP/3 (UDP :2567)
-if (!process.env.WEBTRANSPORT_CERT_PATH) {
-  const certDir = path.join(os.tmpdir(), "colyseus-h3-cert");
-  fs.mkdirSync(certDir, { recursive: true });
-  const certFile = path.join(certDir, `${host}.pem`);
-  const keyFile = path.join(certDir, `${host}-key.pem`);
+class FingerprintedH3Transport extends H3Transport {
+  private customFingerprint?: number[];
 
-  if (!fs.existsSync(certFile) || !fs.existsSync(keyFile)) {
-    try {
-      execFileSync("mkcert", [
-        "-ecdsa",
-        "-cert-file", certFile,
-        "-key-file", keyFile,
-        host, "localhost", "127.0.0.1", "::1"
-      ], { stdio: "ignore" });
-    } catch {
-      // If mkcert generation fails, fallback to standard openssl self-signed ECDSA
-      try {
-        execFileSync("openssl", [
-          "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
-          "-nodes", "-keyout", keyFile, "-out", certFile, "-days", "10",
-          "-subj", `/CN=${host}`,
-          "-addext", `subjectAltName=DNS:localhost,IP:${host},IP:127.0.0.1,IP:::1`
-        ], { stdio: "ignore" });
-      } catch {
-        // Fallback handled by internal h3Transport
-      }
+  constructor(opts: any, customFingerprint?: number[]) {
+    super(opts);
+    this.customFingerprint = customFingerprint;
+    if (customFingerprint) {
+      this.fingerprint = customFingerprint;
     }
   }
+
+  protected override registerMatchMakeRoutes(fp?: number[]) {
+    super.registerMatchMakeRoutes(fp ?? this.customFingerprint);
+  }
+}
+
+// Generate valid OpenSSL self-signed ECDSA P-256 certificate with SHA-256 fingerprint pinning
+let certPem: string;
+let keyPem: string;
+let fingerprint: number[] | undefined;
+
+if (process.env.WEBTRANSPORT_CERT_PATH && process.env.WEBTRANSPORT_KEY_PATH) {
+  certPem = fs.readFileSync(process.env.WEBTRANSPORT_CERT_PATH, "utf8");
+  keyPem = fs.readFileSync(process.env.WEBTRANSPORT_KEY_PATH, "utf8");
+} else {
+  const certDir = path.join(os.tmpdir(), "colyseus-h3-cert");
+  fs.mkdirSync(certDir, { recursive: true });
+  const certFile = path.join(certDir, `${host}-wt.pem`);
+  const keyFile = path.join(certDir, `${host}-wt-key.pem`);
+
+  try {
+    execFileSync("openssl", [
+      "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
+      "-nodes", "-keyout", keyFile, "-out", certFile, "-days", "10",
+      "-subj", `/CN=${host}`,
+      "-addext", `subjectAltName=DNS:localhost,IP:${host},IP:127.0.0.1,IP:::1`
+    ], { stdio: "ignore" });
+  } catch (err) {
+    console.error("Failed to generate ECDSA certificate with OpenSSL:", err);
+  }
+
+  certPem = fs.readFileSync(certFile, "utf8");
+  keyPem = fs.readFileSync(keyFile, "utf8");
+
+  const x509 = new X509Certificate(certPem);
+  fingerprint = x509.fingerprint256.split(":").map((h) => parseInt(h, 16));
 }
 
 const expressApp = express();
@@ -90,7 +108,10 @@ expressApp.use((req, res, next) => {
   next();
 });
 
-const h3Transport = new H3Transport({ app: expressApp });
+const h3Transport = new FingerprintedH3Transport(
+  { app: expressApp, cert: certPem, key: keyPem },
+  fingerprint,
+);
 const wsFallbackTransport = new WebSocketTransport({ noServer: true });
 
 const gameServer = defineServer({
