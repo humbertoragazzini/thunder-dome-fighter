@@ -89,6 +89,9 @@ export function MatchLoadingScreen() {
 
         const joinedRoom = await connectWithDualTransport(
           async (client) => {
+            if (token) {
+              client.http.authToken = token;
+            }
             if (reservation) {
               setLoadingStep("Consuming allocated seat reservation...");
               const r = await client.consumeSeatReservation(reservation);
