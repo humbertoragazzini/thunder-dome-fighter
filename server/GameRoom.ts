@@ -44,6 +44,14 @@ import { GAME_ITEMS } from "../shared/domain/GameItem";
 import { calculateDamageScaledKnockback } from "../shared/player/PlayerPhysicsMath";
 import { MatchStatsTracker } from "./match/MatchStatsTracker.js";
 import { MatchFinalizer } from "./match/MatchFinalizer.js";
+import {
+  ClientMessageType,
+  type NetPingPayload,
+} from "../shared/contracts/network/ClientMessages.ts";
+import {
+  ServerMessageType,
+  type NetPongPayload,
+} from "../shared/contracts/network/ServerMessages.ts";
 
 export interface GameRoomOptions {
   serverName?: string;
@@ -327,6 +335,19 @@ export class GameRoom extends Room {
     this.onMessage("player:drop-weapon", (client) => {
       this.handlePlayerDropWeapon(client.sessionId);
     });
+
+    // Telemetry heartbeat listener for round-trip latency & server clock measurement
+    this.onMessage(
+      ClientMessageType.NET_PING,
+      (client, message: NetPingPayload) => {
+        const pongPayload: NetPongPayload = {
+          clientTime: message?.clientTime ?? 0,
+          serverTime: performance.now(),
+          serverTick: this.state.serverTick,
+        };
+        client.send(ServerMessageType.NET_PONG, pongPayload);
+      },
+    );
   }
 
   // ==================================================
