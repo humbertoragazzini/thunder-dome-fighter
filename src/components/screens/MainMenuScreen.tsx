@@ -14,10 +14,12 @@
 // Replaces bare developer canvas overlays with a full arcade main menu.
 // ==================================================
 
+import { useEffect } from "react";
 import { FaUserGroup } from "react-icons/fa6";
 import { GiBoxingGlove, GiCrown, GiLightningTrio, GiRadarDish, GiSwordsPower } from "react-icons/gi";
 import { useMatchmakingStore } from "../../store/useMatchmakingStore";
 import { useNavigationStore } from "../../store/useNavigationStore";
+import { useNetworkDiagnosticsStore } from "../../store/useNetworkDiagnosticsStore";
 import { Button } from "../ui/atoms/Button";
 import { Heading } from "../ui/atoms/Heading";
 import { MenuCard } from "../ui/molecules/MenuCard";
@@ -32,17 +34,49 @@ export function MainMenuScreen() {
   const squadSize = party ? Object.keys(party.members).length : 0;
   const isSquadActive = squadSize > 1;
 
+  const ping = useNetworkDiagnosticsStore((state) => state.ping);
+
+  useEffect(() => {
+    useNetworkDiagnosticsStore.getState().startSampling();
+    return () => {
+      useNetworkDiagnosticsStore.getState().stopSampling();
+    };
+  }, []);
+
   return (
     <ScreenLayout
       header={<PlayerBanner />}
       footer={
         <div className="w-full bg-slate-950/80 border-t border-slate-800/80 px-4 md:px-8 py-2.5 flex items-center justify-between text-xs text-slate-400 select-none">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span style={{ fontFamily: "var(--font-tech)" }}>
+          <button
+            onClick={() => openModal("DIAGNOSTICS")}
+            className="flex items-center gap-2 hover:text-slate-200 transition-colors cursor-pointer group focus:outline-none"
+            title="Click to open Server Diagnostics & Latency Monitor"
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                ping === null
+                  ? "bg-emerald-400 animate-pulse"
+                  : ping < 50
+                    ? "bg-emerald-400"
+                    : ping < 100
+                      ? "bg-cyan-400"
+                      : ping < 150
+                        ? "bg-amber-400"
+                        : "bg-rose-500 animate-pulse"
+              }`}
+            />
+            <span
+              style={{ fontFamily: "var(--font-tech)" }}
+              className="group-hover:underline"
+            >
               Authoritative Simulation Cluster Online
             </span>
-          </div>
+            <span className="font-mono text-[11px] px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700/80 text-cyan-400 flex items-center gap-1 group-hover:border-cyan-500/50">
+              <GiRadarDish className="text-xs" />
+              {ping !== null ? `${ping}ms` : "Testing..."}
+            </span>
+          </button>
           <span
             className="hidden sm:inline text-slate-500 font-mono text-[11px]"
           >
