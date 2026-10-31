@@ -16,7 +16,7 @@
 // ==================================================
 
 import { FaDoorOpen, FaPlay } from "react-icons/fa6";
-import { GiPauseButton } from "react-icons/gi";
+import { GiPauseButton, GiRadarDish } from "react-icons/gi";
 import { useAppStore } from "../../../store/useAppStore";
 import { useNavigationStore } from "../../../store/useNavigationStore";
 import { Button } from "../atoms/Button";
@@ -31,6 +31,7 @@ export function PauseMenuDialog({ isOpen, onClose }: PauseMenuDialogProps) {
   const room = useAppStore((state) => state.room);
   const setRoom = useAppStore((state) => state.setRoom);
   const navigateTo = useNavigationStore((state) => state.navigateTo);
+  const openModal = useNavigationStore((state) => state.openModal);
 
   const handleLeaveArena = async () => {
     onClose();
@@ -43,6 +44,11 @@ export function PauseMenuDialog({ isOpen, onClose }: PauseMenuDialogProps) {
       setRoom(null);
     }
     navigateTo("MAIN_MENU");
+  };
+
+  const handleOpenDiagnostics = () => {
+    onClose();
+    openModal("DIAGNOSTICS");
   };
 
   return (
@@ -70,6 +76,16 @@ export function PauseMenuDialog({ isOpen, onClose }: PauseMenuDialogProps) {
             className="w-full"
           >
             Resume Fight
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={handleOpenDiagnostics}
+            leftIcon={<GiRadarDish className="text-cyan-400" />}
+            className="w-full"
+          >
+            Server Diagnostics
           </Button>
 
           <Button
