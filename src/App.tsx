@@ -31,6 +31,7 @@ import { DuplicateTabDialog } from "./components/ui/organisms/DuplicateTabDialog
 import { ErrorDialog } from "./components/ui/organisms/ErrorDialog";
 import { PartyModal } from "./components/ui/organisms/PartyModal";
 import { ProfileModal } from "./components/ui/organisms/ProfileModal";
+import { ServerDiagnosticsModal } from "./components/ui/organisms/ServerDiagnosticsModal";
 import { useAppStore } from "./store/useAppStore";
 import { useAuthStore } from "./store/useAuthStore";
 import { useNavigationStore } from "./store/useNavigationStore";
@@ -99,6 +100,7 @@ export default function App() {
       {/* Global Modals & Tab Enforcer */}
       <ProfileModal />
       <PartyModal />
+      <ServerDiagnosticsModal />
       <ErrorDialog />
       <DuplicateTabDialog />
     </div>
