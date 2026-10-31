@@ -354,17 +354,23 @@ export class GameRoom extends Room {
   // WEBSOCKET AUTHENTICATION HOOK
   // ==================================================
 
-  async onAuth(client: Client, options: unknown): Promise<AuthenticatedUser> {
+  async onAuth(
+    client: Client,
+    options: unknown,
+    authContext?: { token?: string },
+  ): Promise<AuthenticatedUser> {
     const rawOptions =
       typeof options === "object" && options !== null
         ? (options as Record<string, unknown>)
         : {};
     const token =
-      typeof rawOptions.token === "string"
+      typeof rawOptions.token === "string" && rawOptions.token.length > 0
         ? rawOptions.token
-        : typeof rawOptions._authToken === "string"
+        : typeof rawOptions._authToken === "string" && rawOptions._authToken.length > 0
           ? rawOptions._authToken
-          : undefined;
+          : typeof authContext?.token === "string" && authContext.token.length > 0
+            ? authContext.token
+            : undefined;
 
     if (!token) {
       throw new ServerError(401, "Authentication token required to enter arena.");

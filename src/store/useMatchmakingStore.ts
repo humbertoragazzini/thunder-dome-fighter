@@ -273,8 +273,12 @@ export const useMatchmakingStore = create<MatchmakingState>((set, get) => ({
 
   startQueue: async (modeId: GameModeId) => {
     const room = await get().ensureConnected();
+    const token = useAuthStore.getState().token;
     useNavigationStore.getState().setSelectedMatchMode(modeId);
-    room.send(ClientMessageType.MATCH_QUEUE, { gameModeId: modeId });
+    room.send(ClientMessageType.MATCH_QUEUE, {
+      gameModeId: modeId,
+      token: token ?? undefined,
+    });
   },
 
   cancelQueue: async () => {

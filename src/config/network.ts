@@ -44,10 +44,13 @@ export function getWebTransportUrl(): string {
     return envUrl.replace(/^wss?:/, "https:");
   }
   if (typeof window !== "undefined" && window.location?.hostname) {
-    const host = window.location.hostname;
+    let host = window.location.hostname;
+    if (host === "localhost") {
+      host = "127.0.0.1";
+    }
     return `https://${host}:2567`;
   }
-  return envUrl ? envUrl.replace(/^wss?:/, "https:") : "https://localhost:2567";
+  return envUrl ? envUrl.replace(/^wss?:/, "https:") : "https://127.0.0.1:2567";
 }
 
 /**
@@ -59,11 +62,14 @@ export function getWebSocketFallbackUrl(): string {
     return envFallback;
   }
   if (typeof window !== "undefined" && window.location?.hostname) {
-    const host = window.location.hostname;
+    let host = window.location.hostname;
+    if (host === "localhost") {
+      host = "127.0.0.1";
+    }
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     return `${protocol}//${host}:2568`;
   }
-  return "ws://localhost:2568";
+  return "ws://127.0.0.1:2568";
 }
 
 export function getColyseusUrl(): string {
@@ -72,11 +78,14 @@ export function getColyseusUrl(): string {
     return envUrl;
   }
   if (typeof window !== "undefined" && window.location?.hostname) {
-    const host = window.location.hostname;
+    let host = window.location.hostname;
+    if (host === "localhost") {
+      host = "127.0.0.1";
+    }
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     return `${protocol}//${host}:2568`;
   }
-  return envUrl ?? "ws://localhost:2568";
+  return envUrl ?? "ws://127.0.0.1:2568";
 }
 
 /**

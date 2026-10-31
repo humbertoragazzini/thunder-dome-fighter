@@ -165,6 +165,10 @@ export class MatchmakingRoom extends Room {
         const user = this.getAuthUser(client);
         if (!user) return;
 
+        if (typeof message?.token === "string" && message.token.length > 0) {
+          this.clientTokens.set(client.sessionId, message.token);
+        }
+
         const playerId = user.playerId;
         const gameModeId = message.gameModeId;
         const party = partyManager.getPartyByPlayerId(playerId);
@@ -224,6 +228,9 @@ export class MatchmakingRoom extends Room {
             const memberClient = this.clientByPlayerId.get(m.playerId);
             const token =
               (memberClient ? this.clientTokens.get(memberClient.sessionId) : undefined) ??
+              (m.playerId === playerId && typeof message?.token === "string" && message.token.length > 0
+                ? message.token
+                : undefined) ??
               this.clientTokens.get(client.sessionId) ??
               "";
             return {
@@ -286,6 +293,13 @@ export class MatchmakingRoom extends Room {
           }
         } else {
           // Solo queue
+          const soloToken =
+            (typeof message?.token === "string" && message.token.length > 0
+              ? message.token
+              : undefined) ??
+            this.clientTokens.get(client.sessionId) ??
+            "";
+
           matchmakingQueueManager.addTicket({
             gameModeId,
             partyId: null,
@@ -295,7 +309,7 @@ export class MatchmakingRoom extends Room {
                 playerId,
                 playerName: user.playerName,
                 avatarUrl: null,
-                token: this.clientTokens.get(client.sessionId) ?? "",
+                token: soloToken,
                 sessionId: client.sessionId,
               },
             ],
@@ -353,17 +367,20 @@ export class MatchmakingRoom extends Room {
   override async onAuth(
     _client: Client,
     options: unknown,
+    authContext?: { token?: string },
   ): Promise<MatchmakingClientAuth> {
     const rawOptions =
       typeof options === "object" && options !== null
         ? (options as Record<string, unknown>)
         : {};
     const token =
-      typeof rawOptions.token === "string"
+      typeof rawOptions.token === "string" && rawOptions.token.length > 0
         ? rawOptions.token
-        : typeof rawOptions._authToken === "string"
+        : typeof rawOptions._authToken === "string" && rawOptions._authToken.length > 0
           ? rawOptions._authToken
-          : undefined;
+          : typeof authContext?.token === "string" && authContext.token.length > 0
+            ? authContext.token
+            : undefined;
 
     if (!token) {
       throw new ServerError(401, "Authentication token required for matchmaking.");
@@ -379,13 +396,16 @@ export class MatchmakingRoom extends Room {
     }
   }
 
-  override onJoin(client: Client): void {
+  override onJoin(client: Client, options?: any): void {
     const user = this.getAuthUser(client);
     if (!user) return;
 
     this.clientByPlayerId.set(user.playerId, client);
     const auth = client.auth as any;
-    const token = typeof auth?.token === "string" ? auth.token : undefined;
+    const token =
+      (typeof options?.token === "string" && options.token.length > 0 ? options.token : undefined) ??
+      (typeof options?._authToken === "string" && options._authToken.length > 0 ? options._authToken : undefined) ??
+      (typeof auth?.token === "string" && auth.token.length > 0 ? auth.token : undefined);
     if (token) {
       this.clientTokens.set(client.sessionId, token);
     }

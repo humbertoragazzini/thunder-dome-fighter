@@ -73,6 +73,7 @@ export interface PartySetReadyPayload {
 
 export interface MatchQueuePayload {
   gameModeId: GameModeId;
+  token?: string;
 }
 
 export interface InteractPayload {
