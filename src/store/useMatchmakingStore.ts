@@ -21,7 +21,7 @@
 // from raw WebSocket communication.
 // ==================================================
 
-import { Client, type Room } from "@colyseus/sdk";
+import type { Room } from "@colyseus/sdk";
 import { create } from "zustand";
 import { connectWithDualTransport } from "../config/network";
 import { useNetworkDiagnosticsStore } from "./useNetworkDiagnosticsStore";
