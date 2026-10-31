@@ -37,12 +37,21 @@ if (!process.env.WEBTRANSPORT_CERT_PATH) {
 
 const expressApp = express();
 
-// Permissive CORS middleware for cross-origin LAN testing
-expressApp.use((_req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+// Parse incoming JSON bodies for matchmaking options
+expressApp.use(express.json());
+
+// Permissive CORS middleware supporting credentials for cross-origin LAN testing
+expressApp.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header("Access-Control-Allow-Origin", origin);
+  } else {
+    res.header("Access-Control-Allow-Origin", "*");
+  }
+  res.header("Access-Control-Allow-Credentials", "true");
   res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
-  if (_req.method === "OPTIONS") {
+  if (req.method === "OPTIONS") {
     res.sendStatus(204);
     return;
   }

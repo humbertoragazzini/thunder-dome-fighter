@@ -53,6 +53,18 @@ export class MatchmakingRoom extends Room {
   private clientByPlayerId = new Map<string, Client>();
   private clientTokens = new Map<string, string>(); // sessionId -> token
 
+  private getAuthUser(client: Client): AuthenticatedUser | undefined {
+    const auth = client.auth as any;
+    if (!auth) return undefined;
+    if (auth.user && typeof auth.user.playerId === "string") {
+      return auth.user as AuthenticatedUser;
+    }
+    if (typeof auth.playerId === "string") {
+      return auth as AuthenticatedUser;
+    }
+    return undefined;
+  }
+
   override onCreate(): void {
     this.maxClients = 10000;
 
@@ -60,12 +72,12 @@ export class MatchmakingRoom extends Room {
     // 1. Party Creation
     // --------------------------------------------------
     this.onMessage(ClientMessageType.PARTY_CREATE, (client) => {
-      const auth = client.auth as MatchmakingClientAuth | undefined;
-      if (!auth) return;
+      const user = this.getAuthUser(client);
+      if (!user) return;
 
       const party = partyManager.createParty({
-        playerId: auth.user.playerId,
-        playerName: auth.user.playerName,
+        playerId: user.playerId,
+        playerName: user.playerName,
         avatarUrl: null,
       });
 
@@ -79,12 +91,12 @@ export class MatchmakingRoom extends Room {
     this.onMessage(
       ClientMessageType.PARTY_JOIN,
       (client, message: PartyJoinPayload) => {
-        const auth = client.auth as MatchmakingClientAuth | undefined;
-        if (!auth) return;
+        const user = this.getAuthUser(client);
+        if (!user) return;
 
         const result = partyManager.joinParty(message.inviteCode, {
-          playerId: auth.user.playerId,
-          playerName: auth.user.playerName,
+          playerId: user.playerId,
+          playerName: user.playerName,
           avatarUrl: null,
         });
 
@@ -106,13 +118,13 @@ export class MatchmakingRoom extends Room {
     // 3. Party Leave
     // --------------------------------------------------
     this.onMessage(ClientMessageType.PARTY_LEAVE, (client) => {
-      const auth = client.auth as MatchmakingClientAuth | undefined;
-      if (!auth) return;
+      const user = this.getAuthUser(client);
+      if (!user) return;
 
       // Cancel any ongoing queue for this party/player first
-      this.cancelQueueForPlayer(auth.user.playerId);
+      this.cancelQueueForPlayer(user.playerId);
 
-      const { updatedParty } = partyManager.leaveParty(auth.user.playerId);
+      const { updatedParty } = partyManager.leaveParty(user.playerId);
 
       // Notify the leaving client that they have no party
       const leavePayload: PartyUpdatedPayload = { party: null };
@@ -130,11 +142,11 @@ export class MatchmakingRoom extends Room {
     this.onMessage(
       ClientMessageType.PARTY_SET_READY,
       (client, message: PartySetReadyPayload) => {
-        const auth = client.auth as MatchmakingClientAuth | undefined;
-        if (!auth) return;
+        const user = this.getAuthUser(client);
+        if (!user) return;
 
         const updatedParty = partyManager.setMemberReady(
-          auth.user.playerId,
+          user.playerId,
           message.isReady,
         );
 
@@ -150,10 +162,10 @@ export class MatchmakingRoom extends Room {
     this.onMessage(
       ClientMessageType.MATCH_QUEUE,
       (client, message: MatchQueuePayload) => {
-        const auth = client.auth as MatchmakingClientAuth | undefined;
-        if (!auth) return;
+        const user = this.getAuthUser(client);
+        if (!user) return;
 
-        const playerId = auth.user.playerId;
+        const playerId = user.playerId;
         const gameModeId = message.gameModeId;
         const party = partyManager.getPartyByPlayerId(playerId);
 
@@ -211,8 +223,9 @@ export class MatchmakingRoom extends Room {
           const participants: QueuedParticipant[] = membersList.map((m) => {
             const memberClient = this.clientByPlayerId.get(m.playerId);
             const token =
-              (memberClient?.auth as MatchmakingClientAuth | undefined)?.token ??
-              auth.token;
+              (memberClient ? this.clientTokens.get(memberClient.sessionId) : undefined) ??
+              this.clientTokens.get(client.sessionId) ??
+              "";
             return {
               playerId: m.playerId,
               playerName: m.playerName,
@@ -280,9 +293,9 @@ export class MatchmakingRoom extends Room {
             participants: [
               {
                 playerId,
-                playerName: auth.user.playerName,
+                playerName: user.playerName,
                 avatarUrl: null,
-                token: auth.token,
+                token: this.clientTokens.get(client.sessionId) ?? "",
                 sessionId: client.sessionId,
               },
             ],
@@ -315,10 +328,10 @@ export class MatchmakingRoom extends Room {
     // 6. Cancel Matchmaking Queue
     // --------------------------------------------------
     this.onMessage(ClientMessageType.MATCH_CANCEL_QUEUE, (client) => {
-      const auth = client.auth as MatchmakingClientAuth | undefined;
-      if (!auth) return;
+      const user = this.getAuthUser(client);
+      if (!user) return;
 
-      this.cancelQueueForPlayer(auth.user.playerId);
+      this.cancelQueueForPlayer(user.playerId);
     });
 
     // --------------------------------------------------
@@ -358,7 +371,7 @@ export class MatchmakingRoom extends Room {
 
     try {
       const user = await verifySessionToken(token);
-      return { user, token };
+      return { ...user, user, token };
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Invalid session token.";
@@ -367,14 +380,18 @@ export class MatchmakingRoom extends Room {
   }
 
   override onJoin(client: Client): void {
-    const auth = client.auth as MatchmakingClientAuth | undefined;
-    if (!auth) return;
+    const user = this.getAuthUser(client);
+    if (!user) return;
 
-    this.clientByPlayerId.set(auth.user.playerId, client);
-    this.clientTokens.set(client.sessionId, auth.token);
+    this.clientByPlayerId.set(user.playerId, client);
+    const auth = client.auth as any;
+    const token = typeof auth?.token === "string" ? auth.token : undefined;
+    if (token) {
+      this.clientTokens.set(client.sessionId, token);
+    }
 
     // If player already belongs to a party, sync it immediately
-    const existingParty = partyManager.getPartyByPlayerId(auth.user.playerId);
+    const existingParty = partyManager.getPartyByPlayerId(user.playerId);
     if (existingParty) {
       const payload: PartyUpdatedPayload = { party: existingParty };
       client.send(ServerMessageType.PARTY_UPDATED, payload);
@@ -382,10 +399,10 @@ export class MatchmakingRoom extends Room {
   }
 
   override onLeave(client: Client): void {
-    const auth = client.auth as MatchmakingClientAuth | undefined;
-    if (!auth) return;
+    const user = this.getAuthUser(client);
+    if (!user) return;
 
-    const playerId = auth.user.playerId;
+    const playerId = user.playerId;
     this.clientByPlayerId.delete(playerId);
     this.clientTokens.delete(client.sessionId);
 
