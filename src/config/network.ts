@@ -17,6 +17,10 @@
 // but attempt to query their own local loopback (localhost) for the backend.
 // ==================================================
 
+import { Client } from "@colyseus/sdk";
+
+export type ActiveTransportProtocol = "UDP (WebTransport)" | "TCP (WebSocket)" | "Detecting...";
+
 export function getApiUrl(): string {
   const envUrl = (import.meta as any).env?.VITE_API_URL;
   if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
@@ -28,6 +32,38 @@ export function getApiUrl(): string {
     return `${protocol}//${host}:3000`;
   }
   return envUrl ?? "http://localhost:3000";
+}
+
+/**
+ * Resolves the primary WebTransport HTTP/3 (UDP) endpoint on port 2567.
+ * WebTransport specification mandates the https:// scheme.
+ */
+export function getWebTransportUrl(): string {
+  const envUrl = (import.meta as any).env?.VITE_COLYSEUS_URL;
+  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+    return envUrl.replace(/^wss?:/, "https:");
+  }
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    const host = window.location.hostname;
+    return `https://${host}:2567`;
+  }
+  return envUrl ? envUrl.replace(/^wss?:/, "https:") : "https://localhost:2567";
+}
+
+/**
+ * Resolves the secondary WebSocket (TCP) fallback endpoint on port 2568.
+ */
+export function getWebSocketFallbackUrl(): string {
+  const envFallback = (import.meta as any).env?.VITE_COLYSEUS_WS_FALLBACK_URL;
+  if (envFallback) {
+    return envFallback;
+  }
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    const host = window.location.hostname;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${host}:2568`;
+  }
+  return "ws://localhost:2568";
 }
 
 export function getColyseusUrl(): string {
@@ -42,3 +78,50 @@ export function getColyseusUrl(): string {
   }
   return envUrl ?? "ws://localhost:2567";
 }
+
+/**
+ * Dual-Transport Connection Helper (Method B).
+ * 1. Attempts WebTransport (HTTP/3 over UDP port 2567) with a 2.5s connection race.
+ * 2. If unsupported, rejected, or timed out, falls back cleanly to WebSocket (TCP port 2568).
+ */
+export async function connectWithDualTransport<T>(
+  connectFn: (client: Client, protocol: "h3" | "ws") => Promise<T>,
+  onTransportResolved?: (protocol: "UDP (WebTransport)" | "TCP (WebSocket)") => void,
+): Promise<T> {
+  const isWebTransportSupported = typeof window !== "undefined" && "WebTransport" in window;
+
+  if (isWebTransportSupported) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("WebTransport handshake timeout (2500ms)")),
+          2500,
+        );
+      });
+
+      const wtUrl = getWebTransportUrl();
+      const h3Client = new Client(wtUrl, { protocol: "h3" });
+      const result = await Promise.race([
+        connectFn(h3Client, "h3"),
+        timeoutPromise,
+      ]);
+      clearTimeout(timer);
+      onTransportResolved?.("UDP (WebTransport)");
+      return result;
+    } catch (err) {
+      clearTimeout(timer);
+      console.warn(
+        "[Network] WebTransport UDP connection failed or timed out. Falling back to WebSocket TCP on :2568...",
+        err,
+      );
+    }
+  }
+
+  const wsUrl = getWebSocketFallbackUrl();
+  const wsClient = new Client(wsUrl, { protocol: "ws" });
+  const result = await connectFn(wsClient, "ws");
+  onTransportResolved?.("TCP (WebSocket)");
+  return result;
+}
+
