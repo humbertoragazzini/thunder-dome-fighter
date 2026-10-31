@@ -120,7 +120,12 @@ export const useMatchmakingStore = create<MatchmakingState>((set, get) => ({
 
     try {
       const room = await connectWithDualTransport(
-        (client) => client.joinOrCreate("matchmaking", { token }),
+        (client) => {
+          if (token) {
+            client.http.authToken = token;
+          }
+          return client.joinOrCreate("matchmaking", { token });
+        },
         (protocol) => useNetworkDiagnosticsStore.getState().setActiveTransport(protocol),
       );
 

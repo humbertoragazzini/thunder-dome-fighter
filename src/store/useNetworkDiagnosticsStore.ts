@@ -31,7 +31,7 @@ import {
   ServerMessageType,
   type NetPongPayload,
 } from "../../shared/contracts/network/ServerMessages";
-import { getColyseusUrl, type ActiveTransportProtocol } from "../config/network";
+import { getWebSocketFallbackUrl, type ActiveTransportProtocol } from "../config/network";
 
 export interface NetworkDiagnosticsState {
   // Transport & Protocol
@@ -273,7 +273,7 @@ export const useNetworkDiagnosticsStore = create<NetworkDiagnosticsState>((set, 
 
     // Scenario B: Fallback HTTP / WebSocket endpoint probe when rooms aren't yet active
     try {
-      const colyseusUrl = getColyseusUrl();
+      const colyseusUrl = getWebSocketFallbackUrl();
       const start = performance.now();
 
       await new Promise<void>((resolve) => {

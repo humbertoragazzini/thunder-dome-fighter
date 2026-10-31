@@ -74,9 +74,23 @@ export function getColyseusUrl(): string {
   if (typeof window !== "undefined" && window.location?.hostname) {
     const host = window.location.hostname;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${host}:2567`;
+    return `${protocol}//${host}:2568`;
   }
-  return envUrl ?? "ws://localhost:2567";
+  return envUrl ?? "ws://localhost:2568";
+}
+
+/**
+ * Custom fetch proxy for browser development:
+ * Rewrites direct matchmaking discovery requests targeting :2567 or :2568
+ * to Vite's local dev proxy (/matchmake), which ignores self-signed certificate
+ * errors in Node and returns the SHA-256 certificate fingerprint to the browser.
+ */
+function devFetchProxy(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  let urlStr = typeof input === "string" ? input : input.toString();
+  if (typeof window !== "undefined" && (urlStr.includes(":2567/matchmake") || urlStr.includes(":2568/matchmake"))) {
+    urlStr = urlStr.replace(/^https?:\/\/[^/]+(?::\d+)?\/matchmake/, "/matchmake");
+  }
+  return fetch(urlStr, init);
 }
 
 /**
@@ -101,7 +115,7 @@ export async function connectWithDualTransport<T>(
       });
 
       const wtUrl = getWebTransportUrl();
-      const h3Client = new Client(wtUrl, { protocol: "h3" });
+      const h3Client = new Client(wtUrl, { protocol: "h3", fetchFn: devFetchProxy });
       const result = await Promise.race([
         connectFn(h3Client, "h3"),
         timeoutPromise,
@@ -119,7 +133,7 @@ export async function connectWithDualTransport<T>(
   }
 
   const wsUrl = getWebSocketFallbackUrl();
-  const wsClient = new Client(wsUrl, { protocol: "ws" });
+  const wsClient = new Client(wsUrl, { protocol: "ws", fetchFn: devFetchProxy });
   const result = await connectFn(wsClient, "ws");
   onTransportResolved?.("TCP (WebSocket)");
   return result;
