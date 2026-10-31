@@ -341,12 +341,18 @@ export class MatchmakingRoom extends Room {
     _client: Client,
     options: unknown,
   ): Promise<MatchmakingClientAuth> {
+    const rawOptions =
+      typeof options === "object" && options !== null
+        ? (options as Record<string, unknown>)
+        : {};
     const token =
-      typeof options === "object" && options !== null && "token" in options
-        ? (options as { token: unknown }).token
-        : undefined;
+      typeof rawOptions.token === "string"
+        ? rawOptions.token
+        : typeof rawOptions._authToken === "string"
+          ? rawOptions._authToken
+          : undefined;
 
-    if (!token || typeof token !== "string") {
+    if (!token) {
       throw new ServerError(401, "Authentication token required for matchmaking.");
     }
 
