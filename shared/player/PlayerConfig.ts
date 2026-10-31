@@ -24,6 +24,14 @@ export const PHYSICS_DT_MS = 1000 / PHYSICS_HZ;
 export const PHYSICS_DT_SECONDS = 1 / PHYSICS_HZ;
 
 // ==================================================
+// NETWORK STATE BROADCAST CONSTANTS (30 Hz)
+// ==================================================
+
+/** Authoritative state patch broadcast frequency in Hz (independent of 60 Hz Havok physics) */
+export const NETWORK_TICK_HZ = 30;
+export const NETWORK_PATCH_RATE_MS = 1000 / NETWORK_TICK_HZ; // ~33.33ms
+
+// ==================================================
 // HUMANOID CHARACTER GEOMETRY & TUNING (PHASE 4 TARGET)
 // ==================================================
 
