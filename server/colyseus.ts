@@ -1,24 +1,86 @@
+// ==================================================
+// AUTHORITATIVE MULTIPLAYER GAME SERVER (DUAL-TRANSPORT METHOD B)
+//
+// WHAT IT DOES:
+// Boots the Colyseus authoritative server supporting two concurrent transports:
+// 1. Primary: H3Transport (WebTransport / HTTP/3 over QUIC on UDP port 2567).
+// 2. Fallback: WebSocketTransport (TCP on port 2568) for clients or networks
+//    where WebTransport is unsupported or blocked by firewall policies.
+//
+// HOW IT WORKS:
+// - Generates or resolves an ephemeral ECDSA P-256 certificate (validity <= 14 days)
+//   when custom certificates are omitted (H3_SELF_SIGNED=1).
+// - Registers rooms (`game` and `matchmaking`) in the unified Colyseus matchMaker.
+// - Distributes the SHA-256 certificate fingerprint during room allocation so
+//   Chromium browsers accept the UDP WebTransport session on raw LAN IP addresses.
+// - Attaches a secondary HTTP server on port 2568 running WebSocketTransport for
+//   fail-safe TCP fallback.
+//
+// WHY IT EXISTS:
+// Eliminates TCP Head-of-Line blocking and latency spikes across local network
+// devices by transmitting authoritative inputs and simulation deltas over UDP,
+// while guaranteeing 100% device compatibility via automatic TCP fallback.
+// ==================================================
+
+import http from "node:http";
+import express from "express";
 import { defineServer, defineRoom } from "colyseus";
+import { H3Transport } from "@colyseus/h3-transport";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./GameRoom";
 import { MatchmakingRoom } from "./matchmaking/MatchmakingRoom";
 
+// Enable self-signed ephemeral certificates for local LAN WebTransport if custom cert is omitted
+if (!process.env.WEBTRANSPORT_CERT_PATH) {
+  process.env.H3_SELF_SIGNED = "1";
+}
+
+const expressApp = express();
+
+// Permissive CORS middleware for cross-origin LAN testing
+expressApp.use((_req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  if (_req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
+const h3Transport = new H3Transport({ app: expressApp });
+const wsFallbackTransport = new WebSocketTransport({ noServer: true });
+
 const gameServer = defineServer({
-  transport: new WebSocketTransport(),
+  transport: h3Transport,
   rooms: {
     game: defineRoom(GameRoom).filterBy(["modeId", "levelId"]),
     matchmaking: defineRoom(MatchmakingRoom),
   },
 });
 
-const port = Number(process.env.PORT ?? process.env.COLYSEUS_PORT ?? 2567);
+const h3Port = Number(process.env.PORT ?? process.env.COLYSEUS_PORT ?? 2567);
+const wsFallbackPort = Number(process.env.COLYSEUS_WS_FALLBACK_PORT ?? 2568);
 const host = process.env.COLYSEUS_HOST ?? "0.0.0.0";
 
 async function startServer() {
-  await gameServer.listen(port, host);
+  // 1. Start primary WebTransport (UDP/QUIC :2567) + HTTPS matchmaker
+  await gameServer.listen(h3Port, host);
+
+  // 2. Attach WebSocket fallback to secondary plain HTTP server on port 2568
+  const secondaryHttpServer = http.createServer(expressApp);
+  wsFallbackTransport.attachToServer(secondaryHttpServer);
+  secondaryHttpServer.listen(wsFallbackPort, host, () => {
+    console.log(
+      `🔌 Colyseus TCP Fallback listening on ws://${host}:${wsFallbackPort}`,
+    );
+  });
+
   console.log(
-    `🚀 Colyseus Game Server listening on ws://${host}:${port} (Dynamic Matchmaking Active)`,
+    `🚀 Colyseus Primary Server listening on UDP/QUIC (WebTransport) & HTTPS on ${host}:${h3Port}`,
   );
 }
 
 startServer();
+
