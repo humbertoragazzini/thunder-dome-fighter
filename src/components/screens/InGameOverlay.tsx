@@ -19,10 +19,11 @@
 
 import { useEffect, useState } from "react";
 import { FaBars, FaHourglassHalf, FaListOl } from "react-icons/fa6";
-import { GiGamepad, GiLightningShield } from "react-icons/gi";
+import { GiGamepad, GiLightningShield, GiRadarDish } from "react-icons/gi";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useNavigationStore } from "../../store/useNavigationStore";
+import { useNetworkDiagnosticsStore } from "../../store/useNetworkDiagnosticsStore";
 import { Badge } from "../ui/atoms/Badge";
 import { Button } from "../ui/atoms/Button";
 import { MatchPowerHUD } from "../ui/molecules/MatchPowerHUD";
@@ -140,6 +141,18 @@ export function InGameOverlay() {
   const setRoom = useAppStore((state) => state.setRoom);
   const player = useAuthStore((state) => state.player);
   const navigateTo = useNavigationStore((state) => state.navigateTo);
+  const openModal = useNavigationStore((state) => state.openModal);
+
+  const ping = useNetworkDiagnosticsStore((state) => state.ping);
+  const fps = useNetworkDiagnosticsStore((state) => state.fps);
+
+  // Activate network diagnostics sampling while in combat
+  useEffect(() => {
+    useNetworkDiagnosticsStore.getState().startSampling();
+    return () => {
+      useNetworkDiagnosticsStore.getState().stopSampling();
+    };
+  }, []);
 
   // Auto-dismiss health recovery toast after 2 seconds
   useEffect(() => {
@@ -296,8 +309,14 @@ export function InGameOverlay() {
     });
 
     let isMounted = true;
-    const handleStateChange = () => {
-      if (isMounted) syncState();
+    const handleStateChange = (state: any) => {
+      if (isMounted) {
+        syncState();
+        if (state?.serverTick) {
+          useNetworkDiagnosticsStore.getState().recordServerTick(state.serverTick);
+        }
+        useNetworkDiagnosticsStore.getState().recordStatePatch();
+      }
     };
 
     syncState();
@@ -318,6 +337,9 @@ export function InGameOverlay() {
       } else if (e.key === "Tab") {
         e.preventDefault();
         setIsScoreboardOpen(true);
+      } else if (e.key === "F3") {
+        e.preventDefault();
+        openModal("DIAGNOSTICS");
       }
     };
 
@@ -413,8 +435,30 @@ export function InGameOverlay() {
             </span>
           </div>
 
-          {/* Right: Scoreboard & Pause Triggers */}
+          {/* Right: Telemetry, Scoreboard & Pause Triggers */}
           <div className="pointer-events-auto flex items-center gap-2">
+            {/* Live Network & Latency Telemetry Chip */}
+            <button
+              onClick={() => openModal("DIAGNOSTICS")}
+              title="Click or press [F3] to open Server Diagnostics"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-mono font-bold shadow-lg transition-all backdrop-blur-md cursor-pointer ${
+                ping === null
+                  ? "bg-slate-900/80 border-slate-700 text-slate-400"
+                  : ping < 35
+                    ? "bg-emerald-950/70 border-emerald-500/40 text-emerald-300 hover:border-emerald-400"
+                    : ping < 80
+                      ? "bg-cyan-950/70 border-cyan-500/40 text-cyan-300 hover:border-cyan-400"
+                      : ping < 130
+                        ? "bg-amber-950/70 border-amber-500/40 text-amber-300 hover:border-amber-400"
+                        : "bg-rose-950/70 border-rose-500/40 text-rose-300 hover:border-rose-400"
+              }`}
+            >
+              <GiRadarDish className="text-sm" />
+              <span>{ping !== null ? `${ping}ms` : "--"}</span>
+              <span className="text-slate-500">•</span>
+              <span className="text-slate-300">{fps} FPS</span>
+            </button>
+
             <Button
               variant="secondary"
               size="sm"
