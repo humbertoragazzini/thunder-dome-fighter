@@ -47,6 +47,9 @@ export const ClientMessageType = {
 
   /** Interact with arena environment (e.g. pick up a weapon) */
   INTERACT: "interact",
+
+  /** Telemetry heartbeat to measure round-trip network latency */
+  NET_PING: "net:ping",
 } as const;
 
 export type ClientMessageType =
@@ -76,6 +79,10 @@ export interface InteractPayload {
   targetItemId?: string;
 }
 
+export interface NetPingPayload {
+  clientTime: number;
+}
+
 // ==================================================
 // STRONGLY TYPED CLIENT PAYLOAD MAPPING
 //
@@ -92,4 +99,5 @@ export interface ClientMessagePayloadMap {
   [ClientMessageType.MATCH_QUEUE]: MatchQueuePayload;
   [ClientMessageType.MATCH_CANCEL_QUEUE]: Record<string, never>;
   [ClientMessageType.INTERACT]: InteractPayload;
+  [ClientMessageType.NET_PING]: NetPingPayload;
 }

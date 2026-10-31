@@ -39,6 +39,9 @@ export const ServerMessageType = {
 
   /** Structured error notification */
   SERVER_ERROR: "server-error",
+
+  /** Telemetry heartbeat response containing server timestamp and tick */
+  NET_PONG: "net:pong",
 } as const;
 
 export type ServerMessageType =
@@ -77,6 +80,12 @@ export interface ServerErrorPayload {
   fatal: boolean;
 }
 
+export interface NetPongPayload {
+  clientTime: number;
+  serverTime: number;
+  serverTick: number;
+}
+
 // ==================================================
 // STRONGLY TYPED SERVER PAYLOAD MAPPING
 //
@@ -90,4 +99,5 @@ export interface ServerMessagePayloadMap {
   [ServerMessageType.MATCHMAKING_STATUS]: MatchmakingStatusPayload;
   [ServerMessageType.PARTY_UPDATED]: PartyUpdatedPayload;
   [ServerMessageType.SERVER_ERROR]: ServerErrorPayload;
+  [ServerMessageType.NET_PONG]: NetPongPayload;
 }
