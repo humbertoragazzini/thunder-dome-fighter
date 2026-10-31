@@ -24,12 +24,14 @@ import {
   type PartyJoinPayload,
   type PartySetReadyPayload,
   type MatchQueuePayload,
+  type NetPingPayload,
 } from "../../shared/contracts/network/ClientMessages.ts";
 import {
   ServerMessageType,
   type MatchmakingStatusPayload,
   type PartyUpdatedPayload,
   type ServerErrorPayload,
+  type NetPongPayload,
 } from "../../shared/contracts/network/ServerMessages.ts";
 import {
   verifySessionToken,
@@ -318,6 +320,21 @@ export class MatchmakingRoom extends Room {
 
       this.cancelQueueForPlayer(auth.user.playerId);
     });
+
+    // --------------------------------------------------
+    // 7. Telemetry Heartbeat (Pre-Match Menu / Lobby Ping)
+    // --------------------------------------------------
+    this.onMessage(
+      ClientMessageType.NET_PING,
+      (client, message: NetPingPayload) => {
+        const pongPayload: NetPongPayload = {
+          clientTime: message?.clientTime ?? 0,
+          serverTime: performance.now(),
+          serverTick: 0,
+        };
+        client.send(ServerMessageType.NET_PONG, pongPayload);
+      },
+    );
   }
 
   override async onAuth(
