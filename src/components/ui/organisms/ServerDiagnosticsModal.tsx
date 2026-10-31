@@ -37,6 +37,7 @@ export function ServerDiagnosticsModal() {
 
   const room = useAppStore((state) => state.room);
 
+  const activeTransport = useNetworkDiagnosticsStore((state) => state.activeTransport);
   const ping = useNetworkDiagnosticsStore((state) => state.ping);
   const avgPing = useNetworkDiagnosticsStore((state) => state.avgPing);
   const minPing = useNetworkDiagnosticsStore((state) => state.minPing);
@@ -95,11 +96,16 @@ export function ServerDiagnosticsModal() {
               className="text-xs uppercase font-bold tracking-wider text-slate-400"
               style={{ fontFamily: "var(--font-tech)" }}
             >
-              WebSocket Flight Latency (RTT)
+              Network Flight Latency (RTT)
             </span>
-            <Badge variant={latencyTier.variant} pulse={isTesting}>
-              {latencyTier.label}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant={activeTransport.includes("UDP") ? "emerald" : activeTransport.includes("TCP") ? "cyan" : "slate"}>
+                {activeTransport.includes("UDP") ? "⚡ UDP / QUIC" : activeTransport.includes("TCP") ? "🔌 TCP / WS" : activeTransport}
+              </Badge>
+              <Badge variant={latencyTier.variant} pulse={isTesting}>
+                {latencyTier.label}
+              </Badge>
+            </div>
           </div>
 
           <div className="flex items-baseline gap-2">
@@ -246,8 +252,8 @@ export function ServerDiagnosticsModal() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <span>Fastify: <strong className="text-slate-300">:3000</strong></span>
-            <span>Colyseus: <strong className="text-slate-300">:2567</strong></span>
+            <span>Transport: <strong className={activeTransport.includes("UDP") ? "text-emerald-400 font-bold" : "text-cyan-400 font-bold"}>{activeTransport}</strong></span>
+            <span>Ports: <strong className="text-slate-300">UDP:2567 / TCP:2568</strong></span>
           </div>
         </div>
 
