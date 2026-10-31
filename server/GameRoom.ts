@@ -27,8 +27,8 @@ import {
   type PlayerInputCommand,
   type CharacterInputCommand,
   type AttackActionType,
-  PHYSICS_DT_MS,
   PHYSICS_DT_SECONDS,
+  NETWORK_PATCH_RATE_MS,
   COMBAT_CONFIG,
 } from "../shared/player/PlayerConfig";
 import { verifySessionToken, type AuthenticatedUser } from "./auth/TokenVerifier.ts";
@@ -267,7 +267,7 @@ export class GameRoom extends Room {
 
     this.maxClients = this.gameMode.maxPlayers;
     this.autoDispose = true;
-    this.patchRate = PHYSICS_DT_MS;
+    this.patchRate = Number(process.env.PATCH_RATE_MS ?? NETWORK_PATCH_RATE_MS);
 
     this.state.modeId = this.gameMode.id;
     this.state.levelId = this.level.id;
