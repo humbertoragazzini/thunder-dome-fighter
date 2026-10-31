@@ -23,6 +23,10 @@
 // ==================================================
 
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { execFileSync } from "node:child_process";
 import express from "express";
 import { defineServer, defineRoom } from "colyseus";
 import { H3Transport } from "@colyseus/h3-transport";
@@ -30,9 +34,37 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./GameRoom";
 import { MatchmakingRoom } from "./matchmaking/MatchmakingRoom";
 
-// Enable self-signed ephemeral certificates for local LAN WebTransport if custom cert is omitted
+const host = process.env.COLYSEUS_HOST ?? "0.0.0.0";
+
+// Ensure a browser-trusted ECDSA certificate is prepared for WebTransport HTTP/3 (UDP :2567)
 if (!process.env.WEBTRANSPORT_CERT_PATH) {
-  process.env.H3_SELF_SIGNED = "1";
+  const certDir = path.join(os.tmpdir(), "colyseus-h3-cert");
+  fs.mkdirSync(certDir, { recursive: true });
+  const certFile = path.join(certDir, `${host}.pem`);
+  const keyFile = path.join(certDir, `${host}-key.pem`);
+
+  if (!fs.existsSync(certFile) || !fs.existsSync(keyFile)) {
+    try {
+      execFileSync("mkcert", [
+        "-ecdsa",
+        "-cert-file", certFile,
+        "-key-file", keyFile,
+        host, "localhost", "127.0.0.1", "::1"
+      ], { stdio: "ignore" });
+    } catch {
+      // If mkcert generation fails, fallback to standard openssl self-signed ECDSA
+      try {
+        execFileSync("openssl", [
+          "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
+          "-nodes", "-keyout", keyFile, "-out", certFile, "-days", "10",
+          "-subj", `/CN=${host}`,
+          "-addext", `subjectAltName=DNS:localhost,IP:${host},IP:127.0.0.1,IP:::1`
+        ], { stdio: "ignore" });
+      } catch {
+        // Fallback handled by internal h3Transport
+      }
+    }
+  }
 }
 
 const expressApp = express();
@@ -71,7 +103,6 @@ const gameServer = defineServer({
 
 const h3Port = Number(process.env.PORT ?? process.env.COLYSEUS_PORT ?? 2567);
 const wsFallbackPort = Number(process.env.COLYSEUS_WS_FALLBACK_PORT ?? 2568);
-const host = process.env.COLYSEUS_HOST ?? "0.0.0.0";
 
 async function startServer() {
   // 1. Start primary WebTransport (UDP/QUIC :2567) + HTTPS matchmaker
