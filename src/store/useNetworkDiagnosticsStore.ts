@@ -31,9 +31,12 @@ import {
   ServerMessageType,
   type NetPongPayload,
 } from "../../shared/contracts/network/ServerMessages";
-import { getColyseusUrl } from "../config/network";
+import { getColyseusUrl, type ActiveTransportProtocol } from "../config/network";
 
 export interface NetworkDiagnosticsState {
+  // Transport & Protocol
+  activeTransport: ActiveTransportProtocol;
+
   // Latency & Network
   ping: number | null;
   avgPing: number | null;
@@ -60,6 +63,7 @@ export interface NetworkDiagnosticsState {
   reconciliationCount: number;
 
   // Actions
+  setActiveTransport: (transport: ActiveTransportProtocol) => void;
   startSampling: () => void;
   stopSampling: () => void;
   measurePingNow: () => Promise<number | null>;
@@ -91,6 +95,7 @@ let lastPatchCalculationTime = performance.now();
 let lastPatchTimestamp = performance.now();
 
 export const useNetworkDiagnosticsStore = create<NetworkDiagnosticsState>((set, get) => ({
+  activeTransport: "Detecting...",
   ping: null,
   avgPing: null,
   minPing: null,
@@ -110,6 +115,8 @@ export const useNetworkDiagnosticsStore = create<NetworkDiagnosticsState>((set, 
 
   pendingInputsCount: 0,
   reconciliationCount: 0,
+
+  setActiveTransport: (activeTransport) => set({ activeTransport }),
 
   startSampling: () => {
     // --------------------------------------------------
@@ -219,6 +226,14 @@ export const useNetworkDiagnosticsStore = create<NetworkDiagnosticsState>((set, 
             jitterVal = Math.round(diffSum / (pingHistory.length - 1));
           }
 
+          const transportProtocol = (targetRoom as any)?.transport?.protocol;
+          const detectedTransport: ActiveTransportProtocol =
+            transportProtocol === "h3"
+              ? "UDP (WebTransport)"
+              : transportProtocol === "ws"
+                ? "TCP (WebSocket)"
+                : get().activeTransport;
+
           set({
             ping: rtt,
             avgPing: avg,
@@ -228,6 +243,7 @@ export const useNetworkDiagnosticsStore = create<NetworkDiagnosticsState>((set, 
             lastPingAt: Date.now(),
             isTesting: false,
             serverTick: message.serverTick ?? get().serverTick,
+            activeTransport: detectedTransport,
           });
 
           resolve(rtt);
