@@ -24,7 +24,11 @@ import { useAuthStore } from "../../store/useAuthStore";
 import { useMatchmakingStore } from "../../store/useMatchmakingStore";
 import { useNavigationStore } from "../../store/useNavigationStore";
 import { useNetworkDiagnosticsStore } from "../../store/useNetworkDiagnosticsStore";
-import { connectWithDualTransport } from "../../config/network";
+import {
+  connectWithDualTransport,
+  getCachedCertificateFingerprint,
+  fetchCertificateFingerprint,
+} from "../../config/network";
 import { Heading } from "../ui/atoms/Heading";
 import { Spinner } from "../ui/atoms/Spinner";
 import { ScreenLayout } from "../ui/templates/ScreenLayout";
@@ -94,6 +98,12 @@ export function MatchLoadingScreen() {
             }
             if (reservation) {
               setLoadingStep("Consuming allocated seat reservation...");
+              if (!reservation.fingerprint) {
+                const fp = getCachedCertificateFingerprint() ?? (await fetchCertificateFingerprint());
+                if (fp) {
+                  reservation.fingerprint = fp;
+                }
+              }
               const r = await client.consumeSeatReservation(reservation);
               useMatchmakingStore.getState().clearReservation();
               return r;

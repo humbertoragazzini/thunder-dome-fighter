@@ -23,7 +23,7 @@
 
 import type { Room } from "@colyseus/sdk";
 import { create } from "zustand";
-import { connectWithDualTransport } from "../config/network";
+import { connectWithDualTransport, setCachedCertificateFingerprint } from "../config/network";
 import { useNetworkDiagnosticsStore } from "./useNetworkDiagnosticsStore";
 import { ClientMessageType } from "../../shared/contracts/network/ClientMessages.ts";
 import {
@@ -157,6 +157,9 @@ export const useMatchmakingStore = create<MatchmakingState>((set, get) => ({
             }
           } else if (payload.status === "MATCH_FOUND") {
             stopElapsedTimer();
+            if (payload.reservation?.fingerprint) {
+              setCachedCertificateFingerprint(payload.reservation.fingerprint);
+            }
             set({
               isQueuing: false,
               seatReservation: payload.reservation,

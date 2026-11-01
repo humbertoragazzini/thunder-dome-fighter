@@ -22,6 +22,7 @@
 import crypto from "node:crypto";
 import { matchMaker } from "colyseus";
 import { type GameModeId, GAME_MODES } from "../../shared/domain/GameMode.ts";
+import { getWebTransportFingerprint } from "../transport/webTransportCert.ts";
 
 export interface QueuedParticipant {
   playerId: string;
@@ -273,6 +274,7 @@ export class MatchmakingQueueManager {
         });
 
         // Reserve seats for Team 0 (Alpha)
+        const fp = getWebTransportFingerprint();
         for (const ticket of matchResult.team0) {
           for (const participant of ticket.participants) {
             const reservation = await matchMaker.reserveSeatFor(room, {
@@ -283,6 +285,9 @@ export class MatchmakingQueueManager {
               modeId,
               teamIndex: 0,
             });
+            if (fp) {
+              (reservation as any).fingerprint = fp;
+            }
             ticket.onMatchFound(reservation, room.roomId, participant.playerId);
           }
         }
@@ -298,6 +303,9 @@ export class MatchmakingQueueManager {
               modeId,
               teamIndex: 1,
             });
+            if (fp) {
+              (reservation as any).fingerprint = fp;
+            }
             ticket.onMatchFound(reservation, room.roomId, participant.playerId);
           }
         }
@@ -372,6 +380,7 @@ export class MatchmakingQueueManager {
       });
 
       // Generate seat reservations for all participants
+      const fp = getWebTransportFingerprint();
       let playerSlotIndex = 0;
       for (const ticket of matchedTickets) {
         for (const participant of ticket.participants) {
@@ -386,6 +395,9 @@ export class MatchmakingQueueManager {
             modeId,
             teamIndex,
           });
+          if (fp) {
+            (reservation as any).fingerprint = fp;
+          }
 
           ticket.onMatchFound(reservation, room.roomId, participant.playerId);
         }

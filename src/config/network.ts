@@ -88,6 +88,37 @@ export function getColyseusUrl(): string {
   return envUrl ?? "ws://127.0.0.1:2568";
 }
 
+let cachedCertificateFingerprint: number[] | null = null;
+
+export function setCachedCertificateFingerprint(fingerprint: number[]): void {
+  if (Array.isArray(fingerprint) && fingerprint.length > 0) {
+    cachedCertificateFingerprint = fingerprint;
+  }
+}
+
+export function getCachedCertificateFingerprint(): number[] | null {
+  return cachedCertificateFingerprint;
+}
+
+export async function fetchCertificateFingerprint(): Promise<number[] | null> {
+  if (cachedCertificateFingerprint) {
+    return cachedCertificateFingerprint;
+  }
+  try {
+    const res = await devFetchProxy("/matchmake/fingerprint");
+    if (res.ok) {
+      const data = (await res.json()) as { fingerprint?: number[] };
+      if (Array.isArray(data?.fingerprint)) {
+        cachedCertificateFingerprint = data.fingerprint;
+        return cachedCertificateFingerprint;
+      }
+    }
+  } catch (err) {
+    console.warn("[Network] Failed to fetch certificate fingerprint:", err);
+  }
+  return null;
+}
+
 /**
  * Custom fetch proxy for browser development:
  * Rewrites direct matchmaking discovery requests targeting :2567 or :2568
@@ -99,7 +130,26 @@ function devFetchProxy(input: RequestInfo | URL, init?: RequestInit): Promise<Re
   if (typeof window !== "undefined" && (urlStr.includes(":2567/matchmake") || urlStr.includes(":2568/matchmake"))) {
     urlStr = urlStr.replace(/^https?:\/\/[^/]+(?::\d+)?\/matchmake/, "/matchmake");
   }
-  return fetch(urlStr, init);
+  return fetch(urlStr, init).then((response) => {
+    if (response.ok && urlStr.includes("/matchmake")) {
+      try {
+        const clone = response.clone();
+        clone
+          .json()
+          .then((data: { fingerprint?: number[] }) => {
+            if (Array.isArray(data?.fingerprint)) {
+              setCachedCertificateFingerprint(data.fingerprint);
+            }
+          })
+          .catch(() => {
+            // Non-JSON response, ignore
+          });
+      } catch {
+        // Clone unsupported or failed, ignore
+      }
+    }
+    return response;
+  });
 }
 
 /**
