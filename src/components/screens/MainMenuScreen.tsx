@@ -182,10 +182,11 @@ export function MainMenuScreen() {
             title="Custom Lobbies"
             description="Create private fighting rooms, configure arena modifiers, and invite friend rivalries."
             icon={<GiRadarDish className="text-cyan-400" />}
-            badgeText="PHASE 19"
+            badgeText="ACTIVE"
             badgeVariant="cyan"
+            badgePulse
             accentColor="cyan"
-            disabled
+            onClick={() => navigateTo("ROOM_BROWSER")}
           />
 
           <MenuCard

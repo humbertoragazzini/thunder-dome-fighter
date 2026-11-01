@@ -29,7 +29,9 @@ export type AppScreen =
   | "MATCHMAKING"
   | "MATCH_LOADING"
   | "IN_GAME"
-  | "MATCH_RESULTS";
+  | "MATCH_RESULTS"
+  | "ROOM_BROWSER"
+  | "CUSTOM_LOBBY";
 
 export type ModalType = "PROFILE" | "SETTINGS" | "PARTY" | "ERROR" | "DIAGNOSTICS" | null;
 

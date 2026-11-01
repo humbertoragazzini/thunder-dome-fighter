@@ -24,11 +24,12 @@
 
 import http from "node:http";
 import express from "express";
-import { defineServer, defineRoom } from "colyseus";
+import { defineServer, defineRoom, matchMaker } from "colyseus";
 import { H3Transport } from "@colyseus/h3-transport";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./GameRoom";
 import { MatchmakingRoom } from "./matchmaking/MatchmakingRoom";
+import { CustomLobbyRoom } from "./lobby/CustomLobbyRoom";
 import {
   getWebTransportCertificate,
   getWebTransportFingerprint,
@@ -66,6 +67,56 @@ expressApp.get("/matchmake/fingerprint", (_req, res) => {
   res.json({ fingerprint });
 });
 
+// Expose custom lobbies discovery endpoint for the room browser (Step 19.1)
+expressApp.get("/matchmake/custom-lobbies", async (_req, res) => {
+  try {
+    const rooms = await matchMaker.query({ name: "custom_lobby" });
+    const publicRooms = rooms
+      .filter((r) => !r.metadata?.isPrivate && r.metadata?.status === "WAITING")
+      .map((r) => ({
+        roomId: r.roomId,
+        roomName: r.metadata?.roomName ?? "Custom Match",
+        hostName: r.metadata?.hostName ?? "Host",
+        gameMode: r.metadata?.gameMode ?? "1v1",
+        levelId: r.metadata?.levelId ?? "thunder-dome-alpha",
+        scoreLimit: r.metadata?.scoreLimit ?? 5,
+        timeLimitSeconds: r.metadata?.timeLimitSeconds ?? 180,
+        currentPlayers: r.clients,
+        maxPlayers: r.maxClients,
+        status: r.metadata?.status ?? "WAITING",
+        isPrivate: false,
+      }));
+    res.json({ lobbies: publicRooms });
+  } catch (err) {
+    console.error("[Colyseus] Failed to query custom lobbies:", err);
+    res.status(500).json({ error: "Failed to query lobbies" });
+  }
+});
+
+// Lookup private lobby by room code
+expressApp.post("/matchmake/custom-lobbies/lookup", async (req, res) => {
+  try {
+    const { roomCode } = req.body ?? {};
+    if (!roomCode || typeof roomCode !== "string") {
+      return res.status(400).json({ error: "Room code required" });
+    }
+    const cleanCode = roomCode.trim().toUpperCase();
+    const rooms = await matchMaker.query({ name: "custom_lobby" });
+    const match = rooms.find(
+      (r) =>
+        r.metadata?.roomCode?.toUpperCase() === cleanCode &&
+        r.metadata?.status === "WAITING",
+    );
+    if (!match) {
+      return res.status(404).json({ error: "Lobby not found or match already launched" });
+    }
+    res.json({ roomId: match.roomId, metadata: match.metadata });
+  } catch (err) {
+    console.error("[Colyseus] Failed to lookup custom lobby:", err);
+    res.status(500).json({ error: "Failed to lookup lobby" });
+  }
+});
+
 // Permissive CORS middleware supporting credentials for cross-origin LAN testing
 expressApp.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -95,6 +146,7 @@ const gameServer = defineServer({
   rooms: {
     game: defineRoom(GameRoom).filterBy(["modeId", "levelId"]),
     matchmaking: defineRoom(MatchmakingRoom),
+    custom_lobby: defineRoom(CustomLobbyRoom),
   },
 });
 

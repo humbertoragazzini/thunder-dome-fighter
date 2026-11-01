@@ -10,12 +10,12 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 19 — Room Browser & Custom Game Lobbies** |
-| **Current Step** | **Step 19.1 — Implement RoomBrowserScreen listing active public custom rooms** |
-| **Last Completed Step** | **Phase 18 — Free-For-All (FFA) & 20-Player Stress Validation (18.1 - 18.6)** |
-| **Next Step** | **Step 19.1 — Implement RoomBrowserScreen listing active public custom rooms** |
-| **Overall Status** | **Phase 18 (FFA & 20-Player Stress Validation) 100% complete; moving to Phase 19.** |
-| **Last Updated** | **2026-10-26** |
+| **Current Phase** | **Phase 20 — Generic Competition & Tournament Core Architecture** |
+| **Current Step** | **Step 20.1 — Design tournament schema & bracket generator** |
+| **Last Completed Step** | **Phase 19 — Room Browser & Custom Game Lobbies (19.1 - 19.4)** |
+| **Next Step** | **Step 20.1 — Design tournament schema & bracket generator** |
+| **Overall Status** | **Phase 19 (Room Browser & Custom Game Lobbies) 100% complete; moving to Phase 20.** |
+| **Last Updated** | **2026-11-01** |
 
 ---
 
@@ -843,31 +843,39 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 ---
 
 ### Phase 19 — Room Browser & Custom Game Lobbies
-
-**Status:** Not Started `[ ]`  
+ 
+**Status:** Completed `[x]`  
 **Goal:** Custom game creation, private rooms, custom rule selection, and interactive room browser.  
 **Dependencies:** Phase 8, Phase 18.  
-
+ 
 #### Steps
-- [ ] 19.1 Implement `RoomBrowserScreen` listing active public custom rooms (Name, Host, GameMode, Arena, Current/Max Players).
-- [ ] 19.2 Implement `CreateRoomModal` allowing host to customize:
+- [x] 19.1 Implement `RoomBrowserScreen` listing active public custom rooms (Name, Host, GameMode, Arena, Current/Max Players).
+- [x] 19.2 Implement `CreateRoomModal` allowing host to customize:
   - Room name.
   - Game mode (`1v1`, `3v3`, `4v4`, `FFA`).
   - Arena selection.
   - Score and time limits.
   - Privacy toggle (Public vs Private with room code).
-- [ ] 19.3 Implement `CustomLobbyScreen`:
+- [x] 19.3 Implement `CustomLobbyScreen`:
   - Interactive participant list.
   - Team switcher (move between Team 1, Team 2, or Spectator).
   - Player Ready toggle button.
   - Host controls (Start Game, Kick Player).
-- [ ] 19.4 Host can only click Start Game when all non-host participants are Ready and minimum player count is met.
-
+- [x] 19.4 Host can only click Start Game when all non-host participants are Ready and minimum player count is met.
+ 
 #### Completion Criteria
 - Players can create, find, join, configure, ready up, and launch custom multiplayer matches.
 
-#### Verification
-- Manual test with 2 browser windows: Host creates room, Player joins via browser, changes team, toggles ready, Host launches match.
+#### Verification & Test Results
+- Automated end-to-end lifecycle test suite (`test_custom_lobby_lifecycle.ts`): all 8 steps passed cleanly.
+  - Public lobby creation with custom score limit (7 KOs) and duration (240s).
+  - REST and Colyseus `matchMaker.query()` listing public lobbies with metadata.
+  - Private lobby creation, exclusion from public listings, and resolution via 6-character room codes.
+  - Client join, state synchronization, and interactive team switching (Alpha vs Beta).
+  - Authoritative match launch barrier (host launch blocked while non-host is unready).
+  - Ready toggle and match launch into authoritative `GameRoom` with seat reservations.
+  - Consuming seat reservations with JWT auth, verifying custom score and time limits on live GameRoom, and clean teardown.
+- TypeScript build (`tsc -b`), linter (`npm run lint`), and production bundle (`npm run build`): 100% clean with 0 errors, 0 warnings.
 
 ---
 

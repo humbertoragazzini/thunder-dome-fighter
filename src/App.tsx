@@ -27,6 +27,8 @@ import { MatchLoadingScreen } from "./components/screens/MatchLoadingScreen";
 import { MatchmakingScreen } from "./components/screens/MatchmakingScreen";
 import { PlayMenuScreen } from "./components/screens/PlayMenuScreen";
 import { ProfileScreen } from "./components/screens/ProfileScreen";
+import { RoomBrowserScreen } from "./components/screens/RoomBrowserScreen";
+import { CustomLobbyScreen } from "./components/screens/CustomLobbyScreen";
 import { DuplicateTabDialog } from "./components/ui/organisms/DuplicateTabDialog";
 import { ErrorDialog } from "./components/ui/organisms/ErrorDialog";
 import { PartyModal } from "./components/ui/organisms/PartyModal";
@@ -95,6 +97,8 @@ export default function App() {
         {currentScreen === "MATCHMAKING" && <MatchmakingScreen />}
         {currentScreen === "MATCH_LOADING" && <MatchLoadingScreen />}
         {currentScreen === "IN_GAME" && <InGameOverlay />}
+        {currentScreen === "ROOM_BROWSER" && <RoomBrowserScreen />}
+        {currentScreen === "CUSTOM_LOBBY" && <CustomLobbyScreen />}
       </div>
 
       {/* Global Modals & Tab Enforcer */}

@@ -58,6 +58,8 @@ export interface GameRoomOptions {
   serverSlot?: number;
   modeId?: GameModeId;
   levelId?: string;
+  scoreLimit?: number;
+  timeLimitSeconds?: number;
 }
 
 // ==================================================
@@ -258,7 +260,14 @@ export class GameRoom extends Room {
 
   async onCreate(options: GameRoomOptions = {}) {
     const requestedModeId = options.modeId && options.modeId in GAME_MODES ? options.modeId : "1v1";
-    this.gameMode = GAME_MODES[requestedModeId];
+    this.gameMode = { ...GAME_MODES[requestedModeId] };
+
+    if (typeof options.scoreLimit === "number" && options.scoreLimit > 0) {
+      this.gameMode.scoreLimit = options.scoreLimit;
+    }
+    if (typeof options.timeLimitSeconds === "number" && options.timeLimitSeconds > 0) {
+      this.gameMode.timeLimitSeconds = options.timeLimitSeconds;
+    }
 
     const requestedLevelId = options.levelId && options.levelId in LEVELS ? options.levelId : "thunder-dome-alpha";
     this.level = LEVELS[requestedLevelId];
