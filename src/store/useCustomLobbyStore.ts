@@ -45,6 +45,7 @@ interface CustomLobbyStoreState {
   publicLobbies: CustomLobbyListingItem[];
   activeRoom: Room<CustomLobbyState> | null;
   lobbyState: CustomLobbyState | null;
+  lobbyRevision: number;
   isLoading: boolean;
   isSearching: boolean;
   error: string | null;
@@ -67,6 +68,7 @@ export const useCustomLobbyStore = create<CustomLobbyStoreState>((set, get) => (
   publicLobbies: [],
   activeRoom: null,
   lobbyState: null,
+  lobbyRevision: 0,
   isLoading: false,
   isSearching: false,
   error: null,
@@ -106,7 +108,15 @@ export const useCustomLobbyStore = create<CustomLobbyStoreState>((set, get) => (
 
       // Bind reactive state change listener
       room.onStateChange((state) => {
-        set({ lobbyState: state });
+        set((prev) => ({
+          lobbyState: state,
+          lobbyRevision: prev.lobbyRevision + 1,
+        }));
+      });
+
+      room.onLeave(() => {
+        set({ activeRoom: null, lobbyState: null, lobbyRevision: 0, isLoading: false });
+        useNavigationStore.getState().navigateTo("ROOM_BROWSER");
       });
 
       // Listen for host launch event
@@ -136,7 +146,7 @@ export const useCustomLobbyStore = create<CustomLobbyStoreState>((set, get) => (
         },
       );
 
-      set({ activeRoom: room, lobbyState: room.state, isLoading: false });
+      set({ activeRoom: room, lobbyState: room.state, lobbyRevision: 1, isLoading: false });
       useNavigationStore.getState().navigateTo("CUSTOM_LOBBY");
     } catch (err: any) {
       console.error("[CustomLobbyStore] createCustomRoom error:", err);
@@ -161,7 +171,15 @@ export const useCustomLobbyStore = create<CustomLobbyStoreState>((set, get) => (
       });
 
       room.onStateChange((state) => {
-        set({ lobbyState: state });
+        set((prev) => ({
+          lobbyState: state,
+          lobbyRevision: prev.lobbyRevision + 1,
+        }));
+      });
+
+      room.onLeave(() => {
+        set({ activeRoom: null, lobbyState: null, lobbyRevision: 0, isLoading: false });
+        useNavigationStore.getState().navigateTo("ROOM_BROWSER");
       });
 
       room.onMessage(
@@ -189,7 +207,7 @@ export const useCustomLobbyStore = create<CustomLobbyStoreState>((set, get) => (
         },
       );
 
-      set({ activeRoom: room, lobbyState: room.state, isLoading: false });
+      set({ activeRoom: room, lobbyState: room.state, lobbyRevision: 1, isLoading: false });
       useNavigationStore.getState().navigateTo("CUSTOM_LOBBY");
     } catch (err: any) {
       console.error("[CustomLobbyStore] joinCustomRoom error:", err);
@@ -260,7 +278,7 @@ export const useCustomLobbyStore = create<CustomLobbyStoreState>((set, get) => (
     if (room) {
       room.leave();
     }
-    set({ activeRoom: null, lobbyState: null, isLoading: false, error: null });
+    set({ activeRoom: null, lobbyState: null, lobbyRevision: 0, isLoading: false, error: null });
     useNavigationStore.getState().navigateTo("ROOM_BROWSER");
   },
 }));

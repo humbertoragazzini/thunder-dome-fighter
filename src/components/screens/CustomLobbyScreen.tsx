@@ -21,7 +21,7 @@
 // and private friend battles.
 // ==================================================
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FaCheck,
   FaCopy,
@@ -48,6 +48,7 @@ import { ScreenLayout } from "../ui/templates/ScreenLayout";
 export function CustomLobbyScreen() {
   const activeRoom = useCustomLobbyStore((state) => state.activeRoom);
   const lobbyState = useCustomLobbyStore((state) => state.lobbyState);
+  useCustomLobbyStore((state) => state.lobbyRevision);
   const switchTeam = useCustomLobbyStore((state) => state.switchTeam);
   const toggleReady = useCustomLobbyStore((state) => state.toggleReady);
   const kickPlayer = useCustomLobbyStore((state) => state.kickPlayer);
@@ -55,6 +56,23 @@ export function CustomLobbyScreen() {
   const leaveLobby = useCustomLobbyStore((state) => state.leaveLobby);
 
   const [copied, setCopied] = useState(false);
+  const [, setLocalVersion] = useState(0);
+
+  // Directly bind onStateChange listener on activeRoom to guarantee immediate React re-renders on every Colyseus state patch
+  useEffect(() => {
+    if (!activeRoom) return;
+
+    const handleStateChange = () => {
+      setLocalVersion((v) => v + 1);
+    };
+
+    activeRoom.onStateChange(handleStateChange);
+    return () => {
+      if (typeof (activeRoom.onStateChange as any)?.remove === "function") {
+        (activeRoom.onStateChange as any).remove(handleStateChange);
+      }
+    };
+  }, [activeRoom]);
 
   if (!activeRoom || !lobbyState) {
     return (
@@ -105,9 +123,15 @@ export function CustomLobbyScreen() {
 
   const canLaunch = isHost && hasMinPlayers && allNonHostsReady && isTeamBalanced;
 
-  const handleCopyCode = () => {
+  const handleCopyCode = async () => {
     if (lobbyState.roomCode) {
-      navigator.clipboard.writeText(lobbyState.roomCode);
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(lobbyState.roomCode);
+        }
+      } catch (err) {
+        console.warn("[CustomLobbyScreen] Clipboard error:", err);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
