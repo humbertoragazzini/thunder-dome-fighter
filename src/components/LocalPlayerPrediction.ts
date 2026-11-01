@@ -54,6 +54,7 @@ import {
   decayPositionError,
   decayRotationError,
 } from "../../shared/networking/ReconciliationMath";
+import { useNetworkDiagnosticsStore } from "../store/useNetworkDiagnosticsStore";
 
 export interface AuthoritativePlayerState {
   x: number;
@@ -570,23 +571,33 @@ export class LocalPlayerPrediction {
     };
 
     // --------------------------------------------------
-    // EPSILON COMPARISON (TEMPORAL IDENTITY)
+    // Guard: only reconcile if server has acknowledged at least one input
+    // --------------------------------------------------
+    if (!playerState.lastProcessedInputSequence || playerState.lastProcessedInputSequence <= 0) {
+      return;
+    }
+
+    // --------------------------------------------------
+    // EPSILON COMPARISON (DETERMINISTIC SEQUENCE IDENTITY)
     //
-    // Locate the historical predicted state corresponding to the exact
-    // physical moment represented by this authoritative packet (expectedServerTick === serverTick).
+    // Locate the historical predicted frame corresponding to the exact
+    // input command acknowledged by this authoritative packet.
     // --------------------------------------------------
     const predictedFrame = this.predictionHistory.find(
-      (frame) => frame.expectedServerTick === serverTick,
+      (frame) => frame.sequence === playerState.lastProcessedInputSequence,
     );
 
-    let withinTolerance = false;
-    if (predictedFrame) {
-      const checkResult = isPredictionWithinTolerance(
-        predictedFrame,
-        authoritativeState,
-      );
-      withinTolerance = checkResult.withinTolerance;
+    // If this sequence is older than our oldest history frame, it was already
+    // acknowledged and pruned on a previous packet. Do NOT trigger false rollback.
+    if (!predictedFrame) {
+      return;
     }
+
+    const checkResult = isPredictionWithinTolerance(
+      predictedFrame,
+      authoritativeState,
+    );
+    const withinTolerance = checkResult.withinTolerance;
 
     // --------------------------------------------------
     // CASE A: WITHIN TOLERANCE (NORMAL PREDICTION)
@@ -600,7 +611,7 @@ export class LocalPlayerPrediction {
         (cmd) => cmd.sequence > playerState.lastProcessedInputSequence,
       );
       this.predictionHistory = this.predictionHistory.filter(
-        (frame) => frame.expectedServerTick > serverTick,
+        (frame) => frame.sequence > playerState.lastProcessedInputSequence,
       );
       return;
     }
@@ -612,6 +623,7 @@ export class LocalPlayerPrediction {
     // replay unacknowledged inputs in order, rebuild corrected history,
     // and compute visual error offset so visible mesh does not snap.
     // --------------------------------------------------
+    useNetworkDiagnosticsStore.getState().recordReconciliationRollback();
 
     // 1. Capture current visible transform before correction
     const oldVisualPos = localVisualNode.position.clone();
@@ -627,9 +639,10 @@ export class LocalPlayerPrediction {
     this.predictionBody.setLinearVelocity(authoritativeState.linearVelocity);
     this.predictionBody.setAngularVelocity(authoritativeState.angularVelocity);
 
-    // 3. Reset timeline baseline and flush obsolete history
+    // 3. Reset timeline baseline, clear history, and reset jumpConsumed for clean replay
     this.currentPredictionTick = serverTick;
     this.predictionHistory = [];
+    this.jumpConsumed = false;
 
     // 4. Discard acknowledged inputs
     this.pendingInputs = this.pendingInputs.filter(

@@ -528,17 +528,33 @@ export class SimulatorWorld {
         const nextCommand = entity.pendingInputCommands.shift()!;
         entity.currentInput = nextCommand;
         entity.lastProcessedInputSequence = nextCommand.sequence;
-      } else if (
-        entity.inputBufferPrimed &&
-        entity.pendingInputCommands.length === 0
-      ) {
-        // Queue Starvation:
-        // Network starvation occurred. The shared Havok world still advances.
-        // Continue using the entity's last known currentInput.
-        // Do NOT advance lastProcessedInputSequence (no phantom acknowledgments).
-        // Reset inputBufferPrimed to false to rebuild the jitter margin before consumption resumes.
-        // Starvation creates temporary prediction divergence that client reconciliation corrects later.
-        entity.inputBufferPrimed = false;
+      } else {
+        // Queue Starvation / Priming:
+        // No input command consumed this tick. Reset inputBufferPrimed if queue is empty.
+        if (entity.inputBufferPrimed && entity.pendingInputCommands.length === 0) {
+          entity.inputBufferPrimed = false;
+        }
+        // Zero active movement forces so Havok does not apply phantom acceleration.
+        // Preserve lookYaw and orientation so character doesn't snap rotation.
+        const prevYaw =
+          "lookYaw" in entity.currentInput &&
+          typeof entity.currentInput.lookYaw === "number"
+            ? entity.currentInput.lookYaw
+            : entity.node.rotationQuaternion
+              ? entity.node.rotationQuaternion.toEulerAngles().y
+              : 0;
+
+        entity.currentInput = {
+          moveX: 0,
+          moveZ: 0,
+          lookYaw: prevYaw,
+          jump: false,
+          sprint: false,
+          attackAction: "NONE",
+          throttle: 0,
+          steering: 0,
+          brake: 0,
+        } as CharacterActionInput & PlayerInput;
       }
 
       // Perform 3-point downward ground detection
