@@ -56,7 +56,6 @@ export class TouchVirtualGamepadProvider implements IInputProvider {
 
   public setLookYaw(yaw: number): void {
     this.lookYaw = yaw;
-    this.active = true;
   }
 
   public setJump(active: boolean): void {

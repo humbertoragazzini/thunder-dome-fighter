@@ -718,6 +718,13 @@ export class LocalPlayerPrediction {
   }
 
   /**
+   * Returns whether the local prediction system has received its initial authoritative state from the server
+   */
+  getHasReceivedInitialState(): boolean {
+    return this.hasReceivedInitialAuthoritativeState;
+  }
+
+  /**
    * Returns instantaneous linear velocity of the predicted Havok body
    */
   getLinearVelocity(): Vector3 {

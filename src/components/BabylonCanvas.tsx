@@ -219,6 +219,17 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
             : state.players[room.sessionId];
 
         if (localState) {
+          // Initialize input provider yaw on first authoritative state packet to match server spawn heading
+          if (!localPrediction.getHasReceivedInitialState()) {
+            const rx = localState.rx ?? 0;
+            const ry = localState.ry ?? 0;
+            const rz = localState.rz ?? 0;
+            const rw = localState.rw ?? 1;
+            const spawnYaw = new Quaternion(rx, ry, rz, rw).toEulerAngles().y;
+            inputController.keyboard.setLookYaw(spawnYaw);
+            inputController.touch.setLookYaw(spawnYaw);
+          }
+
           localPrediction.handleAuthoritativeState(
             localState,
             state.serverTick ?? 0,
@@ -311,7 +322,18 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
 
       engine.runRenderLoop(() => {
         const deltaSeconds = engine.getDeltaTime() / 1000;
-        const currentInput = inputController.pollInput();
+        const rawInput = inputController.pollInput();
+        const isPlaying = !room?.state?.matchStatus || room.state.matchStatus === "PLAYING";
+        const currentInput = isPlaying
+          ? rawInput
+          : {
+              ...rawInput,
+              moveX: 0,
+              moveZ: 0,
+              jump: false,
+              sprint: false,
+              attackAction: "NONE" as const,
+            };
 
         // 1. Fixed 30 Hz local prediction loop
         localPrediction.updatePrediction(currentInput, deltaSeconds);

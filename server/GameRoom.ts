@@ -222,24 +222,22 @@ export class GameRoom extends Room {
 
         if (!currentPlayer) return;
 
-        // Epsilon culling (Step 18.4): Only dirty fields when delta exceeds epsilon
-        // to prevent unnecessary network serialization for stationary/resting entities.
-        if (Math.abs(currentPlayer.x - x) > 0.001) currentPlayer.x = x;
-        if (Math.abs(currentPlayer.y - y) > 0.001) currentPlayer.y = y;
-        if (Math.abs(currentPlayer.z - z) > 0.001) currentPlayer.z = z;
-        if (Math.abs(currentPlayer.rx - rx) > 0.001) currentPlayer.rx = rx;
-        if (Math.abs(currentPlayer.ry - ry) > 0.001) currentPlayer.ry = ry;
-        if (Math.abs(currentPlayer.rz - rz) > 0.001) currentPlayer.rz = rz;
-        if (Math.abs(currentPlayer.rw - rw) > 0.001) currentPlayer.rw = rw;
-        if (Math.abs(currentPlayer.vx - vx) > 0.01) currentPlayer.vx = vx;
-        if (Math.abs(currentPlayer.vy - vy) > 0.01) currentPlayer.vy = vy;
-        if (Math.abs(currentPlayer.vz - vz) > 0.01) currentPlayer.vz = vz;
-        if (Math.abs(currentPlayer.avx - avx) > 0.01) currentPlayer.avx = avx;
-        if (Math.abs(currentPlayer.avy - avy) > 0.01) currentPlayer.avy = avy;
-        if (Math.abs(currentPlayer.avz - avz) > 0.01) currentPlayer.avz = avz;
-        if (currentPlayer.lastProcessedInputSequence !== lastProcessedInputSequence) {
-          currentPlayer.lastProcessedInputSequence = lastProcessedInputSequence;
-        }
+        // Synchronize true Havok transforms, velocities, and sequence acknowledgments directly.
+        // Colyseus @colyseus/schema delta compression handles packet minimization automatically.
+        currentPlayer.x = x;
+        currentPlayer.y = y;
+        currentPlayer.z = z;
+        currentPlayer.rx = rx;
+        currentPlayer.ry = ry;
+        currentPlayer.rz = rz;
+        currentPlayer.rw = rw;
+        currentPlayer.vx = vx;
+        currentPlayer.vy = vy;
+        currentPlayer.vz = vz;
+        currentPlayer.avx = avx;
+        currentPlayer.avy = avy;
+        currentPlayer.avz = avz;
+        currentPlayer.lastProcessedInputSequence = lastProcessedInputSequence;
 
         const invuln = this.simulationWorld.isEntityInvulnerable(playerId);
         if (currentPlayer.isInvulnerable !== invuln) {

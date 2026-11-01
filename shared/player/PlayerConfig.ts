@@ -128,14 +128,14 @@ export const MAX_PREDICTION_STEPS_PER_UPDATE = 8;
 export const PREDICTION_HISTORY_MAX_FRAMES = 256;
 
 // Tolerances beyond which reconciliation re-simulates physics
-export const POSITION_RECONCILIATION_EPSILON = 0.02; // 2 cm
-export const ROTATION_RECONCILIATION_EPSILON = 0.03; // ~1.7 degrees
-export const VELOCITY_RECONCILIATION_EPSILON = 0.1; // 0.1 m/s
-export const ANGULAR_VELOCITY_RECONCILIATION_EPSILON = 0.2; // 0.2 rad/s
+export const POSITION_RECONCILIATION_EPSILON = 0.03; // 3 cm
+export const ROTATION_RECONCILIATION_EPSILON = 0.15; // ~8.6 degrees
+export const VELOCITY_RECONCILIATION_EPSILON = 0.10; // 0.10 m/s
+export const ANGULAR_VELOCITY_RECONCILIATION_EPSILON = 0.50; // 0.50 rad/s
 
 // Visual error smoothing
 export const VISUAL_CORRECTION_TIME_CONSTANT_MS = 100;
-export const LOCAL_HARD_SNAP_DISTANCE = 3.0;
+export const LOCAL_HARD_SNAP_DISTANCE = 6.0;
 export const RESIDUAL_POSITION_EPSILON = 0.001; // 1 mm
 export const RESIDUAL_ROTATION_EPSILON = 0.001;
 
