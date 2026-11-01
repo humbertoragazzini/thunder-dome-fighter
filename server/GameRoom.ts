@@ -42,8 +42,9 @@ import {
 } from "../shared/domain/MatchPlayerState";
 import { GAME_ITEMS } from "../shared/domain/GameItem";
 import { calculateDamageScaledKnockback } from "../shared/player/PlayerPhysicsMath";
-import { MatchStatsTracker } from "./match/MatchStatsTracker.js";
+import { MatchStatsTracker, type MatchSummaryPayload } from "./match/MatchStatsTracker.js";
 import { MatchFinalizer } from "./match/MatchFinalizer.js";
+import { tournamentCoordinatorService } from "./tournament/TournamentCoordinatorService.js";
 import {
   ClientMessageType,
   type NetPingPayload,
@@ -60,6 +61,9 @@ export interface GameRoomOptions {
   levelId?: string;
   scoreLimit?: number;
   timeLimitSeconds?: number;
+  tournamentId?: string;
+  tournamentMatchId?: string;
+  onMatchComplete?: (summary: MatchSummaryPayload) => void;
 }
 
 // ==================================================
@@ -187,6 +191,11 @@ export class GameRoom extends Room {
   public matchStartTime: Date = new Date();
   public isFinalized: boolean = false;
 
+  // Tournament Coordination (Phase 20)
+  public tournamentId?: string;
+  public tournamentMatchId?: string;
+  public onMatchComplete?: (summary: MatchSummaryPayload) => void;
+
   getGameMode(): GameMode {
     return this.gameMode;
   }
@@ -259,6 +268,10 @@ export class GameRoom extends Room {
   // ==================================================
 
   async onCreate(options: GameRoomOptions = {}) {
+    this.tournamentId = options.tournamentId;
+    this.tournamentMatchId = options.tournamentMatchId;
+    this.onMatchComplete = options.onMatchComplete;
+
     const requestedModeId = options.modeId && options.modeId in GAME_MODES ? options.modeId : "1v1";
     this.gameMode = { ...GAME_MODES[requestedModeId] };
 
@@ -774,6 +787,23 @@ export class GameRoom extends Room {
       .catch((err) => {
         console.error(`❌ Match finalization error for ${summary.matchId}:`, err);
       });
+
+    // Notify tournament coordinator or direct callback if this was a tournament match
+    if (this.onMatchComplete) {
+      try {
+        this.onMatchComplete(summary);
+      } catch (err) {
+        console.error("❌ Error in onMatchComplete callback:", err);
+      }
+    }
+
+    if (this.tournamentId && this.tournamentMatchId) {
+      tournamentCoordinatorService
+        .handleGameRoomSummary(this.tournamentId, this.tournamentMatchId, summary)
+        .catch((err) => {
+          console.error(`❌ Tournament coordinator error for match ${this.tournamentMatchId}:`, err);
+        });
+    }
   }
 
   // ==================================================

@@ -10,11 +10,11 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Current Phase** | **Phase 20 — Generic Competition & Tournament Core Architecture** |
-| **Current Step** | **Step 20.1 — Design tournament schema & bracket generator** |
-| **Last Completed Step** | **Phase 19 — Room Browser & Custom Game Lobbies (19.1 - 19.4)** |
-| **Next Step** | **Step 20.1 — Design tournament schema & bracket generator** |
-| **Overall Status** | **Phase 19 (Room Browser & Custom Game Lobbies) 100% complete; moving to Phase 20.** |
+| **Current Phase** | **Phase 21 — 4-Participant "Cuadrangular" 1v1 Championship** |
+| **Current Step** | **Step 21.1 — Configure TournamentFormat_Cuadrangular_1v1** |
+| **Last Completed Step** | **Phase 20 — Generic Competition & Tournament Core Architecture (20.1 - 20.3)** |
+| **Next Step** | **Step 21.1 — Configure TournamentFormat_Cuadrangular_1v1** |
+| **Overall Status** | **Phase 20 (Generic Competition & Tournament Core Architecture) 100% complete; moving to Phase 21.** |
 | **Last Updated** | **2026-11-01** |
 
 ---
@@ -881,25 +881,25 @@ The project is structured into **31 sequential, trackable phases (Phase 0 to Pha
 
 ### Phase 20 — Generic Competition & Tournament Core Architecture
 
-**Status:** Not Started `[ ]`  
+**Status:** Completed `[x]`  
 **Goal:** Build the game-genre-agnostic tournament engine that coordinates brackets, stages, rounds, and participant advancement.  
 **Dependencies:** Phase 8, Phase 19.  
 
 #### Steps
-- [ ] 20.1 Define tournament domain entities in `shared/domain/tournament/`:
+- [x] 20.1 Define tournament domain entities in `shared/domain/tournament/`:
   - `Competition` (ID, name, format, status).
   - `TournamentParticipant` (participant ID, seed, type `[INDIVIDUAL, TEAM]`).
   - `TournamentStage` (stage index, type `[KNOCKOUT, ROUND_ROBIN]`).
   - `TournamentRound` (round number, name e.g. "Semifinal", "Final").
   - `TournamentMatch` (round ID, seed A, seed B, referenced `matchId`, winner ID).
-- [ ] 20.2 Implement `TournamentCoordinatorService`:
+- [x] 20.2 Implement `TournamentCoordinatorService`:
   - Initializes tournament bracket structure.
   - Seeds participants.
   - Spawns actual `GameRoom` matches for active bracket nodes.
   - Listens for match completion events.
   - Advances winning participants to the next round node.
   - Marks defeated participants as eliminated.
-- [ ] 20.3 Persist tournament records and bracket trees to PostgreSQL.
+- [x] 20.3 Persist tournament records and bracket trees to PostgreSQL.
 
 #### Completion Criteria
 - Tournament engine executes bracket progression cleanly using standard `GameRoom` instances without modifying core match logic.

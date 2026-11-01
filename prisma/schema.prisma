@@ -187,3 +187,120 @@ model PlayerItemStats {
   @@map("player_item_stats")
 }
 
+// ==================================================
+// 9. Tournament: Authoritative Tournament Record
+// Coordinates brackets, rounds, matches, and champions (Phase 20)
+// ==================================================
+model Tournament {
+  id              String                  @id @default(uuid())
+  name            String
+  format          String                  @default("KNOCKOUT") // "KNOCKOUT" | "ROUND_ROBIN"
+  status          String                  @default("PENDING")  // "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"
+  participantType String                  @default("INDIVIDUAL") @map("participant_type") // "INDIVIDUAL" | "TEAM"
+  gameModeId      String                  @map("game_mode_id")
+  championId      String?                 @map("champion_id")
+  championName    String?                 @map("champion_name")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+
+  // Relations
+  participants    TournamentParticipant[]
+  stages          TournamentStage[]
+
+  @@map("tournaments")
+}
+
+// ==================================================
+// 10. TournamentParticipant: Seeding & Placements
+// ==================================================
+model TournamentParticipant {
+  id              String      @id @default(uuid())
+  tournamentId    String      @map("tournament_id")
+  participantType String      @default("INDIVIDUAL") @map("participant_type")
+  seed            Int
+  name            String
+  avatarUrl       String?     @map("avatar_url")
+  playerId        String?     @map("player_id")
+  memberIds       String[]    @default([]) @map("member_ids")
+  isEliminated    Boolean     @default(false) @map("is_eliminated")
+  finalPlacement  Int?        @map("final_placement")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  tournament      Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId])
+  @@index([playerId])
+  @@map("tournament_participants")
+}
+
+// ==================================================
+// 11. TournamentStage: Tournament Phase Container
+// ==================================================
+model TournamentStage {
+  id           String            @id @default(uuid())
+  tournamentId String            @map("tournament_id")
+  stageIndex   Int               @default(0) @map("stage_index")
+  stageType    String            @default("KNOCKOUT") @map("stage_type")
+  status       String            @default("PENDING") // "PENDING" | "IN_PROGRESS" | "COMPLETED"
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  tournament   Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  rounds       TournamentRound[]
+
+  @@unique([tournamentId, stageIndex])
+  @@map("tournament_stages")
+}
+
+// ==================================================
+// 12. TournamentRound: Sequential Bracket Level
+// ==================================================
+model TournamentRound {
+  id         String            @id @default(uuid())
+  stageId    String            @map("stage_id")
+  roundIndex Int               @map("round_index")
+  name       String
+  status     String            @default("PENDING") // "PENDING" | "IN_PROGRESS" | "COMPLETED"
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  stage      TournamentStage   @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  matches    TournamentMatch[]
+
+  @@unique([stageId, roundIndex])
+  @@map("tournament_rounds")
+}
+
+// ==================================================
+// 13. TournamentMatch: Individual Bracket Match Node
+// ==================================================
+model TournamentMatch {
+  id                String          @id @default(uuid())
+  roundId           String          @map("round_id")
+  matchIndex        Int             @map("match_index")
+  participantAId    String?         @map("participant_a_id")
+  participantBId    String?         @map("participant_b_id")
+  winnerId          String?         @map("winner_id")
+  scoreA            Int             @default(0) @map("score_a")
+  scoreB            Int             @default(0) @map("score_b")
+  status            String          @default("PENDING") // "PENDING" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"
+  gameRoomId        String?         @map("game_room_id")
+  referencedMatchId String?         @map("referenced_match_id")
+  nextMatchId       String?         @map("next_match_id")
+  nextMatchSlot     String?         @map("next_match_slot") // "A" | "B"
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  round             TournamentRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, matchIndex])
+  @@index([roundId])
+  @@index([nextMatchId])
+  @@map("tournament_matches")
+}
+
