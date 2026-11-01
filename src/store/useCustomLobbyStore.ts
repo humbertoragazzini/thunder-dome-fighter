@@ -116,7 +116,9 @@ export const useCustomLobbyStore = create<CustomLobbyStoreState>((set, get) => (
 
       room.onLeave(() => {
         set({ activeRoom: null, lobbyState: null, lobbyRevision: 0, isLoading: false });
-        useNavigationStore.getState().navigateTo("ROOM_BROWSER");
+        if (useNavigationStore.getState().currentScreen === "CUSTOM_LOBBY") {
+          useNavigationStore.getState().navigateTo("ROOM_BROWSER");
+        }
       });
 
       // Listen for host launch event
@@ -134,6 +136,13 @@ export const useCustomLobbyStore = create<CustomLobbyStoreState>((set, get) => (
           const currentMode = (get().lobbyState?.gameMode as any) ?? options.gameMode;
           useNavigationStore.getState().setSelectedMatchMode(currentMode);
           useNavigationStore.getState().navigateTo("MATCH_LOADING");
+
+          set({ activeRoom: null, lobbyState: null, lobbyRevision: 0, isLoading: false });
+          try {
+            room.leave();
+          } catch {
+            // Ignore
+          }
         },
       );
 
@@ -179,7 +188,9 @@ export const useCustomLobbyStore = create<CustomLobbyStoreState>((set, get) => (
 
       room.onLeave(() => {
         set({ activeRoom: null, lobbyState: null, lobbyRevision: 0, isLoading: false });
-        useNavigationStore.getState().navigateTo("ROOM_BROWSER");
+        if (useNavigationStore.getState().currentScreen === "CUSTOM_LOBBY") {
+          useNavigationStore.getState().navigateTo("ROOM_BROWSER");
+        }
       });
 
       room.onMessage(
@@ -196,6 +207,13 @@ export const useCustomLobbyStore = create<CustomLobbyStoreState>((set, get) => (
           const currentMode = (get().lobbyState?.gameMode as any) ?? "1v1";
           useNavigationStore.getState().setSelectedMatchMode(currentMode);
           useNavigationStore.getState().navigateTo("MATCH_LOADING");
+
+          set({ activeRoom: null, lobbyState: null, lobbyRevision: 0, isLoading: false });
+          try {
+            room.leave();
+          } catch {
+            // Ignore
+          }
         },
       );
 

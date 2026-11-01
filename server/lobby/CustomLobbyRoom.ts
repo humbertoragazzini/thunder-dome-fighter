@@ -302,10 +302,14 @@ export class CustomLobbyRoom extends Room<{ state: CustomLobbyState }> {
         this.state.status = "LAUNCHED";
         this.setMetadata({ status: "LAUNCHED" });
 
-        // Disconnect lobby after brief handoff delay
+        // Clean up lobby after graceful client departure
         setTimeout(() => {
-          this.disconnect();
-        }, 3000);
+          try {
+            this.disconnect();
+          } catch {
+            // Ignore
+          }
+        }, 15000);
       } catch (err) {
         console.error("[CustomLobbyRoom] Failed to launch game room:", err);
         this.state.status = "WAITING";
