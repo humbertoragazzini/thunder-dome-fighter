@@ -30,6 +30,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./GameRoom";
 import { MatchmakingRoom } from "./matchmaking/MatchmakingRoom";
 import { CustomLobbyRoom } from "./lobby/CustomLobbyRoom";
+import { TournamentLobbyRoom } from "./tournament/TournamentLobbyRoom";
 import {
   getWebTransportCertificate,
   getWebTransportFingerprint,
@@ -117,6 +118,55 @@ expressApp.post("/matchmake/custom-lobbies/lookup", async (req, res) => {
   }
 });
 
+// Expose tournament discovery endpoint for tournament browser
+expressApp.get("/matchmake/tournaments", async (_req, res) => {
+  try {
+    const rooms = await matchMaker.query({ name: "tournament_lobby" });
+    const publicTournaments = rooms
+      .filter((r) => !r.metadata?.isPrivate && r.metadata?.status === "WAITING")
+      .map((r) => ({
+        roomId: r.roomId,
+        tournamentName: r.metadata?.tournamentName ?? "Championship",
+        hostName: r.metadata?.hostName ?? "Host",
+        participantCapacity: r.metadata?.participantCapacity ?? 4,
+        currentParticipants: r.metadata?.currentParticipants ?? 0,
+        scoreLimit: r.metadata?.scoreLimit ?? 5,
+        timeLimitSeconds: r.metadata?.timeLimitSeconds ?? 180,
+        status: r.metadata?.status ?? "WAITING",
+        isPrivate: false,
+        currentRoundName: r.metadata?.currentRoundName ?? "Registration",
+      }));
+    res.json({ tournaments: publicTournaments });
+  } catch (err) {
+    console.error("[Colyseus] Failed to query tournaments:", err);
+    res.status(500).json({ error: "Failed to query tournaments" });
+  }
+});
+
+// Lookup private tournament by room code
+expressApp.post("/matchmake/tournaments/lookup", async (req, res) => {
+  try {
+    const { roomCode } = req.body ?? {};
+    if (!roomCode || typeof roomCode !== "string") {
+      return res.status(400).json({ error: "Room code required" });
+    }
+    const cleanCode = roomCode.trim().toUpperCase();
+    const rooms = await matchMaker.query({ name: "tournament_lobby" });
+    const match = rooms.find(
+      (r) =>
+        r.metadata?.roomCode?.toUpperCase() === cleanCode &&
+        r.metadata?.status === "WAITING",
+    );
+    if (!match) {
+      return res.status(404).json({ error: "Tournament not found or already in progress" });
+    }
+    res.json({ roomId: match.roomId, metadata: match.metadata });
+  } catch (err) {
+    console.error("[Colyseus] Failed to lookup tournament:", err);
+    res.status(500).json({ error: "Failed to lookup tournament" });
+  }
+});
+
 // Permissive CORS middleware supporting credentials for cross-origin LAN testing
 expressApp.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -130,9 +180,9 @@ expressApp.use((req, res, next) => {
   res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
   if (req.method === "OPTIONS") {
     res.sendStatus(204);
-    return;
+  } else {
+    next();
   }
-  next();
 });
 
 const h3Transport = new FingerprintedH3Transport(
@@ -147,6 +197,7 @@ const gameServer = defineServer({
     game: defineRoom(GameRoom).filterBy(["modeId", "levelId"]),
     matchmaking: defineRoom(MatchmakingRoom),
     custom_lobby: defineRoom(CustomLobbyRoom),
+    tournament_lobby: defineRoom(TournamentLobbyRoom),
   },
 });
 

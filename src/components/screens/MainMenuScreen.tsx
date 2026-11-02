@@ -170,12 +170,13 @@ export function MainMenuScreen() {
 
           <MenuCard
             title="Cuadrangular Championship"
-            description="4-Participant double elimination tournaments with dynamic brackets and podium ceremonies."
-            icon={<GiCrown className="text-red-400" />}
-            badgeText="PHASE 20"
-            badgeVariant="red"
-            accentColor="fire"
-            disabled
+            description="4-Participant World Cup knockout tournament with dynamic brackets, concurrent matches, and victory podium."
+            icon={<GiCrown className="text-amber-400" />}
+            badgeText="ACTIVE"
+            badgeVariant="emerald"
+            badgePulse
+            accentColor="amber"
+            onClick={() => openModal("CREATE_TOURNAMENT")}
           />
 
           <MenuCard

@@ -29,6 +29,8 @@ import { PlayMenuScreen } from "./components/screens/PlayMenuScreen";
 import { ProfileScreen } from "./components/screens/ProfileScreen";
 import { RoomBrowserScreen } from "./components/screens/RoomBrowserScreen";
 import { CustomLobbyScreen } from "./components/screens/CustomLobbyScreen";
+import { TournamentLobbyScreen } from "./components/screens/TournamentLobbyScreen";
+import { CreateTournamentModal } from "./components/ui/organisms/CreateTournamentModal";
 import { DuplicateTabDialog } from "./components/ui/organisms/DuplicateTabDialog";
 import { ErrorDialog } from "./components/ui/organisms/ErrorDialog";
 import { PartyModal } from "./components/ui/organisms/PartyModal";
@@ -99,12 +101,14 @@ export default function App() {
         {currentScreen === "IN_GAME" && <InGameOverlay />}
         {currentScreen === "ROOM_BROWSER" && <RoomBrowserScreen />}
         {currentScreen === "CUSTOM_LOBBY" && <CustomLobbyScreen />}
+        {currentScreen === "TOURNAMENT_LOBBY" && <TournamentLobbyScreen />}
       </div>
 
       {/* Global Modals & Tab Enforcer */}
       <ProfileModal />
       <PartyModal />
       <ServerDiagnosticsModal />
+      <CreateTournamentModal />
       <ErrorDialog />
       <DuplicateTabDialog />
     </div>

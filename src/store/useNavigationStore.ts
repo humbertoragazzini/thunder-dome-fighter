@@ -31,9 +31,17 @@ export type AppScreen =
   | "IN_GAME"
   | "MATCH_RESULTS"
   | "ROOM_BROWSER"
-  | "CUSTOM_LOBBY";
+  | "CUSTOM_LOBBY"
+  | "TOURNAMENT_LOBBY";
 
-export type ModalType = "PROFILE" | "SETTINGS" | "PARTY" | "ERROR" | "DIAGNOSTICS" | null;
+export type ModalType =
+  | "PROFILE"
+  | "SETTINGS"
+  | "PARTY"
+  | "ERROR"
+  | "DIAGNOSTICS"
+  | "CREATE_TOURNAMENT"
+  | null;
 
 export type MatchMode = "1v1" | "3v3" | "4v4" | "ffa";
 

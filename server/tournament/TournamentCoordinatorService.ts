@@ -168,7 +168,7 @@ export class TournamentCoordinatorService {
     tournamentId: string,
     matchId: string,
     extraOptions?: Record<string, unknown>,
-  ): Promise<{ gameRoomId: string; room: any }> {
+  ): Promise<{ gameRoomId: string; room: any; roomListing: any }> {
     const tournament = await this.getTournament(tournamentId);
     if (!tournament) {
       throw new Error(`Tournament ${tournamentId} not found`);
@@ -232,7 +232,7 @@ export class TournamentCoordinatorService {
     // Retrieve local room instance if running on local process
     const localRoom = matchMaker.getLocalRoomById(gameRoom.roomId);
 
-    return { gameRoomId: gameRoom.roomId, room: localRoom ?? gameRoom };
+    return { gameRoomId: gameRoom.roomId, room: localRoom ?? gameRoom, roomListing: gameRoom };
   }
 
   /**
