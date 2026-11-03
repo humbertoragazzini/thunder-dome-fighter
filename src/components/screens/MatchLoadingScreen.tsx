@@ -151,6 +151,7 @@ export function MatchLoadingScreen() {
         setLoadingStep("Authoritative handshake accepted. Launching viewport...");
       } catch (err: unknown) {
         connectionLockRef.current = false;
+        useMatchmakingStore.getState().clearReservation();
         if (!isMountedRef.current) return;
         const msg =
           err instanceof Error

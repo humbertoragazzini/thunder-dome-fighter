@@ -57,6 +57,7 @@ interface TournamentStoreState {
   lobbyState: TournamentLobbyState | null;
   lobbyRevision: number;
   assignedMatch: TournamentMatchAssignedPayload | null;
+  currentMatchId: string | null;
   championData: TournamentChampionCrownedPayload | null;
   bracketTree: { stages: ITournamentStage[]; participants: ITournamentParticipant[] } | null;
   isSpectatingMatch: boolean;
@@ -90,6 +91,7 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
   lobbyState: null,
   lobbyRevision: 0,
   assignedMatch: null,
+  currentMatchId: null,
   championData: null,
   bracketTree: null,
   isSpectatingMatch: false,
@@ -446,6 +448,7 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
     set({
       isSpectatingMatch: false,
       spectatingMatchData: null,
+      currentMatchId: assignedMatch.matchId,
     });
 
     useMatchmakingStore.setState({
@@ -477,9 +480,38 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
       }
       useAppStore.getState().setRoom(null);
     }
+
+    const { currentMatchId, assignedMatch, bracketTree } = get();
+
+    // Check if assignedMatch is completed or matches the match we just left
+    let shouldClearAssigned = false;
+    if (assignedMatch) {
+      if (currentMatchId && assignedMatch.matchId === currentMatchId) {
+        shouldClearAssigned = true;
+      } else if (bracketTree?.stages) {
+        for (const stage of bracketTree.stages) {
+          for (const round of stage.rounds) {
+            for (const m of round.matches) {
+              if (m.id === assignedMatch.matchId && m.status === "COMPLETED") {
+                shouldClearAssigned = true;
+                break;
+              }
+            }
+            if (shouldClearAssigned) break;
+          }
+          if (shouldClearAssigned) break;
+        }
+      }
+    }
+
+    // Clear stale reservation from matchmaking store
+    useMatchmakingStore.getState().clearReservation();
+
     set({
       isSpectatingMatch: false,
       spectatingMatchData: null,
+      currentMatchId: null,
+      ...(shouldClearAssigned ? { assignedMatch: null } : {}),
     });
     useNavigationStore.getState().navigateTo("TOURNAMENT_LOBBY");
   },
@@ -502,16 +534,19 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
         // Ignored
       }
     }
+    useMatchmakingStore.getState().clearReservation();
     set({
       activeRoom: null,
       lobbyState: null,
       lobbyRevision: 0,
       assignedMatch: null,
+      currentMatchId: null,
       championData: null,
       bracketTree: null,
       isSpectatingMatch: false,
       spectatingMatchData: null,
       isLoading: false,
+      error: null,
     });
     useNavigationStore.getState().navigateTo("MAIN_MENU");
   },

@@ -18,6 +18,8 @@
 import { FaTriangleExclamation } from "react-icons/fa6";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useNavigationStore } from "../../../store/useNavigationStore";
+import { useTournamentStore } from "../../../store/useTournamentStore";
+import { useMatchmakingStore } from "../../../store/useMatchmakingStore";
 import { Button } from "../atoms/Button";
 import { ModalBackdrop } from "../templates/ModalBackdrop";
 
@@ -32,7 +34,11 @@ export function ErrorDialog() {
 
   const handleAcknowledge = () => {
     closeModal();
-    if (isAuthenticated) {
+    const isTournament = Boolean(useTournamentStore.getState().activeRoom);
+    if (isTournament) {
+      useMatchmakingStore.getState().clearReservation();
+      navigateTo("TOURNAMENT_LOBBY");
+    } else if (isAuthenticated) {
       navigateTo("MAIN_MENU");
     } else {
       navigateTo("AUTH");

@@ -155,9 +155,16 @@ export function InGameOverlay() {
   );
   const isSpectatingMatch = useTournamentStore((state) => state.isSpectatingMatch);
   const assignedMatch = useTournamentStore((state) => state.assignedMatch);
+  const currentMatchId = useTournamentStore((state) => state.currentMatchId);
   const proceedToAssignedMatch = useTournamentStore((state) => state.proceedToAssignedMatch);
   const returnToTournamentHub = useTournamentStore((state) => state.returnToTournamentHub);
   const leaveTournament = useTournamentStore((state) => state.leaveTournament);
+
+  // A match is only considered an upcoming next match if its matchId differs from the match just played
+  const nextAssignedMatch =
+    assignedMatch && (!currentMatchId || assignedMatch.matchId !== currentMatchId)
+      ? assignedMatch
+      : null;
 
   const [autoReturnCountdown, setAutoReturnCountdown] = useState<number>(10);
 
@@ -170,7 +177,10 @@ export function InGameOverlay() {
           if (prev <= 1) {
             clearInterval(timer);
             const latestAssigned = useTournamentStore.getState().assignedMatch;
-            if (latestAssigned) {
+            const activeMatchId = useTournamentStore.getState().currentMatchId;
+            const hasNext = latestAssigned && (!activeMatchId || latestAssigned.matchId !== activeMatchId);
+
+            if (hasNext) {
               proceedToAssignedMatch();
             } else {
               returnToTournamentHub();
@@ -1088,8 +1098,8 @@ export function InGameOverlay() {
           onReturnToTournament={returnToTournamentHub}
           autoReturnSeconds={autoReturnCountdown}
           onReturnToMenu={isTournamentActive ? leaveTournament : handleReturnToMenu}
-          nextRoundName={assignedMatch?.roundName}
-          onProceedToNextMatch={assignedMatch ? proceedToAssignedMatch : undefined}
+          nextRoundName={nextAssignedMatch?.roundName}
+          onProceedToNextMatch={nextAssignedMatch ? proceedToAssignedMatch : undefined}
         />
       )}
 

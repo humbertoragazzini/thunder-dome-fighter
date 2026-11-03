@@ -18,7 +18,7 @@
 // Dedicated competitive esports hub for tournaments and championships.
 // ==================================================
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   FaArrowLeft,
   FaCheck,
@@ -54,7 +54,6 @@ export function TournamentLobbyScreen() {
   const bracketTree = useTournamentStore((state) => state.bracketTree);
   const spectateTournamentMatch = useTournamentStore((state) => state.spectateTournamentMatch);
   const assignedMatch = useTournamentStore((state) => state.assignedMatch);
-  const proceedToAssignedMatch = useTournamentStore((state) => state.proceedToAssignedMatch);
   const requestMatchReservation = useTournamentStore((state) => state.requestMatchReservation);
 
   const [copiedCode, setCopiedCode] = useState(false);
@@ -88,6 +87,22 @@ export function TournamentLobbyScreen() {
   const bracketParticipantMap = new Map(
     bracketTree?.participants?.map((p) => [p.id, p]) ?? [],
   );
+
+  // Check if assignedMatch corresponds to an active, uncompleted match
+  const isAssignedMatchActive = useMemo(() => {
+    if (!assignedMatch) return false;
+    if (!bracketTree?.stages) return true;
+    for (const stage of bracketTree.stages) {
+      for (const round of stage.rounds) {
+        for (const m of round.matches) {
+          if (m.id === assignedMatch.matchId) {
+            return m.status === "SCHEDULED" || m.status === "IN_PROGRESS";
+          }
+        }
+      }
+    }
+    return true;
+  }, [assignedMatch, bracketTree]);
 
   const isHost = Boolean(localParticipant?.isHost);
   const capacity = lobbyState?.participantCapacity ?? 4;
@@ -171,7 +186,7 @@ export function TournamentLobbyScreen() {
     >
       <div className="w-full max-w-5xl flex flex-col gap-6 py-4">
         {/* Match Ready Hero Banner */}
-        {assignedMatch && (
+        {assignedMatch && isAssignedMatchActive && (
           <div className="w-full p-4 rounded-3xl bg-gradient-to-r from-amber-950/80 via-slate-900/90 to-amber-950/80 border-2 border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.35)] flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-300 text-2xl shrink-0">
@@ -189,7 +204,9 @@ export function TournamentLobbyScreen() {
             <Button
               variant="primary"
               size="lg"
-              onClick={proceedToAssignedMatch}
+              onClick={() => {
+                requestMatchReservation(assignedMatch.matchId);
+              }}
               leftIcon={<GiBoxingGlove />}
               className="w-full sm:w-auto bg-amber-400 text-slate-950 font-black hover:bg-amber-300 shadow-xl"
             >
@@ -541,11 +558,7 @@ export function TournamentLobbyScreen() {
                               variant="primary"
                               size="sm"
                               onClick={() => {
-                                if (assignedMatch?.matchId === match.id) {
-                                  proceedToAssignedMatch();
-                                } else {
-                                  requestMatchReservation(match.id);
-                                }
+                                requestMatchReservation(match.id);
                               }}
                               leftIcon={<GiBoxingGlove />}
                               className="w-full mt-1 text-xs font-mono font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md flex items-center justify-center gap-1.5 py-1.5 animate-pulse"

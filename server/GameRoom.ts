@@ -287,6 +287,7 @@ export class GameRoom extends Room {
     this.level = LEVELS[requestedLevelId];
 
     this.maxClients = this.tournamentId ? this.gameMode.maxPlayers + 16 : this.gameMode.maxPlayers;
+    this.seatReservationTimeout = this.tournamentId ? 120 : 60;
     this.autoDispose = true;
     this.patchRate = Number(process.env.PATCH_RATE_MS ?? NETWORK_PATCH_RATE_MS);
 
