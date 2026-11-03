@@ -16,6 +16,11 @@
 // client stores, UI screens, and authoritative Colyseus rooms.
 // ==================================================
 
+import type {
+  ITournamentStage,
+  ITournamentParticipant,
+} from "../../domain/tournament/TournamentTypes";
+
 export interface CreateTournamentLobbyOptions {
   tournamentName: string;
   participantCapacity: number; // 4, 8, or 16
@@ -43,6 +48,7 @@ export const TournamentClientMessage = {
   START_TOURNAMENT: "tournament:start",
   UPDATE_SETTINGS: "tournament:update-settings",
   KICK_PARTICIPANT: "tournament:kick-participant",
+  REQUEST_SPECTATE: "tournament:request-spectate",
 } as const;
 
 export type TournamentClientMessageType =
@@ -58,11 +64,17 @@ export interface TournamentKickParticipantPayload {
   targetSessionId: string;
 }
 
+export interface TournamentRequestSpectatePayload {
+  tournamentId: string;
+  matchId: string;
+}
+
 export const TournamentServerMessage = {
   MATCH_ASSIGNED: "tournament:match-assigned",
   BRACKET_UPDATED: "tournament:bracket-updated",
   CHAMPION_CROWNED: "tournament:champion-crowned",
   PARTICIPANT_KICKED: "tournament:kicked",
+  SPECTATE_GRANTED: "tournament:spectate-granted",
 } as const;
 
 export type TournamentServerMessageType =
@@ -80,9 +92,22 @@ export interface TournamentMatchAssignedPayload {
   fingerprint?: number[];
 }
 
+export interface TournamentSpectateGrantedPayload {
+  tournamentId: string;
+  matchId: string;
+  roundName: string;
+  gameRoomId: string;
+  reservation: any;
+  participantAName: string;
+  participantBName: string;
+  fingerprint?: number[];
+}
+
 export interface TournamentBracketUpdatedPayload {
   tournamentId: string;
   lastCompletedMatchId?: string;
+  stages?: ITournamentStage[];
+  participants?: ITournamentParticipant[];
 }
 
 export interface TournamentPlacementItem {

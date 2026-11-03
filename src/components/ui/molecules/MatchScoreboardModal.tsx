@@ -17,7 +17,7 @@
 // ==================================================
 
 import { FaTrophy, FaXmark } from "react-icons/fa6";
-import { GiPunch, GiBroadsword, GiWarhammer, GiPistolGun } from "react-icons/gi";
+import { GiPunch, GiBroadsword, GiWarhammer, GiPistolGun, GiTrophyCup } from "react-icons/gi";
 import { Badge } from "../atoms/Badge";
 import { Button } from "../atoms/Button";
 
@@ -46,6 +46,9 @@ export interface MatchScoreboardModalProps {
   participants: ScoreboardParticipant[];
   isPostMatch?: boolean;
   onReturnToMenu?: () => void;
+  isTournament?: boolean;
+  onReturnToTournament?: () => void;
+  autoReturnSeconds?: number;
 }
 
 function getWeaponIcon(itemId?: string) {
@@ -71,6 +74,9 @@ export function MatchScoreboardModal({
   participants,
   isPostMatch = false,
   onReturnToMenu,
+  isTournament = false,
+  onReturnToTournament,
+  autoReturnSeconds,
 }: MatchScoreboardModalProps) {
   if (!isOpen) return null;
 
@@ -244,16 +250,40 @@ export function MatchScoreboardModal({
         </div>
 
         {/* Footer */}
-        {isPostMatch && onReturnToMenu && (
-          <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end">
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={onReturnToMenu}
-              className="w-full sm:w-auto shadow-lg"
-            >
-              Return to Main Menu
-            </Button>
+        {isPostMatch && (
+          <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+            {isTournament ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onReturnToMenu}
+                  className="text-slate-400 hover:text-rose-400 font-mono text-xs"
+                >
+                  Leave Tournament & Exit
+                </Button>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={onReturnToTournament}
+                  leftIcon={<GiTrophyCup />}
+                  className="w-full sm:w-auto shadow-lg shadow-amber-500/20 font-bold"
+                >
+                  Return to Tournament Hub{typeof autoReturnSeconds === "number" && autoReturnSeconds > 0 ? ` (${autoReturnSeconds}s)` : ""}
+                </Button>
+              </>
+            ) : (
+              onReturnToMenu && (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={onReturnToMenu}
+                  className="w-full sm:w-auto shadow-lg ml-auto"
+                >
+                  Return to Main Menu
+                </Button>
+              )
+            )}
           </div>
         )}
       </div>

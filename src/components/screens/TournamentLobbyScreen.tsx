@@ -24,6 +24,7 @@ import {
   FaCheck,
   FaCopy,
   FaCrown,
+  FaEye,
   FaGlobe,
   FaLock,
   FaTrophy,
@@ -50,6 +51,8 @@ export function TournamentLobbyScreen() {
   const leaveTournament = useTournamentStore((state) => state.leaveTournament);
   const championData = useTournamentStore((state) => state.championData);
   const dismissChampion = useTournamentStore((state) => state.dismissChampion);
+  const bracketTree = useTournamentStore((state) => state.bracketTree);
+  const spectateTournamentMatch = useTournamentStore((state) => state.spectateTournamentMatch);
 
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -71,6 +74,17 @@ export function TournamentLobbyScreen() {
   const localParticipant = activeRoom
     ? participants.find((p) => p.sessionId === activeRoom.sessionId)
     : undefined;
+
+  const localBracketParticipant = bracketTree?.participants?.find(
+    (p) =>
+      (localParticipant?.playerId && p.playerId === localParticipant.playerId) ||
+      p.name === localParticipant?.playerName,
+  );
+  const localParticipantId = localBracketParticipant?.id;
+
+  const bracketParticipantMap = new Map(
+    bracketTree?.participants?.map((p) => [p.id, p]) ?? [],
+  );
 
   const isHost = Boolean(localParticipant?.isHost);
   const capacity = lobbyState?.participantCapacity ?? 4;
@@ -244,7 +258,9 @@ export function TournamentLobbyScreen() {
                   className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 relative overflow-hidden ${
                     p
                       ? p.isEliminated
-                        ? "bg-slate-950/40 border-rose-950/60 opacity-60"
+                        ? isLocal
+                          ? "bg-rose-950/20 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+                          : "bg-slate-950/60 border-rose-950/60 opacity-80"
                         : isLocal
                           ? "bg-amber-500/10 border-amber-500/50 shadow-[0_0_15px_rgba(251,191,36,0.15)]"
                           : "bg-slate-900/80 border-slate-800/80 hover:border-slate-700"
@@ -260,7 +276,9 @@ export function TournamentLobbyScreen() {
                     {p ? (
                       p.isEliminated ? (
                         <span className="px-2 py-0.5 rounded-md bg-rose-950/80 border border-rose-500/40 text-[10px] font-mono font-bold text-rose-300">
-                          ELIMINATED
+                          {p.finalPlacement
+                            ? `${p.finalPlacement === 3 ? "3rd" : p.finalPlacement === 5 ? "5th" : `${p.finalPlacement}th`} Place (Spectator)`
+                            : "ELIMINATED (Spectator)"}
                         </span>
                       ) : p.isHost ? (
                         <span className="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-[10px] font-mono font-bold text-amber-300 flex items-center gap-1">
@@ -307,7 +325,7 @@ export function TournamentLobbyScreen() {
                           {p.playerName}
                           {isLocal && (
                             <span className="text-amber-400 font-normal ml-1">
-                              (You)
+                              (You{p.isEliminated ? " - Spectator" : ""})
                             </span>
                           )}
                         </span>
@@ -328,7 +346,7 @@ export function TournamentLobbyScreen() {
         </div>
 
         {/* Live Bracket Overview Card */}
-        <div className="flex flex-col gap-3 p-5 rounded-3xl bg-slate-900/90 border border-slate-800/80 shadow-xl backdrop-blur-md">
+        <div className="flex flex-col gap-4 p-5 rounded-3xl bg-slate-900/90 border border-slate-800/80 shadow-xl backdrop-blur-md">
           <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
             <div className="flex items-center gap-2">
               <GiCrossedSwords className="text-amber-400 text-lg" />
@@ -336,48 +354,219 @@ export function TournamentLobbyScreen() {
                 Tournament Bracket Overview
               </span>
             </div>
-            <span className="text-xs text-slate-400 font-mono">
-              World Cup Knockout Single Elimination
-            </span>
+            <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+              <span>Single Elimination Knockout</span>
+              {lobbyState?.status === "IN_PROGRESS" && (
+                <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Live Sync
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
-            {/* Semifinal 1 */}
-            <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs font-mono font-bold text-amber-400">
-                <span>SEMIFINAL 1</span>
-                <span className="text-[10px] text-slate-400">Feeds Final Slot A</span>
-              </div>
-              <div className="flex flex-col gap-1.5 font-mono text-xs">
-                <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between text-slate-200">
-                  <span>{slotMap.get(0)?.playerName ?? "Seed #1 (Slot 1)"}</span>
-                  <span className="text-[10px] text-amber-400">Seed 1</span>
+          {bracketTree?.stages?.[0]?.rounds?.length ? (
+            <div className="flex flex-col lg:flex-row gap-4 overflow-x-auto pb-2">
+              {bracketTree.stages[0].rounds.map((round) => (
+                <div
+                  key={round.id || round.name}
+                  className="flex-1 min-w-[280px] flex flex-col gap-3 p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80"
+                >
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/60">
+                    <span className="text-xs font-bold font-mono uppercase text-amber-400">
+                      {round.name}
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${
+                        round.status === "COMPLETED"
+                          ? "bg-slate-800 text-slate-400"
+                          : round.status === "IN_PROGRESS"
+                            ? "bg-emerald-950/80 text-emerald-300 border border-emerald-500/40"
+                            : "bg-slate-900 text-slate-500"
+                      }`}
+                    >
+                      {round.status}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    {round.matches.map((match) => {
+                      const pA = match.participantAId
+                        ? bracketParticipantMap.get(match.participantAId)
+                        : undefined;
+                      const pB = match.participantBId
+                        ? bracketParticipantMap.get(match.participantBId)
+                        : undefined;
+
+                      const isLocalInMatch = Boolean(
+                        localParticipantId &&
+                          (match.participantAId === localParticipantId ||
+                            match.participantBId === localParticipantId),
+                      );
+
+                      const canSpectate =
+                        match.status === "IN_PROGRESS" &&
+                        lobbyState?.status === "IN_PROGRESS" &&
+                        !isLocalInMatch;
+
+                      return (
+                        <div
+                          key={match.id}
+                          className={`p-3 rounded-xl border flex flex-col gap-2 transition-all ${
+                            match.status === "IN_PROGRESS"
+                              ? "bg-emerald-950/20 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+                              : match.status === "COMPLETED"
+                                ? "bg-slate-900/60 border-slate-800/60"
+                                : "bg-slate-900/40 border-slate-800/40"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-[11px] font-mono">
+                            <span className="text-slate-400 font-bold">
+                              Match #{match.matchIndex + 1}
+                            </span>
+                            {match.status === "IN_PROGRESS" ? (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                                LIVE
+                              </span>
+                            ) : match.status === "COMPLETED" ? (
+                              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px] font-bold">
+                                FINAL
+                              </span>
+                            ) : match.status === "SCHEDULED" ? (
+                              <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-bold">
+                                READY
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded bg-slate-950 text-slate-500 text-[10px]">
+                                PENDING
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Participant A */}
+                          <div
+                            className={`p-2 rounded-lg flex items-center justify-between font-mono text-xs ${
+                              match.winnerId === pA?.id && match.status === "COMPLETED"
+                                ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40"
+                                : pA?.isEliminated
+                                  ? "bg-slate-950/60 text-slate-500 line-through"
+                                  : "bg-slate-950/40 text-slate-200"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <span className="text-[10px] text-slate-400">
+                                {pA ? `[#${pA.seed}]` : ""}
+                              </span>
+                              <span className="truncate">
+                                {pA?.name ?? (match.roundIndex === 0 ? "TBD" : "Winner prev")}
+                              </span>
+                              {pA?.id === localParticipantId && (
+                                <span className="text-[10px] text-amber-400 font-normal">
+                                  (You)
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-bold text-sm ml-2">
+                              {match.status === "COMPLETED" || match.status === "IN_PROGRESS"
+                                ? match.scoreA
+                                : "-"}
+                            </span>
+                          </div>
+
+                          {/* Participant B */}
+                          <div
+                            className={`p-2 rounded-lg flex items-center justify-between font-mono text-xs ${
+                              match.winnerId === pB?.id && match.status === "COMPLETED"
+                                ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40"
+                                : pB?.isEliminated
+                                  ? "bg-slate-950/60 text-slate-500 line-through"
+                                  : "bg-slate-950/40 text-slate-200"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <span className="text-[10px] text-slate-400">
+                                {pB ? `[#${pB.seed}]` : ""}
+                              </span>
+                              <span className="truncate">
+                                {pB?.name ?? (match.roundIndex === 0 ? "TBD" : "Winner prev")}
+                              </span>
+                              {pB?.id === localParticipantId && (
+                                <span className="text-[10px] text-amber-400 font-normal">
+                                  (You)
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-bold text-sm ml-2">
+                              {match.status === "COMPLETED" || match.status === "IN_PROGRESS"
+                                ? match.scoreB
+                                : "-"}
+                            </span>
+                          </div>
+
+                          {/* Spectate Button */}
+                          {canSpectate && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => spectateTournamentMatch(match.id)}
+                              leftIcon={<FaEye />}
+                              className="w-full mt-1 text-xs font-mono font-bold bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/50 text-cyan-200 shadow-md flex items-center justify-center gap-1.5 py-1.5"
+                            >
+                              Spectate Live Match
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between text-slate-200">
-                  <span>{slotMap.get(capacity - 1)?.playerName ?? `Seed #${capacity} (Slot ${capacity})`}</span>
-                  <span className="text-[10px] text-slate-400">Seed {capacity}</span>
+              ))}
+            </div>
+          ) : (
+            /* Unstarted Tournament Bracket Preview */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs font-mono font-bold text-amber-400">
+                  <span>SEMIFINAL 1</span>
+                  <span className="text-[10px] text-slate-400">Feeds Final Slot A</span>
+                </div>
+                <div className="flex flex-col gap-1.5 font-mono text-xs">
+                  <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between text-slate-200">
+                    <span>{slotMap.get(0)?.playerName ?? "Seed #1 (Slot 1)"}</span>
+                    <span className="text-[10px] text-amber-400">Seed 1</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between text-slate-200">
+                    <span>
+                      {slotMap.get(capacity - 1)?.playerName ??
+                        `Seed #${capacity} (Slot ${capacity})`}
+                    </span>
+                    <span className="text-[10px] text-slate-400">Seed {capacity}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs font-mono font-bold text-cyan-400">
+                  <span>SEMIFINAL 2</span>
+                  <span className="text-[10px] text-slate-400">Feeds Final Slot B</span>
+                </div>
+                <div className="flex flex-col gap-1.5 font-mono text-xs">
+                  <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between text-slate-200">
+                    <span>{slotMap.get(1)?.playerName ?? "Seed #2 (Slot 2)"}</span>
+                    <span className="text-[10px] text-cyan-400">Seed 2</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between text-slate-200">
+                    <span>
+                      {slotMap.get(capacity - 2)?.playerName ??
+                        `Seed #${capacity - 1} (Slot ${capacity - 1})`}
+                    </span>
+                    <span className="text-[10px] text-slate-400">Seed {capacity - 1}</span>
+                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Semifinal 2 */}
-            <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs font-mono font-bold text-cyan-400">
-                <span>SEMIFINAL 2</span>
-                <span className="text-[10px] text-slate-400">Feeds Final Slot B</span>
-              </div>
-              <div className="flex flex-col gap-1.5 font-mono text-xs">
-                <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between text-slate-200">
-                  <span>{slotMap.get(1)?.playerName ?? "Seed #2 (Slot 2)"}</span>
-                  <span className="text-[10px] text-cyan-400">Seed 2</span>
-                </div>
-                <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between text-slate-200">
-                  <span>{slotMap.get(capacity - 2)?.playerName ?? `Seed #${capacity - 1} (Slot ${capacity - 1})`}</span>
-                  <span className="text-[10px] text-slate-400">Seed {capacity - 1}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Victory Podium Dialog / Modal */}
@@ -401,7 +590,7 @@ export function TournamentLobbyScreen() {
               </div>
 
               {/* Placements Table */}
-              <div className="w-full flex flex-col gap-2 p-3 rounded-2xl bg-slate-950/80 border border-amber-500/20 font-mono text-xs">
+              <div className="w-full flex flex-col gap-2 p-3 rounded-2xl bg-slate-950/80 border border-amber-500/20 font-mono text-xs max-h-60 overflow-y-auto">
                 {championData.placements.map((pl) => (
                   <div
                     key={pl.participantId}
@@ -410,7 +599,9 @@ export function TournamentLobbyScreen() {
                         ? "bg-amber-500/20 border border-amber-500/50 text-amber-300 font-bold"
                         : pl.placement === 2
                           ? "bg-slate-800/50 text-slate-200"
-                          : "text-slate-400"
+                          : pl.placement === 3
+                            ? "bg-amber-950/30 text-amber-400"
+                            : "text-slate-400"
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -419,7 +610,9 @@ export function TournamentLobbyScreen() {
                           ? "🥇 1st Place"
                           : pl.placement === 2
                             ? "🥈 2nd Place"
-                            : "🥉 Semifinalist"}
+                            : pl.placement === 3
+                              ? "🥉 3rd Place"
+                              : `${pl.placement}th Place`}
                       </span>
                       <span>{pl.name}</span>
                     </div>
@@ -438,7 +631,7 @@ export function TournamentLobbyScreen() {
                 leftIcon={<GiFist />}
                 className="w-full shadow-lg shadow-amber-500/30"
               >
-                Return to Command Hub
+                Leave Championship & Return to Command Hub
               </Button>
             </div>
           </div>

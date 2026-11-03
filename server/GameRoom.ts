@@ -195,6 +195,7 @@ export class GameRoom extends Room {
   public tournamentId?: string;
   public tournamentMatchId?: string;
   public onMatchComplete?: (summary: MatchSummaryPayload) => void;
+  public spectatorSessions = new Set<string>();
 
   getGameMode(): GameMode {
     return this.gameMode;
@@ -285,7 +286,7 @@ export class GameRoom extends Room {
     const requestedLevelId = options.levelId && options.levelId in LEVELS ? options.levelId : "thunder-dome-alpha";
     this.level = LEVELS[requestedLevelId];
 
-    this.maxClients = this.gameMode.maxPlayers;
+    this.maxClients = this.tournamentId ? this.gameMode.maxPlayers + 16 : this.gameMode.maxPlayers;
     this.autoDispose = true;
     this.patchRate = Number(process.env.PATCH_RATE_MS ?? NETWORK_PATCH_RATE_MS);
 
@@ -481,6 +482,20 @@ export class GameRoom extends Room {
       this.clients.push(client);
     }
 
+    const rawOpts = (typeof options === "object" && options !== null ? options : {}) as Record<string, unknown>;
+    const isSpectator = Boolean(rawOpts.isSpectator);
+
+    if (isSpectator) {
+      this.spectatorSessions.add(client.sessionId);
+      console.log(`👁️ Spectator joined: ${auth.playerName} (${auth.playerId}) [Session: ${client.sessionId}]`);
+      client.send("spectator:joined", {
+        matchStatus: this.state.matchStatus,
+        serverTick: this.state.serverTick,
+        serverName: (this as any)._listing?.metadata?.serverName ?? "Thunder Dome Arena",
+      });
+      return;
+    }
+
     // Optional requested team index from client join options
     const requestedTeam =
       typeof options === "object" &&
@@ -573,6 +588,17 @@ export class GameRoom extends Room {
   // ==================================================
 
   onLeave(client: Client) {
+    if (this.spectatorSessions.has(client.sessionId)) {
+      this.spectatorSessions.delete(client.sessionId);
+      if (this.clients) {
+        const clientIndex = this.clients.indexOf(client);
+        if (clientIndex !== -1) {
+          this.clients.splice(clientIndex, 1);
+        }
+      }
+      return;
+    }
+
     const auth = client.auth as AuthenticatedUser | undefined;
     const playerName = auth?.playerName ?? client.sessionId;
     console.log(`👋 Player leaving: ${playerName} [Session: ${client.sessionId}]`);

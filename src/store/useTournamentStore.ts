@@ -30,16 +30,23 @@ import type {
   TournamentChampionCrownedPayload,
   TournamentUpdateSettingsPayload,
   TournamentKickedPayload,
+  TournamentBracketUpdatedPayload,
+  TournamentSpectateGrantedPayload,
 } from "../../shared/contracts/network/TournamentMessages";
 import {
   TournamentClientMessage,
   TournamentServerMessage,
 } from "../../shared/contracts/network/TournamentMessages";
+import type {
+  ITournamentStage,
+  ITournamentParticipant,
+} from "../../shared/domain/tournament/TournamentTypes";
 import type { TournamentLobbyState } from "../../server/tournament/TournamentLobbyState";
 import {
   connectWithDualTransport,
   setCachedCertificateFingerprint,
 } from "../config/network";
+import { useAppStore } from "./useAppStore";
 import { useAuthStore } from "./useAuthStore";
 import { useNavigationStore } from "./useNavigationStore";
 import { useMatchmakingStore } from "./useMatchmakingStore";
@@ -51,6 +58,9 @@ interface TournamentStoreState {
   lobbyRevision: number;
   assignedMatch: TournamentMatchAssignedPayload | null;
   championData: TournamentChampionCrownedPayload | null;
+  bracketTree: { stages: ITournamentStage[]; participants: ITournamentParticipant[] } | null;
+  isSpectatingMatch: boolean;
+  spectatingMatchData: TournamentSpectateGrantedPayload | null;
   isLoading: boolean;
   isSearching: boolean;
   error: string | null;
@@ -65,6 +75,8 @@ interface TournamentStoreState {
   kickParticipant: (targetSessionId: string) => void;
   startTournament: () => void;
   leaveTournament: () => void;
+  spectateTournamentMatch: (matchId: string) => void;
+  returnToTournamentHub: () => Promise<void>;
   dismissAssignedMatch: () => void;
   dismissChampion: () => void;
   clearError: () => void;
@@ -77,6 +89,9 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
   lobbyRevision: 0,
   assignedMatch: null,
   championData: null,
+  bracketTree: null,
+  isSpectatingMatch: false,
+  spectatingMatchData: null,
   isLoading: false,
   isSearching: false,
   error: null,
@@ -155,9 +170,35 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
       );
 
       // Listen for bracket updates
-      room.onMessage(TournamentServerMessage.BRACKET_UPDATED, () => {
-        set((prev) => ({ lobbyRevision: prev.lobbyRevision + 1 }));
-      });
+      room.onMessage(
+        TournamentServerMessage.BRACKET_UPDATED,
+        (payload: TournamentBracketUpdatedPayload) => {
+          if (payload?.stages && payload?.participants) {
+            set({ bracketTree: { stages: payload.stages, participants: payload.participants } });
+          }
+          set((prev) => ({ lobbyRevision: prev.lobbyRevision + 1 }));
+        },
+      );
+
+      // Listen for spectate granted
+      room.onMessage(
+        TournamentServerMessage.SPECTATE_GRANTED,
+        (payload: TournamentSpectateGrantedPayload) => {
+          console.log("👁️ [TournamentStore] Spectate granted:", payload);
+          if (payload.fingerprint) {
+            setCachedCertificateFingerprint(payload.fingerprint);
+          }
+          set({ isSpectatingMatch: true, spectatingMatchData: payload });
+
+          useMatchmakingStore.setState({
+            seatReservation: payload.reservation,
+            targetRoomId: payload.gameRoomId,
+          });
+
+          useNavigationStore.getState().setSelectedMatchMode("1v1");
+          useNavigationStore.getState().navigateTo("MATCH_LOADING");
+        },
+      );
 
       // Listen for champion crowned
       room.onMessage(
@@ -240,9 +281,36 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
         },
       );
 
-      room.onMessage(TournamentServerMessage.BRACKET_UPDATED, () => {
-        set((prev) => ({ lobbyRevision: prev.lobbyRevision + 1 }));
-      });
+      // Listen for bracket updates
+      room.onMessage(
+        TournamentServerMessage.BRACKET_UPDATED,
+        (payload: TournamentBracketUpdatedPayload) => {
+          if (payload?.stages && payload?.participants) {
+            set({ bracketTree: { stages: payload.stages, participants: payload.participants } });
+          }
+          set((prev) => ({ lobbyRevision: prev.lobbyRevision + 1 }));
+        },
+      );
+
+      // Listen for spectate granted
+      room.onMessage(
+        TournamentServerMessage.SPECTATE_GRANTED,
+        (payload: TournamentSpectateGrantedPayload) => {
+          console.log("👁️ [TournamentStore] Spectate granted:", payload);
+          if (payload.fingerprint) {
+            setCachedCertificateFingerprint(payload.fingerprint);
+          }
+          set({ isSpectatingMatch: true, spectatingMatchData: payload });
+
+          useMatchmakingStore.setState({
+            seatReservation: payload.reservation,
+            targetRoomId: payload.gameRoomId,
+          });
+
+          useNavigationStore.getState().setSelectedMatchMode("1v1");
+          useNavigationStore.getState().navigateTo("MATCH_LOADING");
+        },
+      );
 
       room.onMessage(
         TournamentServerMessage.CHAMPION_CROWNED,
@@ -337,7 +405,44 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
     }
   },
 
-  leaveTournament: () => {
+  spectateTournamentMatch: (matchId: string) => {
+    const activeRoom = get().activeRoom;
+    if (activeRoom) {
+      activeRoom.send(TournamentClientMessage.REQUEST_SPECTATE, {
+        tournamentId: get().lobbyState?.tournamentId ?? "",
+        matchId,
+      });
+    }
+  },
+
+  returnToTournamentHub: async () => {
+    const gameRoom = useAppStore.getState().room;
+    if (gameRoom) {
+      try {
+        await gameRoom.leave();
+      } catch {
+        // Ignored
+      }
+      useAppStore.getState().setRoom(null);
+    }
+    set({
+      isSpectatingMatch: false,
+      spectatingMatchData: null,
+      assignedMatch: null,
+    });
+    useNavigationStore.getState().navigateTo("TOURNAMENT_LOBBY");
+  },
+
+  leaveTournament: async () => {
+    const gameRoom = useAppStore.getState().room;
+    if (gameRoom) {
+      try {
+        await gameRoom.leave();
+      } catch {
+        // Ignored
+      }
+      useAppStore.getState().setRoom(null);
+    }
     const activeRoom = get().activeRoom;
     if (activeRoom) {
       try {
@@ -352,10 +457,11 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
       lobbyRevision: 0,
       assignedMatch: null,
       championData: null,
+      bracketTree: null,
+      isSpectatingMatch: false,
+      spectatingMatchData: null,
       isLoading: false,
     });
-    if (useNavigationStore.getState().currentScreen === "TOURNAMENT_LOBBY") {
-      useNavigationStore.getState().navigateTo("MAIN_MENU");
-    }
+    useNavigationStore.getState().navigateTo("MAIN_MENU");
   },
 }));

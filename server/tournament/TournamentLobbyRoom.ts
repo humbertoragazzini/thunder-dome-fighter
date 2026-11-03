@@ -30,6 +30,8 @@ import {
   type TournamentMatchAssignedPayload,
   type TournamentChampionCrownedPayload,
   type TournamentPlacementItem,
+  type TournamentRequestSpectatePayload,
+  type TournamentSpectateGrantedPayload,
 } from "../../shared/contracts/network/TournamentMessages.js";
 import {
   TournamentLobbyState,
@@ -176,6 +178,66 @@ export class TournamentLobbyRoom extends Room<{ state: TournamentLobbyState }> {
       },
     );
 
+    this.onMessage(
+      TournamentClientMessage.REQUEST_SPECTATE,
+      async (client: Client, payload: TournamentRequestSpectatePayload) => {
+        try {
+          const tournament = await tournamentCoordinatorService.getTournament(this.state.tournamentId);
+          if (!tournament) return;
+
+          let targetMatch: ITournamentMatch | undefined;
+          for (const s of tournament.stages) {
+            for (const r of s.rounds) {
+              for (const m of r.matches) {
+                if (m.id === payload.matchId) {
+                  targetMatch = m;
+                  break;
+                }
+              }
+              if (targetMatch) break;
+            }
+            if (targetMatch) break;
+          }
+
+          if (!targetMatch || !targetMatch.gameRoomId || targetMatch.status !== "IN_PROGRESS") {
+            return;
+          }
+
+          const localRoom = matchMaker.getLocalRoomById(targetMatch.gameRoomId);
+          const roomListing = localRoom ?? { roomId: targetMatch.gameRoomId };
+          const token = this.clientTokens.get(client.sessionId) ?? "";
+          const user = this.getAuthUser(client);
+
+          const reservation = await matchMaker.reserveSeatFor(roomListing as any, {
+            token,
+            playerId: user?.playerId ?? "",
+            playerName: user?.playerName ?? "Spectator",
+            avatarUrl: "",
+            modeId: "1v1",
+            isSpectator: true,
+          });
+
+          const pA = tournament.participants.find((p) => p.id === targetMatch!.participantAId);
+          const pB = tournament.participants.find((p) => p.id === targetMatch!.participantBId);
+
+          const response: TournamentSpectateGrantedPayload = {
+            tournamentId: this.state.tournamentId,
+            matchId: targetMatch.id,
+            roundName: targetMatch.roundName,
+            gameRoomId: targetMatch.gameRoomId,
+            reservation,
+            participantAName: pA?.name ?? "Fighter 1",
+            participantBName: pB?.name ?? "Fighter 2",
+            fingerprint: getWebTransportFingerprint(),
+          };
+
+          client.send(TournamentServerMessage.SPECTATE_GRANTED, response);
+        } catch (err) {
+          console.error("[TournamentLobby] Spectate reservation failed:", err);
+        }
+      },
+    );
+
     this.onMessage(TournamentClientMessage.START_TOURNAMENT, async (client: Client) => {
       if (client.sessionId !== this.state.hostSessionId) {
         return;
@@ -249,6 +311,13 @@ export class TournamentLobbyRoom extends Room<{ state: TournamentLobbyState }> {
         console.log(
           `🏆 [TournamentLobby] Tournament ${tournament.id} launched with ${combatants.length} fighters in round '${this.state.currentRoundName}'!`,
         );
+
+        // Broadcast initial bracket state
+        this.broadcast(TournamentServerMessage.BRACKET_UPDATED, {
+          tournamentId: tournament.id,
+          stages: tournament.stages,
+          participants: tournament.participants,
+        });
 
         // Spawn all opening round matches concurrently
         if (initialRound && initialRound.matches) {
@@ -384,6 +453,9 @@ export class TournamentLobbyRoom extends Room<{ state: TournamentLobbyState }> {
         for (const p of this.state.participants.values()) {
           if (p.playerId === loser.playerId) {
             p.isEliminated = true;
+            if (loser.finalPlacement) {
+              p.finalPlacement = loser.finalPlacement;
+            }
           }
         }
       }
@@ -392,9 +464,18 @@ export class TournamentLobbyRoom extends Room<{ state: TournamentLobbyState }> {
       this.broadcast(TournamentServerMessage.BRACKET_UPDATED, {
         tournamentId: this.state.tournamentId,
         lastCompletedMatchId: match.id,
+        stages: tournament.stages,
+        participants: tournament.participants,
       });
     } else if (event.type === "MATCH_SCHEDULED" && event.match) {
       const match: ITournamentMatch = event.match;
+      const tournament = event.tournament;
+
+      this.broadcast(TournamentServerMessage.BRACKET_UPDATED, {
+        tournamentId: this.state.tournamentId,
+        stages: tournament.stages,
+        participants: tournament.participants,
+      });
 
       // When downstream match (e.g. Grand Final) has both combatants resolved, automatically spawn it!
       if (match.participantAId && match.participantBId && match.status === "SCHEDULED") {
@@ -553,6 +634,18 @@ export class TournamentLobbyRoom extends Room<{ state: TournamentLobbyState }> {
       status: this.state.status,
       currentRoundName: this.state.currentRoundName,
     });
+
+    if (this.state.status === "IN_PROGRESS" || this.state.status === "COMPLETED") {
+      tournamentCoordinatorService.getTournament(this.state.tournamentId).then((t) => {
+        if (t) {
+          client.send(TournamentServerMessage.BRACKET_UPDATED, {
+            tournamentId: t.id,
+            stages: t.stages,
+            participants: t.participants,
+          });
+        }
+      }).catch(() => {});
+    }
   }
 
   override onLeave(client: Client): void {

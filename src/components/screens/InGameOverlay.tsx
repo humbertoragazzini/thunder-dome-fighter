@@ -24,6 +24,7 @@ import { useAppStore } from "../../store/useAppStore";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useNavigationStore } from "../../store/useNavigationStore";
 import { useNetworkDiagnosticsStore } from "../../store/useNetworkDiagnosticsStore";
+import { useTournamentStore } from "../../store/useTournamentStore";
 import { Badge } from "../ui/atoms/Badge";
 import { Button } from "../ui/atoms/Button";
 import { MatchPowerHUD } from "../ui/molecules/MatchPowerHUD";
@@ -146,6 +147,35 @@ export function InGameOverlay() {
   const activeTransport = useNetworkDiagnosticsStore((state) => state.activeTransport);
   const ping = useNetworkDiagnosticsStore((state) => state.ping);
   const fps = useNetworkDiagnosticsStore((state) => state.fps);
+
+  const isTournamentActive = Boolean(
+    useTournamentStore((state) => state.activeRoom) ||
+    useTournamentStore((state) => state.assignedMatch) ||
+    useTournamentStore((state) => state.isSpectatingMatch)
+  );
+  const isSpectatingMatch = useTournamentStore((state) => state.isSpectatingMatch);
+  const returnToTournamentHub = useTournamentStore((state) => state.returnToTournamentHub);
+  const leaveTournament = useTournamentStore((state) => state.leaveTournament);
+
+  const [autoReturnCountdown, setAutoReturnCountdown] = useState<number>(10);
+
+  // Auto-return countdown timer back to tournament hub upon MATCH_END
+  useEffect(() => {
+    if (matchStatus === "MATCH_END" && isTournamentActive) {
+      setAutoReturnCountdown(10);
+      const timer = setInterval(() => {
+        setAutoReturnCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            returnToTournamentHub();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [matchStatus, isTournamentActive, returnToTournamentHub]);
 
   // Activate network diagnostics sampling while in combat
   useEffect(() => {
@@ -294,6 +324,9 @@ export function InGameOverlay() {
             }
             setNearbyWeapon(detectedWeapon);
           }
+        } else if (allFightersList.length >= 2) {
+          setLocalFighter(allFightersList[0]);
+          setOpponentFighter(allFightersList[1]);
         }
         if (foundOpponent) setOpponentFighter(foundOpponent);
       }
@@ -417,7 +450,11 @@ export function InGameOverlay() {
                 className="text-[11px] text-slate-400 font-bold uppercase tracking-wider"
                 style={{ fontFamily: "var(--font-tech)" }}
               >
-                Fighter: {playerName}
+                {isSpectatingMatch ? (
+                  <span className="text-amber-400 font-bold">Role: Spectator</span>
+                ) : (
+                  `Fighter: ${playerName}`
+                )}
               </span>
             </div>
           </div>
@@ -482,6 +519,17 @@ export function InGameOverlay() {
             >
               Menu <span className="hidden sm:inline text-xs text-slate-400 font-mono">[ESC]</span>
             </Button>
+
+            {isSpectatingMatch && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={returnToTournamentHub}
+                className="shadow-lg border-amber-500/50 bg-amber-500/20 text-amber-300 font-mono text-xs"
+              >
+                Exit to Hub
+              </Button>
+            )}
           </div>
         </div>
 
@@ -966,24 +1014,44 @@ export function InGameOverlay() {
         </div>
 
         {/* Bottom Bar: Weapon Equipment HUD & Controls Guide */}
-        <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between w-full gap-3">
-          {/* Controls Hints */}
-          <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/85 backdrop-blur-md border border-slate-800/80 px-4 py-2.5 rounded-xl text-xs text-slate-300 shadow-lg">
-            <GiGamepad className="text-amber-400 text-lg flex-shrink-0" />
-            <span style={{ fontFamily: "var(--font-tech)" }}>
-              Move: <strong className="text-amber-400">W/S</strong> • Turn: <strong className="text-amber-400">A/D</strong> • Strafe: <strong className="text-amber-400">Q/E</strong> • Jump: <strong className="text-amber-400">SPACE</strong> • Attack: <strong className="text-amber-400">J/I</strong> (Click) • Kick: <strong className="text-amber-400">K</strong> • Push: <strong className="text-amber-400">L</strong> • Pickup: <strong className="text-emerald-400">E</strong> • Drop: <strong className="text-red-400">G</strong> • Scoreboard: <strong className="text-cyan-400">TAB</strong>
+        {isSpectatingMatch ? (
+          <div className="flex items-center justify-between w-full pointer-events-auto bg-slate-900/90 backdrop-blur-md border border-amber-500/40 px-4 py-2.5 rounded-xl text-xs text-slate-300 shadow-xl font-mono">
+            <span className="text-amber-400 font-bold flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              SPECTATOR CAMERA ACTIVE
             </span>
+            <span className="text-slate-400">
+              Drag to Orbit Camera • Mouse Wheel to Zoom
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={returnToTournamentHub}
+              className="text-xs font-mono py-1 px-3"
+            >
+              Exit to Hub
+            </Button>
           </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between w-full gap-3">
+            {/* Controls Hints */}
+            <div className="pointer-events-auto flex items-center gap-2 bg-slate-900/85 backdrop-blur-md border border-slate-800/80 px-4 py-2.5 rounded-xl text-xs text-slate-300 shadow-lg">
+              <GiGamepad className="text-amber-400 text-lg flex-shrink-0" />
+              <span style={{ fontFamily: "var(--font-tech)" }}>
+                Move: <strong className="text-amber-400">W/S</strong> • Turn: <strong className="text-amber-400">A/D</strong> • Strafe: <strong className="text-amber-400">Q/E</strong> • Jump: <strong className="text-amber-400">SPACE</strong> • Attack: <strong className="text-amber-400">J/I</strong> (Click) • Kick: <strong className="text-amber-400">K</strong> • Push: <strong className="text-amber-400">L</strong> • Pickup: <strong className="text-emerald-400">E</strong> • Drop: <strong className="text-red-400">G</strong> • Scoreboard: <strong className="text-cyan-400">TAB</strong>
+              </span>
+            </div>
 
-          {/* Equipped Weapon HUD */}
-          <WeaponHUD
-            heldItemId={localFighter.heldItemId ?? "FISTS"}
-            ammo={localFighter.ammo ?? 0}
-            nearbyWeapon={nearbyWeapon}
-            onInteract={() => room?.send("player:interact")}
-            onDropWeapon={() => room?.send("player:drop-weapon")}
-          />
-        </div>
+            {/* Equipped Weapon HUD */}
+            <WeaponHUD
+              heldItemId={localFighter.heldItemId ?? "FISTS"}
+              ammo={localFighter.ammo ?? 0}
+              nearbyWeapon={nearbyWeapon}
+              onInteract={() => room?.send("player:interact")}
+              onDropWeapon={() => room?.send("player:drop-weapon")}
+            />
+          </div>
+        )}
       </div>
 
       {/* Live In-Game Scoreboard Modal (Tab Toggle) */}
@@ -1004,12 +1072,15 @@ export function InGameOverlay() {
       {matchStatus === "MATCH_END" && (
         <MatchScoreboardModal
           isOpen={true}
-          title={isWinner ? "Victory!" : winningPlayerId ? "Defeat" : "Match Concluded"}
+          title={isSpectatingMatch ? "Match Concluded" : isWinner ? "Victory!" : winningPlayerId ? "Defeat" : "Match Concluded"}
           gameModeName={(room as any)?.state?.modeId ?? "1v1 Duel"}
           arenaName={roomName}
           participants={scoreboardParticipants}
           isPostMatch={true}
-          onReturnToMenu={handleReturnToMenu}
+          isTournament={isTournamentActive}
+          onReturnToTournament={returnToTournamentHub}
+          autoReturnSeconds={autoReturnCountdown}
+          onReturnToMenu={isTournamentActive ? leaveTournament : handleReturnToMenu}
         />
       )}
 

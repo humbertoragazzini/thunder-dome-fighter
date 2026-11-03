@@ -35,6 +35,7 @@ import {
 import HavokPhysics from "@babylonjs/havok";
 
 import { useAppStore } from "../store/useAppStore";
+import { useTournamentStore } from "../store/useTournamentStore";
 import { LocalPlayerPrediction } from "./LocalPlayerPrediction";
 import { RemotePlayerInterpolation } from "./RemotePlayerInterpolation";
 import { CharacterInputController } from "../input/CharacterInputController";
@@ -165,7 +166,14 @@ export function BabylonCanvas({ onSceneReady }: BabylonCanvasProps) {
         scene,
       );
 
-      camera.lockedTarget = localPlayerRig.rootNode;
+      const isSpectator = useTournamentStore.getState().isSpectatingMatch;
+      if (isSpectator) {
+        camera.setTarget(new Vector3(0, 1.5, 0));
+        camera.radius = 16;
+        localPlayerRig.rootNode.setEnabled(false);
+      } else {
+        camera.lockedTarget = localPlayerRig.rootNode;
+      }
       camera.attachControl(canvas, true);
 
       // Prevent WASD and Arrow keys from rotating the camera
