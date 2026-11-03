@@ -53,6 +53,9 @@ export function TournamentLobbyScreen() {
   const dismissChampion = useTournamentStore((state) => state.dismissChampion);
   const bracketTree = useTournamentStore((state) => state.bracketTree);
   const spectateTournamentMatch = useTournamentStore((state) => state.spectateTournamentMatch);
+  const assignedMatch = useTournamentStore((state) => state.assignedMatch);
+  const proceedToAssignedMatch = useTournamentStore((state) => state.proceedToAssignedMatch);
+  const requestMatchReservation = useTournamentStore((state) => state.requestMatchReservation);
 
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -167,6 +170,34 @@ export function TournamentLobbyScreen() {
       }
     >
       <div className="w-full max-w-5xl flex flex-col gap-6 py-4">
+        {/* Match Ready Hero Banner */}
+        {assignedMatch && (
+          <div className="w-full p-4 rounded-3xl bg-gradient-to-r from-amber-950/80 via-slate-900/90 to-amber-950/80 border-2 border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.35)] flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-300 text-2xl shrink-0">
+                <GiTrophyCup />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-black text-amber-300 text-sm uppercase tracking-wider font-mono">
+                  Your Match is Ready: {assignedMatch.roundName}!
+                </span>
+                <span className="text-xs text-slate-300 font-mono">
+                  Opponent: <span className="font-bold text-white">{assignedMatch.opponentName}</span>
+                </span>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={proceedToAssignedMatch}
+              leftIcon={<GiBoxingGlove />}
+              className="w-full sm:w-auto bg-amber-400 text-slate-950 font-black hover:bg-amber-300 shadow-xl"
+            >
+              Enter Arena Now
+            </Button>
+          </div>
+        )}
+
         {/* Championship Status & Launch Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-gradient-to-r from-amber-950/60 via-slate-900/90 to-cyan-950/60 border border-amber-500/30 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center gap-3.5 min-w-0">
@@ -503,6 +534,25 @@ export function TournamentLobbyScreen() {
                                 : "-"}
                             </span>
                           </div>
+
+                          {/* Combatant Enter Match Button */}
+                          {isLocalInMatch && (match.status === "SCHEDULED" || match.status === "IN_PROGRESS") && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => {
+                                if (assignedMatch?.matchId === match.id) {
+                                  proceedToAssignedMatch();
+                                } else {
+                                  requestMatchReservation(match.id);
+                                }
+                              }}
+                              leftIcon={<GiBoxingGlove />}
+                              className="w-full mt-1 text-xs font-mono font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md flex items-center justify-center gap-1.5 py-1.5 animate-pulse"
+                            >
+                              Enter Your Match ({match.roundName})
+                            </Button>
+                          )}
 
                           {/* Spectate Button */}
                           {canSpectate && (

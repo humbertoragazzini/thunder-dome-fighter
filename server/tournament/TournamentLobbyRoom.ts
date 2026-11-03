@@ -32,6 +32,7 @@ import {
   type TournamentPlacementItem,
   type TournamentRequestSpectatePayload,
   type TournamentSpectateGrantedPayload,
+  type TournamentRequestMatchReservationPayload,
 } from "../../shared/contracts/network/TournamentMessages.js";
 import {
   TournamentLobbyState,
@@ -234,6 +235,83 @@ export class TournamentLobbyRoom extends Room<{ state: TournamentLobbyState }> {
           client.send(TournamentServerMessage.SPECTATE_GRANTED, response);
         } catch (err) {
           console.error("[TournamentLobby] Spectate reservation failed:", err);
+        }
+      },
+    );
+
+    this.onMessage(
+      TournamentClientMessage.REQUEST_MATCH_RESERVATION,
+      async (client: Client, payload: TournamentRequestMatchReservationPayload) => {
+        try {
+          const tournament = await tournamentCoordinatorService.getTournament(this.state.tournamentId);
+          if (!tournament) return;
+
+          let targetMatch: ITournamentMatch | undefined;
+          for (const s of tournament.stages) {
+            for (const r of s.rounds) {
+              for (const m of r.matches) {
+                if (m.id === payload.matchId) {
+                  targetMatch = m;
+                  break;
+                }
+              }
+              if (targetMatch) break;
+            }
+            if (targetMatch) break;
+          }
+
+          if (!targetMatch || !targetMatch.gameRoomId) {
+            return;
+          }
+
+          const user = this.getAuthUser(client);
+          if (!user) return;
+
+          const pA = tournament.participants.find((p) => p.id === targetMatch!.participantAId);
+          const pB = tournament.participants.find((p) => p.id === targetMatch!.participantBId);
+
+          const isPartA = pA?.playerId === user.playerId;
+          const isPartB = pB?.playerId === user.playerId;
+
+          if (!isPartA && !isPartB) {
+            console.warn(`[TournamentLobby] Client ${user.playerName} is not a combatant in match ${targetMatch.id}`);
+            return;
+          }
+
+          const myParticipant = isPartA ? pA! : pB!;
+          const opponent = isPartA ? pB : pA;
+          const teamIndex = isPartA ? 0 : 1;
+          const slot = isPartA ? "A" : "B";
+
+          const localRoom = matchMaker.getLocalRoomById(targetMatch.gameRoomId);
+          const roomListing = localRoom ?? { roomId: targetMatch.gameRoomId };
+          const token = this.clientTokens.get(client.sessionId) ?? "";
+
+          const reservation = await matchMaker.reserveSeatFor(roomListing as any, {
+            token,
+            playerId: myParticipant.playerId ?? user.playerId,
+            playerName: myParticipant.name,
+            avatarUrl: myParticipant.avatarUrl ?? "",
+            modeId: "1v1",
+            teamIndex,
+          });
+
+          const matchAssignedPayload: TournamentMatchAssignedPayload = {
+            tournamentId: this.state.tournamentId,
+            matchId: targetMatch.id,
+            roundName: targetMatch.roundName,
+            gameRoomId: targetMatch.gameRoomId,
+            reservation,
+            opponentName: opponent?.name ?? "Opponent",
+            opponentAvatarUrl: opponent?.avatarUrl,
+            slot,
+            fingerprint: getWebTransportFingerprint(),
+          };
+
+          client.send(TournamentServerMessage.MATCH_ASSIGNED, matchAssignedPayload);
+          console.log(`🏆 [TournamentLobby] Re-dispatched match reservation to ${myParticipant.name} for ${targetMatch.roundName}`);
+        } catch (err) {
+          console.error("[TournamentLobby] Error in REQUEST_MATCH_RESERVATION:", err);
         }
       },
     );
@@ -636,13 +714,64 @@ export class TournamentLobbyRoom extends Room<{ state: TournamentLobbyState }> {
     });
 
     if (this.state.status === "IN_PROGRESS" || this.state.status === "COMPLETED") {
-      tournamentCoordinatorService.getTournament(this.state.tournamentId).then((t) => {
+      tournamentCoordinatorService.getTournament(this.state.tournamentId).then(async (t) => {
         if (t) {
           client.send(TournamentServerMessage.BRACKET_UPDATED, {
             tournamentId: t.id,
             stages: t.stages,
             participants: t.participants,
           });
+
+          // Check if joining player is a combatant in an active/scheduled match
+          if (this.state.status === "IN_PROGRESS") {
+            for (const stage of t.stages) {
+              for (const round of stage.rounds) {
+                for (const m of round.matches) {
+                  if (m.gameRoomId && (m.status === "SCHEDULED" || m.status === "IN_PROGRESS")) {
+                    const pA = t.participants.find((p) => p.id === m.participantAId);
+                    const pB = t.participants.find((p) => p.id === m.participantBId);
+                    const isPartA = pA?.playerId === user.playerId;
+                    const isPartB = pB?.playerId === user.playerId;
+
+                    if (isPartA || isPartB) {
+                      const myParticipant = isPartA ? pA! : pB!;
+                      const opponent = isPartA ? pB : pA;
+                      const teamIndex = isPartA ? 0 : 1;
+                      const slot = isPartA ? "A" : "B";
+
+                      const localRoom = matchMaker.getLocalRoomById(m.gameRoomId);
+                      const roomListing = localRoom ?? { roomId: m.gameRoomId };
+                      const token = this.clientTokens.get(client.sessionId) ?? "";
+
+                      const reservation = await matchMaker.reserveSeatFor(roomListing as any, {
+                        token,
+                        playerId: myParticipant.playerId ?? user.playerId,
+                        playerName: myParticipant.name,
+                        avatarUrl: myParticipant.avatarUrl ?? "",
+                        modeId: "1v1",
+                        teamIndex,
+                      });
+
+                      const matchAssignedPayload: TournamentMatchAssignedPayload = {
+                        tournamentId: this.state.tournamentId,
+                        matchId: m.id,
+                        roundName: m.roundName,
+                        gameRoomId: m.gameRoomId,
+                        reservation,
+                        opponentName: opponent?.name ?? "Opponent",
+                        opponentAvatarUrl: opponent?.avatarUrl,
+                        slot,
+                        fingerprint: getWebTransportFingerprint(),
+                      };
+
+                      client.send(TournamentServerMessage.MATCH_ASSIGNED, matchAssignedPayload);
+                      console.log(`🏆 [TournamentLobby] Auto-dispatched match assignment to returning player ${myParticipant.name} for ${m.roundName}`);
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }).catch(() => {});
     }

@@ -154,12 +154,14 @@ export function InGameOverlay() {
     useTournamentStore((state) => state.isSpectatingMatch)
   );
   const isSpectatingMatch = useTournamentStore((state) => state.isSpectatingMatch);
+  const assignedMatch = useTournamentStore((state) => state.assignedMatch);
+  const proceedToAssignedMatch = useTournamentStore((state) => state.proceedToAssignedMatch);
   const returnToTournamentHub = useTournamentStore((state) => state.returnToTournamentHub);
   const leaveTournament = useTournamentStore((state) => state.leaveTournament);
 
   const [autoReturnCountdown, setAutoReturnCountdown] = useState<number>(10);
 
-  // Auto-return countdown timer back to tournament hub upon MATCH_END
+  // Auto-return or auto-proceed countdown timer upon MATCH_END
   useEffect(() => {
     if (matchStatus === "MATCH_END" && isTournamentActive) {
       setAutoReturnCountdown(10);
@@ -167,7 +169,12 @@ export function InGameOverlay() {
         setAutoReturnCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-            returnToTournamentHub();
+            const latestAssigned = useTournamentStore.getState().assignedMatch;
+            if (latestAssigned) {
+              proceedToAssignedMatch();
+            } else {
+              returnToTournamentHub();
+            }
             return 0;
           }
           return prev - 1;
@@ -175,7 +182,7 @@ export function InGameOverlay() {
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [matchStatus, isTournamentActive, returnToTournamentHub]);
+  }, [matchStatus, isTournamentActive, proceedToAssignedMatch, returnToTournamentHub]);
 
   // Activate network diagnostics sampling while in combat
   useEffect(() => {
@@ -1081,6 +1088,8 @@ export function InGameOverlay() {
           onReturnToTournament={returnToTournamentHub}
           autoReturnSeconds={autoReturnCountdown}
           onReturnToMenu={isTournamentActive ? leaveTournament : handleReturnToMenu}
+          nextRoundName={assignedMatch?.roundName}
+          onProceedToNextMatch={assignedMatch ? proceedToAssignedMatch : undefined}
         />
       )}
 

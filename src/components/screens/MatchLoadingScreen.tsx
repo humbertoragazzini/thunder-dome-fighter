@@ -69,11 +69,28 @@ export function MatchLoadingScreen() {
   useEffect(() => {
     isMountedRef.current = true;
 
-    // Guard against duplicate / concurrent connection attempts (e.g. React StrictMode or rapid double-clicks)
-    if (connectionLockRef.current || useAppStore.getState().room?.roomId) {
-      if (useAppStore.getState().room?.roomId) {
+    // Cleanly disconnect from any previous stale match room before connecting to the new target
+    const currentRoom = useAppStore.getState().room;
+    const reservation = useMatchmakingStore.getState().seatReservation;
+    const targetRoomId = useMatchmakingStore.getState().targetRoomId;
+
+    if (currentRoom) {
+      const isStale = Boolean(reservation || (targetRoomId && currentRoom.roomId !== targetRoomId));
+      if (isStale) {
+        try {
+          currentRoom.leave();
+        } catch {
+          // Ignored
+        }
+        setRoom(null);
+      } else {
         setLoadingStep("Synchronizing Havok physics world...");
+        return;
       }
+    }
+
+    // Guard against duplicate concurrent connection attempts
+    if (connectionLockRef.current) {
       return;
     }
 

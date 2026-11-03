@@ -49,6 +49,7 @@ export const TournamentClientMessage = {
   UPDATE_SETTINGS: "tournament:update-settings",
   KICK_PARTICIPANT: "tournament:kick-participant",
   REQUEST_SPECTATE: "tournament:request-spectate",
+  REQUEST_MATCH_RESERVATION: "tournament:request-match-reservation",
 } as const;
 
 export type TournamentClientMessageType =
@@ -65,6 +66,11 @@ export interface TournamentKickParticipantPayload {
 }
 
 export interface TournamentRequestSpectatePayload {
+  tournamentId: string;
+  matchId: string;
+}
+
+export interface TournamentRequestMatchReservationPayload {
   tournamentId: string;
   matchId: string;
 }

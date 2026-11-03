@@ -76,6 +76,8 @@ interface TournamentStoreState {
   startTournament: () => void;
   leaveTournament: () => void;
   spectateTournamentMatch: (matchId: string) => void;
+  proceedToAssignedMatch: () => Promise<void>;
+  requestMatchReservation: (matchId: string) => void;
   returnToTournamentHub: () => Promise<void>;
   dismissAssignedMatch: () => void;
   dismissChampion: () => void;
@@ -159,13 +161,17 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
           }
           set({ assignedMatch: payload });
 
-          useMatchmakingStore.setState({
-            seatReservation: payload.reservation,
-            targetRoomId: payload.gameRoomId,
-          });
+          const currentScreen = useNavigationStore.getState().currentScreen;
+          const currentRoom = useAppStore.getState().room;
 
-          useNavigationStore.getState().setSelectedMatchMode("1v1");
-          useNavigationStore.getState().navigateTo("MATCH_LOADING");
+          // If currently in an active game room (e.g. scoreboard), do not abruptly kick them out.
+          // The scoreboard / countdown will invoke proceedToAssignedMatch() cleanly.
+          if (currentScreen === "IN_GAME" && currentRoom) {
+            console.log("🏆 [TournamentStore] Match assigned while in combat/scoreboard. Ready to proceed upon match completion.");
+            return;
+          }
+
+          get().proceedToAssignedMatch();
         },
       );
 
@@ -271,13 +277,17 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
           }
           set({ assignedMatch: payload });
 
-          useMatchmakingStore.setState({
-            seatReservation: payload.reservation,
-            targetRoomId: payload.gameRoomId,
-          });
+          const currentScreen = useNavigationStore.getState().currentScreen;
+          const currentRoom = useAppStore.getState().room;
 
-          useNavigationStore.getState().setSelectedMatchMode("1v1");
-          useNavigationStore.getState().navigateTo("MATCH_LOADING");
+          // If currently in an active game room (e.g. scoreboard), do not abruptly kick them out.
+          // The scoreboard / countdown will invoke proceedToAssignedMatch() cleanly.
+          if (currentScreen === "IN_GAME" && currentRoom) {
+            console.log("🏆 [TournamentStore] Match assigned while in combat/scoreboard. Ready to proceed upon match completion.");
+            return;
+          }
+
+          get().proceedToAssignedMatch();
         },
       );
 
@@ -415,6 +425,48 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
     }
   },
 
+  proceedToAssignedMatch: async () => {
+    const assignedMatch = get().assignedMatch;
+    if (!assignedMatch) return;
+
+    if (assignedMatch.fingerprint) {
+      setCachedCertificateFingerprint(assignedMatch.fingerprint);
+    }
+
+    const oldGameRoom = useAppStore.getState().room;
+    if (oldGameRoom) {
+      try {
+        await oldGameRoom.leave();
+      } catch {
+        // Ignored
+      }
+      useAppStore.getState().setRoom(null);
+    }
+
+    set({
+      isSpectatingMatch: false,
+      spectatingMatchData: null,
+    });
+
+    useMatchmakingStore.setState({
+      seatReservation: assignedMatch.reservation,
+      targetRoomId: assignedMatch.gameRoomId,
+    });
+
+    useNavigationStore.getState().setSelectedMatchMode("1v1");
+    useNavigationStore.getState().navigateTo("MATCH_LOADING");
+  },
+
+  requestMatchReservation: (matchId: string) => {
+    const activeRoom = get().activeRoom;
+    if (activeRoom) {
+      activeRoom.send(TournamentClientMessage.REQUEST_MATCH_RESERVATION, {
+        tournamentId: get().lobbyState?.tournamentId ?? "",
+        matchId,
+      });
+    }
+  },
+
   returnToTournamentHub: async () => {
     const gameRoom = useAppStore.getState().room;
     if (gameRoom) {
@@ -428,7 +480,6 @@ export const useTournamentStore = create<TournamentStoreState>((set, get) => ({
     set({
       isSpectatingMatch: false,
       spectatingMatchData: null,
-      assignedMatch: null,
     });
     useNavigationStore.getState().navigateTo("TOURNAMENT_LOBBY");
   },

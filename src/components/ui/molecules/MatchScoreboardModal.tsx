@@ -49,6 +49,8 @@ export interface MatchScoreboardModalProps {
   isTournament?: boolean;
   onReturnToTournament?: () => void;
   autoReturnSeconds?: number;
+  nextRoundName?: string;
+  onProceedToNextMatch?: () => void;
 }
 
 function getWeaponIcon(itemId?: string) {
@@ -77,6 +79,8 @@ export function MatchScoreboardModal({
   isTournament = false,
   onReturnToTournament,
   autoReturnSeconds,
+  nextRoundName,
+  onProceedToNextMatch,
 }: MatchScoreboardModalProps) {
   if (!isOpen) return null;
 
@@ -253,25 +257,60 @@ export function MatchScoreboardModal({
         {isPostMatch && (
           <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row items-center justify-between gap-3">
             {isTournament ? (
-              <>
+              <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onReturnToMenu}
-                  className="text-slate-400 hover:text-rose-400 font-mono text-xs"
+                  className="text-slate-400 hover:text-rose-400 font-mono text-xs order-last sm:order-first"
                 >
                   Leave Tournament & Exit
                 </Button>
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={onReturnToTournament}
-                  leftIcon={<GiTrophyCup />}
-                  className="w-full sm:w-auto shadow-lg shadow-amber-500/20 font-bold"
-                >
-                  Return to Tournament Hub{typeof autoReturnSeconds === "number" && autoReturnSeconds > 0 ? ` (${autoReturnSeconds}s)` : ""}
-                </Button>
-              </>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+                  {onProceedToNextMatch ? (
+                    <>
+                      {onReturnToTournament && (
+                        <Button
+                          variant="secondary"
+                          size="md"
+                          onClick={onReturnToTournament}
+                          className="w-full sm:w-auto font-mono text-xs"
+                        >
+                          Return to Hub
+                        </Button>
+                      )}
+                      <Button
+                        variant="primary"
+                        size="lg"
+                        onClick={onProceedToNextMatch}
+                        leftIcon={<GiTrophyCup />}
+                        className="w-full sm:w-auto shadow-lg shadow-amber-500/30 font-bold bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 animate-pulse"
+                      >
+                        Proceed to {nextRoundName ?? "Next Round"}
+                        {typeof autoReturnSeconds === "number" && autoReturnSeconds > 0
+                          ? ` (${autoReturnSeconds}s)`
+                          : ""}
+                      </Button>
+                    </>
+                  ) : (
+                    onReturnToTournament && (
+                      <Button
+                        variant="primary"
+                        size="lg"
+                        onClick={onReturnToTournament}
+                        leftIcon={<GiTrophyCup />}
+                        className="w-full sm:w-auto shadow-lg shadow-amber-500/20 font-bold"
+                      >
+                        Return to Tournament Hub
+                        {typeof autoReturnSeconds === "number" && autoReturnSeconds > 0
+                          ? ` (${autoReturnSeconds}s)`
+                          : ""}
+                      </Button>
+                    )
+                  )}
+                </div>
+              </div>
             ) : (
               onReturnToMenu && (
                 <Button
