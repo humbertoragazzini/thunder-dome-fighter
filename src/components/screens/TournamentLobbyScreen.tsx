@@ -24,6 +24,7 @@ import {
   FaCheck,
   FaCopy,
   FaCrown,
+  FaGlobe,
   FaLock,
   FaTrophy,
   FaUser,
@@ -127,13 +128,17 @@ export function TournamentLobbyScreen() {
           </div>
 
           {/* Room Code Badge */}
-          {isPrivate && lobbyState?.roomCode ? (
+          {lobbyState?.roomCode ? (
             <button
               onClick={handleCopyCode}
-              title="Click to copy private tournament code"
+              title={`Click to copy tournament code (${isPrivate ? "Private" : "Public"})`}
               className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/80 border border-amber-500/40 text-amber-300 font-mono text-xs font-bold hover:bg-slate-800 transition-all cursor-pointer shadow-inner group"
             >
-              <FaLock className="text-[10px] text-amber-400" />
+              {isPrivate ? (
+                <FaLock className="text-[10px] text-amber-400" />
+              ) : (
+                <FaGlobe className="text-[10px] text-emerald-400" />
+              )}
               <span>{lobbyState.roomCode}</span>
               {copiedCode ? (
                 <FaCheck className="text-emerald-400 text-xs" />

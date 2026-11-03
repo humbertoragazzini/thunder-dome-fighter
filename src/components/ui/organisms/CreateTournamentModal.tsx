@@ -18,8 +18,8 @@
 // Gateway to initiating official 1v1 bracket tournaments.
 // ==================================================
 
-import { useState } from "react";
-import { FaCrown, FaGlobe, FaLock, FaXmark } from "react-icons/fa6";
+import { useState, useEffect } from "react";
+import { FaCrown, FaGlobe, FaLock, FaRotate, FaXmark } from "react-icons/fa6";
 import { GiTrophyCup, GiCrossedSwords, GiFist } from "react-icons/gi";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useNavigationStore } from "../../../store/useNavigationStore";
@@ -75,12 +75,16 @@ export function CreateTournamentModal(props: CreateTournamentModalProps = {}) {
 
   const player = useAuthStore((state) => state.player);
   const createTournament = useTournamentStore((state) => state.createTournament);
+  const joinTournament = useTournamentStore((state) => state.joinTournament);
   const joinByRoomCode = useTournamentStore((state) => state.joinByRoomCode);
+  const fetchPublicTournaments = useTournamentStore((state) => state.fetchPublicTournaments);
+  const publicTournaments = useTournamentStore((state) => state.publicTournaments);
+  const isSearching = useTournamentStore((state) => state.isSearching);
   const isLoading = useTournamentStore((state) => state.isLoading);
   const error = useTournamentStore((state) => state.error);
   const clearError = useTournamentStore((state) => state.clearError);
 
-  const [activeTab, setActiveTab] = useState<"CREATE" | "JOIN">("CREATE");
+  const [activeTab, setActiveTab] = useState<"BROWSE" | "CREATE" | "JOIN">("BROWSE");
   const defaultTitle = player?.playerName ? `${player.playerName}'s Championship` : "Thunder Dome Invitational";
   const [tournamentName, setTournamentName] = useState(defaultTitle);
   const [capacity, setCapacity] = useState(4);
@@ -88,6 +92,12 @@ export function CreateTournamentModal(props: CreateTournamentModalProps = {}) {
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(3);
   const [isPrivate, setIsPrivate] = useState(false);
   const [joinCodeInput, setJoinCodeInput] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchPublicTournaments();
+    }
+  }, [isOpen, fetchPublicTournaments]);
 
   if (!isOpen) return null;
 
@@ -147,32 +157,46 @@ export function CreateTournamentModal(props: CreateTournamentModalProps = {}) {
         </div>
 
         {/* Tab Switcher */}
-        <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-950/80 border border-slate-800/80 font-mono text-xs">
+        <div className="grid grid-cols-3 p-1 rounded-2xl bg-slate-950/80 border border-slate-800/80 font-mono text-xs">
+          <button
+            onClick={() => {
+              clearError();
+              setActiveTab("BROWSE");
+              fetchPublicTournaments();
+            }}
+            className={`py-2 px-3 rounded-xl font-bold transition-all ${
+              activeTab === "BROWSE"
+                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-inner"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Public ({publicTournaments.length})
+          </button>
           <button
             onClick={() => {
               clearError();
               setActiveTab("CREATE");
             }}
-            className={`py-2 px-4 rounded-xl font-bold transition-all ${
+            className={`py-2 px-3 rounded-xl font-bold transition-all ${
               activeTab === "CREATE"
                 ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-inner"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            Create Tournament
+            Host Bracket
           </button>
           <button
             onClick={() => {
               clearError();
               setActiveTab("JOIN");
             }}
-            className={`py-2 px-4 rounded-xl font-bold transition-all ${
+            className={`py-2 px-3 rounded-xl font-bold transition-all ${
               activeTab === "JOIN"
                 ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-inner"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            Join with Code
+            Join by Code
           </button>
         </div>
 
@@ -182,7 +206,94 @@ export function CreateTournamentModal(props: CreateTournamentModalProps = {}) {
           </div>
         )}
 
-        {activeTab === "CREATE" ? (
+        {/* Tab 1: Browse Public Tournaments */}
+        {activeTab === "BROWSE" && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
+                Active Public Tournaments
+              </span>
+              <button
+                type="button"
+                onClick={() => fetchPublicTournaments()}
+                disabled={isSearching}
+                className="flex items-center gap-1.5 text-xs font-mono text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+              >
+                <FaRotate className={isSearching ? "animate-spin" : ""} />
+                <span>{isSearching ? "Searching..." : "Refresh"}</span>
+              </button>
+            </div>
+
+            {publicTournaments.length === 0 ? (
+              <div className="py-8 flex flex-col items-center justify-center text-center gap-3 bg-slate-950/60 rounded-2xl border border-slate-800/80 p-6">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 text-2xl">
+                  <GiTrophyCup />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="font-bold text-sm text-slate-200 font-mono">
+                    No Public Tournaments Staging
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">
+                    Be the first to host one, or join a friend using a private code!
+                  </span>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setActiveTab("CREATE")}
+                  leftIcon={<GiFist />}
+                  className="mt-1 shadow-md"
+                >
+                  Host a Tournament
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5 max-h-[50vh] overflow-y-auto pr-1">
+                {publicTournaments.map((t) => (
+                  <div
+                    key={t.roomId}
+                    className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 hover:border-amber-500/50 transition-all flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                        <GiTrophyCup className="text-lg" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-slate-100 font-mono truncate">
+                            {t.tournamentName}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-mono text-emerald-300 font-bold shrink-0">
+                            {t.currentParticipants}/{t.participantCapacity} FIGHTERS
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-slate-400 font-mono truncate">
+                          Host: {t.hostName} • {t.scoreLimit} KOs • {Math.floor(t.timeLimitSeconds / 60)}m
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={async () => {
+                        await joinTournament(t.roomId);
+                        if (!useTournamentStore.getState().error) {
+                          onClose();
+                        }
+                      }}
+                      disabled={isLoading || t.currentParticipants >= t.participantCapacity}
+                    >
+                      {t.currentParticipants >= t.participantCapacity ? "Full" : "Join"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 2: Create Tournament */}
+        {activeTab === "CREATE" && (
           <div className="flex flex-col gap-5">
             {/* Tournament Title */}
             <div className="flex flex-col gap-1.5">
@@ -343,8 +454,10 @@ export function CreateTournamentModal(props: CreateTournamentModalProps = {}) {
               </Button>
             </div>
           </div>
-        ) : (
-          /* Join with Code Tab */
+        )}
+
+        {/* Tab 3: Join with Code Tab */}
+        {activeTab === "JOIN" && (
           <div className="flex flex-col gap-5 py-4">
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
